@@ -1,29 +1,142 @@
-diff --git a/Backend/src/config.ts b/Backend/src/config.ts
---- a/Backend/src/config.ts
-+++ b/Backend/src/config.ts
-@@
-   APPLE_CLIENT_ID: z.string().min(1),
-   PUBLIC_API_URL: z.string().url(),
-+  WEB_APP_ORIGIN: z.string().url().default("https://workspace.app.squaredgroup.studio"),
-   SMTP_URL: z.string().optional(),
-
-diff --git a/Backend/src/server-foundation.ts b/Backend/src/server-foundation.ts
---- a/Backend/src/server-foundation.ts
-+++ b/Backend/src/server-foundation.ts
-@@
--await app.register(cors, { origin: config.NODE_ENV === "production" ? false : true });
-+const webAppOrigin = new URL(config.WEB_APP_ORIGIN).origin;
-+await app.register(cors, {
-+  origin: config.NODE_ENV === "production" ? [webAppOrigin] : true,
-+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-+  exposedHeaders: ["ETag", "X-Next-Cursor"],
-+  maxAge: 86_400
-+});
-
 diff --git a/Backend/.env.example b/Backend/.env.example
 --- a/Backend/.env.example
 +++ b/Backend/.env.example
-@@
- PUBLIC_API_URL=http://localhost:8080
-+# Frontend Web autorisé à appeler l’API en production (CORS).
+@@ -79 +79,4 @@
+ APP_VERSION=1.0.0
++
++# Origine Web officielle autorisée en production (sans changer PUBLIC_API_URL ni le RP ID natif).
 +WEB_APP_ORIGIN=https://workspace.app.squaredgroup.studio
+diff --git a/Backend/src/config.ts b/Backend/src/config.ts
+--- a/Backend/src/config.ts
++++ b/Backend/src/config.ts
+@@ -14,2 +14,3 @@
+   PUBLIC_API_URL: z.string().url(),
++  WEB_APP_ORIGIN: z.string().url().default("https://workspace.app.squaredgroup.studio"),
+   SMTP_URL: z.string().optional(),
+diff --git a/Backend/src/web-browser-policy.ts b/Backend/src/web-browser-policy.ts
+new file mode 100644
+--- /dev/null
++++ b/Backend/src/web-browser-policy.ts
+@@ -0,0 +1,22 @@
++import type { FastifyCorsOptions } from "@fastify/cors";
++
++export function normalizedWebOrigin(value: string, production: boolean): string {
++  const url = new URL(value);
++  if (url.username || url.password || url.search || url.hash || url.pathname !== "/" || !["https:", "http:"].includes(url.protocol) || (production && url.protocol !== "https:")) {
++    throw new Error("WEB_APP_ORIGIN doit être une origine HTTPS sans chemin, identifiants, paramètres ni fragment.");
++  }
++  return url.origin;
++}
++
++export function browserCorsOptions(mode: string, webOrigin: string): FastifyCorsOptions {
++  const origin = normalizedWebOrigin(webOrigin, mode === "production");
++  return {
++    origin: mode === "production" ? [origin] : true,
++    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
++    allowedHeaders: ["Accept", "Authorization", "Content-Type", "If-Match", "If-None-Match", "X-Workspace-Client", "Cache-Control"],
++    exposedHeaders: ["ETag", "X-Next-Cursor", "Retry-After"],
++    credentials: false,
++    maxAge: 600,
++    strictPreflight: true
++  };
++}
+diff --git a/Backend/src/server-foundation.ts b/Backend/src/server-foundation.ts
+--- a/Backend/src/server-foundation.ts
++++ b/Backend/src/server-foundation.ts
+@@ -1 +1,2 @@
++import { browserCorsOptions, normalizedWebOrigin } from "./web-browser-policy.js";
+ import Fastify from "fastify";
+@@ -67,3 +68,4 @@
+ }) : null;
+-await app.register(cors, { origin: config.NODE_ENV === "production" ? false : true });
++export const webAppOrigin = normalizedWebOrigin(config.WEB_APP_ORIGIN, config.NODE_ENV === "production");
++await app.register(cors, browserCorsOptions(config.NODE_ENV, webAppOrigin));
+ await app.register(jwt, { secret: config.JWT_SECRET, sign: { expiresIn: "15m" } });
+@@ -227,2 +229,3 @@
+ export const webAuthnOrigin = config.WEBAUTHN_ORIGIN ?? new URL(config.PUBLIC_API_URL).origin;
++export const webAuthnOrigins = [...new Set([webAuthnOrigin, webAppOrigin])];
+ export const webAuthnResponseSchema = z.object({ id: z.string().min(1), rawId: z.string().min(1), type: z.literal("public-key"), response: z.record(z.string(), z.unknown()), clientExtensionResults: z.record(z.string(), z.unknown()).optional(), authenticatorAttachment: z.string().optional() }).passthrough();
+@@ -266,3 +269,3 @@
+     expectedChallenge: challenge.challenge,
+-    expectedOrigin: webAuthnOrigin,
++    expectedOrigin: webAuthnOrigins,
+     expectedRPID: webAuthnRPID,
+diff --git a/Backend/src/server-system-auth-routes.ts b/Backend/src/server-system-auth-routes.ts
+--- a/Backend/src/server-system-auth-routes.ts
++++ b/Backend/src/server-system-auth-routes.ts
+@@ -133,2 +133,4 @@
+   webAuthnOrigin,
++  webAuthnOrigins,
++  webAppOrigin,
+   webAuthnRPID,
+@@ -187,2 +189,19 @@
+ });
++// Keep the native RP ID. Supporting browsers verify this exact related Web origin.
++app.get("/.well-known/webauthn", async (_request, reply) => {
++  return reply.header("Cache-Control", "public, max-age=300").send({ origins: [webAppOrigin] });
++});
++
++// Existing e-mail links on the API domain remain usable without changing API routes.
++for (const path of ["/reinitialisation", "/verification-email"]) {
++  app.get(path, async (request, reply) => {
++    const query = z.object({ email: z.string().max(320).optional(), token: z.string().max(200).optional() }).parse(request.query);
++    const params = new URLSearchParams();
++    if (query.email) params.set("email", query.email);
++    if (query.token) params.set("token", query.token);
++    return reply.header("Cache-Control", "no-store").header("Referrer-Policy", "no-referrer")
++      .redirect(`${webAppOrigin}/#${path}?${params.toString()}`);
++  });
++}
++
+ app.get("/activation", async (request, reply) => {
+@@ -549,3 +568,3 @@
+     expectedChallenge: challenge.challenge,
+-    expectedOrigin: webAuthnOrigin,
++    expectedOrigin: webAuthnOrigins,
+     expectedRPID: webAuthnRPID,
+diff --git a/Backend/src/mail.ts b/Backend/src/mail.ts
+--- a/Backend/src/mail.ts
++++ b/Backend/src/mail.ts
+@@ -144,3 +144,3 @@
+ export function buildPasswordResetMessage(email: string, token: string, style?: Partial<WorkspaceMailBrandStyle>): WorkspaceMailMessage & { link: string } {
+-  const link = `${config.PUBLIC_API_URL.replace(/\/$/, "")}/reinitialisation?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
++  const link = `${config.WEB_APP_ORIGIN.replace(/\/$/, "")}/#/reinitialisation?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+   const subject = "Réinitialisation de votre accès · Squared Workspace";
+@@ -183,3 +183,3 @@
+ export function buildEmailVerificationMessage(email: string, token: string, style?: Partial<WorkspaceMailBrandStyle>): WorkspaceMailMessage & { link: string } {
+-  const link = `${config.PUBLIC_API_URL.replace(/\/$/, "")}/verification-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
++  const link = `${config.WEB_APP_ORIGIN.replace(/\/$/, "")}/#/verification-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+   const subject = "Confirmez votre adresse e-mail · Squared Workspace";
+@@ -292,2 +292,3 @@
+   const safeEmail = escapeHTML(email.toLowerCase());
++  const webActivationURL = escapeHTML(`${config.WEB_APP_ORIGIN.replace(/\/$/, "")}/#/activation?email=${encodeURIComponent(email.toLowerCase())}&token=${encodeURIComponent(activationCode)}`);
+   const assetBaseURL = escapeHTML(appURL());
+@@ -297,3 +298,3 @@
+     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+-    <meta name="color-scheme" content="dark"><title>Activation · Squared Workspace</title>
++    <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark"><title>Activation · Squared Workspace</title>
+     <link rel="preload" href="${assetBaseURL}/mail-assets/fonts/space-grotesk-regular.woff2" as="font" type="font/woff2" crossorigin>
+@@ -309,3 +310,4 @@
+       <div style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:34px;height:34px;background:#162313;border-radius:10px"><img src="${assetBaseURL}/mail-assets/iconly/grid.svg" width="18" height="18" alt=""></span><span style="font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#7BE84E;font-weight:600">Squared Workspace</span></div>
+-      <h1 style="font-size:28px;line-height:1.2;margin:18px 0 10px;font-weight:600">Finalisez votre activation dans l’app.</h1>
++      <h1 style="font-size:28px;line-height:1.2;margin:18px 0 10px;font-weight:600">Activez votre espace Workspace.</h1>
++      <a href="${webActivationURL}" rel="noreferrer" style="display:block;padding:14px 18px;margin:18px 0;background:#7BE84E;color:#081006;text-align:center;border-radius:12px;text-decoration:none;font-weight:600">Continuer dans le navigateur</a>
+       <p style="color:#A7A7AA;line-height:1.6;margin:0 0 22px">Si Squared Workspace est installé, ce lien ouvre directement l’écran d’activation. Sinon, ouvrez l’app et saisissez les informations ci-dessous.</p>
+diff --git a/Backend/tests/web-browser-policy.test.mjs b/Backend/tests/web-browser-policy.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/Backend/tests/web-browser-policy.test.mjs
+@@ -0,0 +1,13 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import Fastify from 'fastify';
++import cors from '@fastify/cors';
++import {browserCorsOptions,normalizedWebOrigin} from '../dist/src/web-browser-policy.js';
++const origin='https://workspace.app.squaredgroup.studio';
++async function server(){const app=Fastify();await app.register(cors,browserCorsOptions('production',origin));app.get('/health',()=>({ok:true}));app.get('/private',(_req,reply)=>reply.code(401).send({error:'unauthorized'}));return app;}
++test('official Web origin accepts login preflight',async()=>{const app=await server();try{const r=await app.inject({method:'OPTIONS',url:'/v1/auth/password',headers:{origin,'access-control-request-method':'POST','access-control-request-headers':'content-type,x-workspace-client'}});assert.equal(r.statusCode,204);assert.equal(r.headers['access-control-allow-origin'],origin);assert.match(r.headers['access-control-allow-headers'],/X-Workspace-Client/i);}finally{await app.close();}});
++test('official origin accepts PATCH, DELETE and revision headers',async()=>{const app=await server();try{for(const method of ['PATCH','DELETE']){const r=await app.inject({method:'OPTIONS',url:'/v1/projects',headers:{origin,'access-control-request-method':method,'access-control-request-headers':'authorization,if-match'}});assert.equal(r.statusCode,204);assert.match(r.headers['access-control-allow-methods'],new RegExp(method));assert.match(r.headers['access-control-allow-headers'],/If-Match/i);}}finally{await app.close();}});
++test('untrusted and deceptive origins never receive CORS approval',async()=>{const app=await server();try{for(const bad of ['https://other.invalid',origin+'.evil.invalid','null']){const r=await app.inject({method:'OPTIONS',url:'/v1/auth/password',headers:{origin:bad,'access-control-request-method':'POST'}});assert.equal(r.headers['access-control-allow-origin'],undefined);}}finally{await app.close();}});
++test('native requests without Origin still work',async()=>{const app=await server();try{const r=await app.inject({method:'GET',url:'/health'});assert.equal(r.statusCode,200);}finally{await app.close();}});
++test('CORS never grants authenticated access',async()=>{const app=await server();try{const r=await app.inject({method:'GET',url:'/private',headers:{origin}});assert.equal(r.statusCode,401);assert.equal(r.headers['access-control-allow-origin'],origin);}finally{await app.close();}});
++test('unsafe production origin configuration is rejected',()=>{for(const bad of ['http://example.com','https://user:pass@example.com','https://example.com/path','https://example.com/?x=y'])assert.throws(()=>normalizedWebOrigin(bad,true));assert.equal(normalizedWebOrigin(origin+'/',true),origin);});
