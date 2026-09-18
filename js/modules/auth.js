@@ -1,63 +1,154 @@
-import { h, button, field, input, toast, errorMessage, icon } from "../ui.js";
-import { passwordLogin, passkeyOptions, verifyPasskey, verifyRecovery, activateAccount, requestPasswordReset, confirmPasswordReset, confirmEmailVerification } from "../api.js";
+import { h, button, field, input, toast, errorMessage } from "../ui.js";
+import { passwordLogin, passkeyOptions, verifyPasskey, verifyRecovery, activateAccount, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, probeConnection } from "../api.js";
 import { getPasskey, webauthnSupported } from "../webauthn.js";
+import { authContext, clearAuthContext } from "../auth-flow.js";
 
-export function renderAuth(onAuthenticated){
-  const app=document.querySelector("#app"); app.replaceChildren();
-  const visual=h("section",{class:"auth-visual"},h("div",{class:"auth-grid"}),h("img",{class:"auth-mark",src:"/assets/squaredgroup-logo.png",alt:"Squared Group"}),h("div",{class:"auth-visual-copy"},h("div",{class:"auth-kicker",text:"Squared Executive Workspace"}),h("h1",{text:"Tout le groupe. Un seul système."}),h("p",{text:"Projets, finance, clients, opérations, contenus et décisions dans un espace conçu pour garder Squared Group aligné, traçable et rapide."})));
-  const panel=h("section",{class:"auth-panel"});
-  app.append(h("main",{class:"auth-screen"},visual,panel));
-  const params=new URLSearchParams(location.search);
-  const action=params.get("auth") || (location.pathname==="/reinitialisation"?"reset":location.pathname==="/verification-email"?"verify":"");
-  if(action==="activation") showActivation(panel,onAuthenticated);
-  else if(action==="reset") showResetConfirm(panel,params.get("email")||"",onAuthenticated,params.get("token")||"");
-  else if(action==="verify") showEmailVerification(panel,onAuthenticated,params.get("email")||"",params.get("token")||"");
-  else showLogin(panel,onAuthenticated);
+function authError(error) {
+  if (error?.name === "NotAllowedError") return "Vérification annulée ou délai dépassé. Réessayez ou utilisez votre code de récupération.";
+  if (error?.name === "SecurityError") return "La passkey n’est pas disponible sur cette adresse Web. Utilisez votre mot de passe et, si nécessaire, un code de récupération. Le serveur doit autoriser ce nouveau domaine.";
+  return errorMessage(error);
 }
-
-function showLogin(panel,onAuthenticated){
-  const status=h("div",{class:"auth-status"});
-  const email=input("",{type:"email",autocomplete:"email",placeholder:"vous@squaredgroup.studio"});
-  const password=input("",{type:"password",autocomplete:"current-password",placeholder:"••••••••••"});
-  const form=h("form",{class:"form",onSubmit:async e=>{e.preventDefault();status.textContent="";submit.disabled=true;try{const result=await passwordLogin(email.value.trim(),password.value);if(result?.mfaRequired){showMFA(panel,result,email.value,onAuthenticated);return;}await onAuthenticated();}catch(error){status.textContent=errorMessage(error)}finally{submit.disabled=false}}},field("Adresse e-mail",email),field("Mot de passe",password));
-  const submit=button("Se connecter",{kind:"primary",iconName:"send",type:"submit"}); submit.style.width="100%"; form.append(submit);
-  if(webauthnSupported()) form.append(button("Utiliser une passkey",{iconName:"key",onClick:async()=>{status.textContent="";try{const challenge=await passkeyOptions(email.value.trim());const response=await getPasskey(challenge.publicKey);await verifyPasskey(challenge.challengeId,response);await onAuthenticated();}catch(error){status.textContent=errorMessage(error)}}}));
-  panel.replaceChildren(h("div",{class:"auth-box"},h("h2",{text:"Connexion"}),h("p",{text:"Accédez à votre espace Squared Workspace sécurisé."}),form,status,h("div",{class:"auth-secondary"},buttonLink("Mot de passe oublié",()=>showResetRequest(panel,onAuthenticated)),buttonLink("Activer un accès",()=>showActivation(panel,onAuthenticated)))));
+function control(value, options = {}) {
+  const element = input(value, { required: true, ...options });
+  if (options.minLength) element.minLength = options.minLength;
+  element.maxLength = options.maxLength || 200;
+  return element;
 }
-
-function showMFA(panel,challenge,email,onAuthenticated){
-  const status=h("div",{class:"auth-status"});
-  const recovery=input("",{placeholder:"XXXX-XXXX-XXXX",autocomplete:"one-time-code"});
-  const box=h("div",{class:"auth-box"},h("h2",{text:"Vérification renforcée"}),h("p",{text:`Une seconde vérification est requise pour ${email}.`}),status);
-  if(webauthnSupported()) box.append(button("Valider avec ma passkey",{kind:"primary",iconName:"key",onClick:async()=>{try{const response=await getPasskey(challenge.publicKey);await verifyPasskey(challenge.challengeId,response);await onAuthenticated();}catch(error){status.textContent=errorMessage(error)}}}));
-  box.append(h("div",{style:{height:"14px"}}),field("Code de récupération",recovery),h("div",{style:{height:"8px"}}),button("Utiliser ce code",{onClick:async()=>{try{await verifyRecovery(challenge.challengeId,recovery.value);await onAuthenticated();}catch(error){status.textContent=errorMessage(error)}}}),h("div",{class:"auth-secondary"},buttonLink("Retour",()=>showLogin(panel,onAuthenticated))));
-  panel.replaceChildren(box);
+function newPassword() {
+  const element = control("", { name: "new-password", type: "password", autocomplete: "new-password", minLength: 10 });
+  element.addEventListener("input", () => {
+    element.setCustomValidity(element.value && (!/[a-z]/.test(element.value) || !/[A-Z]/.test(element.value) || !/\d/.test(element.value)) ? "Ajoutez une majuscule, une minuscule et un chiffre." : "");
+  });
+  return element;
 }
-
-function showActivation(panel,onAuthenticated){
-  const params=new URLSearchParams(location.search); const status=h("div",{class:"auth-status"});
-  const first=input("",{autocomplete:"given-name"}),last=input("",{autocomplete:"family-name"}),email=input(params.get("email")||"",{type:"email",autocomplete:"email"}),token=input(params.get("token")||"",{placeholder:"Code d’invitation"}),password=input("",{type:"password",autocomplete:"new-password"});
-  const terms=h("input",{type:"checkbox",required:true});
-  const form=h("form",{class:"form",onSubmit:async e=>{e.preventDefault();status.textContent="";try{await activateAccount({firstName:first.value,lastName:last.value,email:email.value,password:password.value,token:token.value,acceptsTerms:true,termsVersion:"2026-09"});await onAuthenticated();}catch(error){status.textContent=errorMessage(error)}}},h("div",{class:"form-row"},field("Prénom",first),field("Nom",last)),field("Adresse e-mail",email),field("Code d’invitation",token),field("Mot de passe",password),h("label",{style:{display:"flex",gap:"9px",alignItems:"center",fontSize:"10px",color:"var(--sq-muted)"}},terms,"J’accepte les conditions d’utilisation de Squared Workspace."),button("Activer mon espace",{kind:"primary",type:"submit"}));
-  panel.replaceChildren(h("div",{class:"auth-box"},h("h2",{text:"Activer votre accès"}),h("p",{text:"Finalisez l’invitation reçue par e-mail pour créer votre espace sécurisé."}),form,status,h("div",{class:"auth-secondary"},buttonLink("Retour à la connexion",()=>showLogin(panel,onAuthenticated)))));
+const passwordHint = () => h("p", { class: "muted", text: "10 caractères minimum, avec une majuscule, une minuscule et un chiffre." });
+const link = (text, onClick) => h("button", { class: "link-button", type: "button", text, onClick });
+function show(panel, title, description, content, footer = null, notice = "") {
+  const status = h("div", { class: "auth-status", role: "alert", "aria-live": "polite", text: notice });
+  panel.replaceChildren(h("div", { class: "auth-box" }, h("h2", { text: title }), h("p", { text: description }), content, status, footer));
+  return status;
 }
-
-function showResetRequest(panel,onAuthenticated){
-  const email=input("",{type:"email",autocomplete:"email"}); const status=h("div",{class:"auth-status"});
-  const send=async()=>{try{await requestPasswordReset(email.value);toast("Si ce compte existe, un lien de réinitialisation vient d’être envoyé.");showResetConfirm(panel,email.value,onAuthenticated);}catch(error){status.textContent=errorMessage(error)}};
-  panel.replaceChildren(h("div",{class:"auth-box"},h("h2",{text:"Réinitialiser le mot de passe"}),h("p",{text:"Indiquez l’adresse liée à votre compte."}),h("div",{class:"form"},field("Adresse e-mail",email),button("Envoyer le lien",{kind:"primary",onClick:send})),status,h("div",{class:"auth-secondary"},buttonLink("Retour",()=>showLogin(panel,onAuthenticated)))));
+function busyForm(form, status, submitAction) {
+  let busy = false;
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (busy) return;
+    busy = true; status.textContent = "";
+    const buttons = [...form.querySelectorAll("button")];
+    const old = buttons.map(b => b.disabled);
+    buttons.forEach(b => { b.disabled = true; }); form.setAttribute("aria-busy", "true");
+    try { await submitAction(); } catch (error) { status.textContent = authError(error); }
+    finally { buttons.forEach((b, i) => { b.disabled = old[i]; }); form.removeAttribute("aria-busy"); busy = false; }
+  });
 }
-function showResetConfirm(panel,defaultEmail,onAuthenticated,defaultToken=""){
-  const email=input(defaultEmail||"",{type:"email"}),token=input(defaultToken||"",{placeholder:"Jeton reçu"}),password=input("",{type:"password",autocomplete:"new-password"}),status=h("div",{class:"auth-status"});
-  panel.replaceChildren(h("div",{class:"auth-box"},h("h2",{text:"Nouveau mot de passe"}),h("p",{text:"Collez le jeton reçu et choisissez un nouveau mot de passe."}),h("div",{class:"form"},field("Adresse e-mail",email),field("Jeton",token),field("Nouveau mot de passe",password),button("Mettre à jour",{kind:"primary",onClick:async()=>{try{await confirmPasswordReset(email.value,token.value,password.value);toast("Mot de passe mis à jour.");showLogin(panel,onAuthenticated);}catch(error){status.textContent=errorMessage(error)}}})),status));
+function back(panel, onAuthenticated) {
+  return h("div", { class: "auth-secondary" }, link("Retour à la connexion", () => { clearAuthContext(); showLogin(panel, onAuthenticated); }));
 }
-function showEmailVerification(panel,onAuthenticated,emailValue,tokenValue){
-  const status=h("div",{class:"auth-status"});
-  const email=input(emailValue||"",{type:"email",autocomplete:"email"});
-  const token=input(tokenValue||"",{placeholder:"Jeton de vérification"});
-  const verify=async()=>{status.textContent="";try{await confirmEmailVerification(email.value.trim(),token.value.trim());toast("Adresse e-mail vérifiée.");history.replaceState({},"","/");showLogin(panel,onAuthenticated)}catch(error){status.textContent=errorMessage(error)}};
-  panel.replaceChildren(h("div",{class:"auth-box"},h("h2",{text:"Vérifier votre adresse"}),h("p",{text:"Confirmez que cette adresse e-mail vous appartient afin de sécuriser votre profil Workspace."}),h("div",{class:"form"},field("Adresse e-mail",email),field("Jeton",token),button("Vérifier mon adresse",{kind:"primary",iconName:"check",onClick:verify})),status,h("div",{class:"auth-secondary"},buttonLink("Retour à la connexion",()=>{history.replaceState({},"","/");showLogin(panel,onAuthenticated)}))));
-  if(emailValue&&tokenValue) setTimeout(verify,30);
+export function renderAuth(onAuthenticated, { message = "", restoring = false } = {}) {
+  const app = document.querySelector("#app");
+  const panel = h("section", { class: "auth-panel" });
+  const visual = h("section", { class: "auth-visual" }, h("div", { class: "auth-grid" }),
+    h("img", { class: "auth-mark", src: "/assets/squaredgroup-logo.png", alt: "Squared Group" }),
+    h("div", { class: "auth-visual-copy" }, h("div", { class: "auth-kicker", text: "Squared Executive Workspace" }),
+      h("h1", { text: "Tout le groupe. Un seul système." }),
+      h("p", { text: "Retrouvez vos projets, vos échanges et les outils de votre espace Squared Workspace." })));
+  app.replaceChildren(h("main", { class: "auth-screen" }, visual, panel));
+  if (authContext.action === "activation") showActivation(panel, onAuthenticated);
+  else if (authContext.action === "reset") showResetConfirm(panel, onAuthenticated);
+  else if (authContext.action === "verify") showEmailVerification(panel, onAuthenticated);
+  else showLogin(panel, onAuthenticated, message, restoring);
 }
-
-function buttonLink(label,onClick){ return h("button",{class:"link-button",type:"button",onClick,text:label}); }
+function showLogin(panel, onAuthenticated, message = "", restoring = false) {
+  const email = control("", { name: "email", type: "email", autocomplete: "email", placeholder: "vous@squaredgroup.studio" });
+  const password = control("", { name: "password", type: "password", autocomplete: "current-password" });
+  const submit = button(restoring ? "Restauration de la session…" : "Se connecter", { kind: "primary", type: "submit", disabled: restoring });
+  const form = h("form", { class: "form" }, field("Adresse e-mail", email), field("Mot de passe", password), submit);
+  const footer = h("div", { class: "auth-secondary" }, link("Mot de passe oublié", () => showResetRequest(panel, onAuthenticated)), link("Activer un accès", () => showActivation(panel, onAuthenticated)));
+  const status = show(panel, "Connexion", "Accédez à votre espace Squared Workspace sécurisé.", form, footer, message);
+  if (restoring) { [...panel.querySelectorAll("input,button")].forEach(e => { e.disabled = true; }); return; }
+  busyForm(form, status, async () => {
+    const result = await passwordLogin(email.value.trim(), password.value);
+    password.value = "";
+    if (result?.mfaRequired) return showMFA(panel, result, email.value.trim(), onAuthenticated);
+    clearAuthContext(); await onAuthenticated();
+  });
+  if (webauthnSupported()) {
+    const passkey = button("Utiliser une passkey", { iconName: "key", onClick: async () => {
+      status.textContent = ""; passkey.disabled = true; submit.disabled = true;
+      try {
+        if (!email.reportValidity()) return;
+        const challenge = await passkeyOptions(email.value.trim());
+        await verifyPasskey(challenge.challengeId, await getPasskey(challenge.publicKey));
+        clearAuthContext(); await onAuthenticated();
+      } catch (error) { status.textContent = authError(error); }
+      finally { passkey.disabled = false; submit.disabled = false; }
+    } });
+    form.append(passkey);
+  }
+  const diagnostic = link("Vérifier la connexion au serveur", async () => {
+    diagnostic.disabled = true; status.textContent = "Vérification de la connexion…";
+    try { status.textContent = await probeConnection(); } catch (error) { status.textContent = authError(error); }
+    finally { diagnostic.disabled = false; }
+  });
+  panel.querySelector(".auth-box").append(h("div", { class: "auth-secondary" }, diagnostic));
+}
+function showMFA(panel, challenge, email, onAuthenticated) {
+  const code = control("", { name: "recovery-code", autocomplete: "one-time-code", placeholder: "Code de récupération", minLength: 8, maxLength: 40 });
+  const form = h("form", { class: "form" }, field("Code de récupération", code), button("Valider le code", { kind: "primary", type: "submit" }));
+  const status = show(panel, "Vérification renforcée", `Une seconde vérification est requise pour ${email}.`, form, back(panel, onAuthenticated));
+  busyForm(form, status, async () => { await verifyRecovery(challenge.challengeId, code.value.trim()); code.value = ""; clearAuthContext(); await onAuthenticated(); });
+  if (webauthnSupported()) {
+    const passkey = button("Valider avec ma passkey", { iconName: "key", onClick: async () => {
+      passkey.disabled = true; status.textContent = "";
+      try { await verifyPasskey(challenge.challengeId, await getPasskey(challenge.publicKey)); clearAuthContext(); await onAuthenticated(); }
+      catch (error) { status.textContent = authError(error); }
+      finally { passkey.disabled = false; }
+    } });
+    form.before(passkey, h("p", { class: "muted", text: "Ou utilisez l’un des codes de récupération remis à l’activation de votre sécurité renforcée." }));
+  }
+}
+function showActivation(panel, onAuthenticated) {
+  const first = control("", { name: "first-name", autocomplete: "given-name", minLength: 2, maxLength: 80 });
+  const last = control("", { name: "last-name", autocomplete: "family-name", minLength: 2, maxLength: 80 });
+  const email = control(authContext.email, { name: "email", type: "email", autocomplete: "email" });
+  const token = control(authContext.token, { name: "invitation", autocomplete: "off", minLength: 12 });
+  const password = newPassword();
+  const terms = h("input", { type: "checkbox", required: true, name: "accepts-terms" });
+  const form = h("form", { class: "form" }, h("div", { class: "form-row" }, field("Prénom", first), field("Nom", last)), field("Adresse e-mail", email), field("Code d’invitation", token), field("Mot de passe", password), passwordHint(),
+    h("label", { class: "auth-terms" }, terms, "J’accepte les conditions d’utilisation de Squared Workspace."), button("Activer mon espace", { kind: "primary", type: "submit" }));
+  const status = show(panel, "Activer votre accès", "Finalisez l’invitation reçue par e-mail.", form, back(panel, onAuthenticated));
+  busyForm(form, status, async () => {
+    await activateAccount({ firstName: first.value.trim(), lastName: last.value.trim(), email: email.value.trim(), password: password.value, token: token.value.trim(), acceptsTerms: terms.checked, termsVersion: "2026-09" });
+    clearAuthContext(); password.value = ""; token.value = ""; await onAuthenticated();
+  });
+}
+function showResetRequest(panel, onAuthenticated) {
+  const email = control("", { name: "email", type: "email", autocomplete: "email" });
+  const form = h("form", { class: "form" }, field("Adresse e-mail", email), button("Envoyer le lien", { kind: "primary", type: "submit" }));
+  const status = show(panel, "Mot de passe oublié", "Indiquez l’adresse liée à votre compte.", form, back(panel, onAuthenticated));
+  busyForm(form, status, async () => {
+    await requestPasswordReset(email.value.trim()); authContext.email = email.value.trim();
+    show(panel, "Consultez votre messagerie", "Si ce compte existe, un lien de réinitialisation a été envoyé. Pensez à vérifier les courriers indésirables.", button("Saisir un code reçu", { onClick: () => showResetConfirm(panel, onAuthenticated) }), back(panel, onAuthenticated));
+  });
+}
+function showResetConfirm(panel, onAuthenticated) {
+  const email = control(authContext.email, { name: "email", type: "email", autocomplete: "email" });
+  const token = control(authContext.token, { name: "reset-token", minLength: 20 });
+  const password = newPassword();
+  const form = h("form", { class: "form" }, field("Adresse e-mail", email), field("Code reçu", token), field("Nouveau mot de passe", password), passwordHint(), button("Mettre à jour", { kind: "primary", type: "submit" }));
+  const status = show(panel, "Nouveau mot de passe", "Utilisez votre lien de réinitialisation ou le code reçu.", form, back(panel, onAuthenticated));
+  busyForm(form, status, async () => {
+    await confirmPasswordReset(email.value.trim(), token.value.trim(), password.value); clearAuthContext(); password.value = ""; token.value = "";
+    toast("Mot de passe mis à jour."); showLogin(panel, onAuthenticated);
+  });
+}
+function showEmailVerification(panel, onAuthenticated) {
+  const email = control(authContext.email, { name: "email", type: "email", autocomplete: "email" });
+  const token = control(authContext.token, { name: "verification-token", minLength: 20 });
+  const form = h("form", { class: "form" }, field("Adresse e-mail", email), field("Code de vérification", token), button("Vérifier mon adresse", { kind: "primary", type: "submit" }));
+  const status = show(panel, "Vérifier votre adresse", "Confirmez cette adresse pour sécuriser votre compte.", form, back(panel, onAuthenticated));
+  busyForm(form, status, async () => {
+    await confirmEmailVerification(email.value.trim(), token.value.trim()); clearAuthContext(); token.value = "";
+    toast("Adresse e-mail vérifiée."); showLogin(panel, onAuthenticated);
+  });
+}

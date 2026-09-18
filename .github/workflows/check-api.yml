@@ -1,0 +1,15 @@
+name: Check production API browser access
+on:
+  push:
+    branches: [main, fix/browser-auth]
+    paths: ['scripts/probe-api.py', '.github/workflows/check-api.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-only-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify health, CORS and passkey metadata without credentials
+        run: python3 scripts/probe-api.py

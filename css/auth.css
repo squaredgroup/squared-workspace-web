@@ -1,0 +1,12 @@
+
+.auth-terms{display:flex;gap:10px;align-items:flex-start;font-size:11px;line-height:1.6;color:var(--sq-muted)}
+.auth-terms input{flex:0 0 auto;width:16px;height:16px;accent-color:var(--sq-accent)}
+.auth-status{line-height:1.6;overflow-wrap:anywhere}.auth-status:empty{display:none}
+button:disabled{cursor:wait;opacity:.6;transform:none!important}
+.top-actions button[aria-label="Déconnexion"]{background:rgba(255,3,62,.1);border-color:rgba(255,3,62,.3);color:#ff4d70}
+.top-actions button[aria-label="Déconnexion"] img{filter:invert(38%) sepia(90%) saturate(1872%) hue-rotate(327deg) brightness(108%)}
+
+.sq-boot{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--sq-bg);color:var(--sq-text)}
+.sq-boot-card{max-width:560px;padding:28px;border:1px solid var(--sq-border);border-radius:18px;background:var(--sq-surface)}
+.sq-boot-card h1{font-size:24px;letter-spacing:-.04em}.sq-boot-card p{color:var(--sq-muted);font-size:13px;line-height:1.6}
+.sq-boot-card button{border:0;border-radius:11px;padding:12px 16px;background:var(--sq-accent);color:#081006;font-weight:700;cursor:pointer}

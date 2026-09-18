@@ -1,34 +1,46 @@
 name: Deploy Squared Workspace Web
-
 on:
   push:
-    branches: [main]
+    branches: [main, fix/browser-auth]
   workflow_dispatch:
-
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages
+  group: workspace-web-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  deploy:
+  validate:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate modules and static resources
+        run: node --experimental-vm-modules scripts/validate.mjs
+      - name: Test session handling
+        run: node --experimental-vm-modules --test tests/session.test.mjs
+      - name: Install browser test tools
+        run: |
+          python3 -m pip install --disable-pip-version-check playwright==1.57.0
+          python3 -m playwright install --with-deps chromium
+      - name: Test browser flows with synthetic API responses
+        run: python3 tests/browser_smoke.py
+      - name: Prepare the static application only
+        run: node scripts/stage.mjs
+      - uses: actions/upload-pages-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: _site
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload static site
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: .
-      - name: Deploy
+      - uses: actions/configure-pages@v5
+      - name: Deploy validated application
         id: deployment
         uses: actions/deploy-pages@v4

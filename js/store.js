@@ -1,8 +1,12 @@
+import { storage } from "./storage.js";
+const preferences=storage("local");
+const tab=storage("session");
 const listeners = new Set();
 const initialRoute = () => {
   const raw = location.hash.replace(/^#\/?/, "");
   const [section = "dashboard", subpage = ""] = raw.split("/");
-  return { section, subpage: decodeURIComponent(subpage || "") };
+  let decoded=""; try { decoded=decodeURIComponent(subpage || ""); } catch { /* malformed URL */ }
+  return { section: section || "dashboard", subpage: decoded };
 };
 
 export const state = {
@@ -13,7 +17,7 @@ export const state = {
   workspaceEtag: null,
   domainCatalog: null,
   route: initialRoute(),
-  openGroup: sessionStorage.getItem("sq-open-group") || "Général",
+  openGroup: tab.get("sq-open-group") || "Général",
   sidebarOpen: false,
   commandOpen: false,
   notificationsOpen: false,
@@ -22,7 +26,7 @@ export const state = {
   lastSyncAt: null,
   realtime: null,
   realtimeTicket: null,
-  appearance: JSON.parse(localStorage.getItem("sq-web-appearance") || "{}")
+  appearance: preferences.json("sq-web-appearance")
 };
 
 export function subscribe(listener){ listeners.add(listener); return () => listeners.delete(listener); }
@@ -35,12 +39,12 @@ export function setRoute(section,subpage=""){
   if(location.hash!==encoded) history.pushState(null,"",encoded);
   notify();
 }
-export function setOpenGroup(group){ state.openGroup=group; sessionStorage.setItem("sq-open-group",group); notify(); }
-export function setAppearance(patch){ state.appearance={...state.appearance,...patch}; localStorage.setItem("sq-web-appearance",JSON.stringify(state.appearance)); applyAppearance(); notify(); }
+export function setOpenGroup(group){ state.openGroup=group; tab.set("sq-open-group",group); notify(); }
+export function setAppearance(patch){ state.appearance={...state.appearance,...patch}; preferences.set("sq-web-appearance",JSON.stringify(state.appearance)); applyAppearance(); notify(); }
 export function applyAppearance(){
-  const mode=state.appearance.mode||"dark";
+  const mode=state.appearance.mode==="light"?"light":"dark";
   document.documentElement.dataset.theme=mode;
-  if(state.appearance.accent){
+  if(/^#[0-9a-f]{6}$/i.test(state.appearance.accent||"")){
     document.documentElement.style.setProperty("--sq-accent",state.appearance.accent);
   }
 }
