@@ -42,7 +42,7 @@ export function textarea(value="",opts={}){ return h("textarea",{name:opts.name|
 export function select(value,options=[],name=""){ const el=h("select",{name}); for(const option of options){ const v=typeof option==="string"?option:option.value; const label=typeof option==="string"?pretty(option):option.label; el.append(h("option",{value:v,selected:v===value,text:label})); } return el; }
 export function card(title,subtitle,content,{accent=false,iconName}={}){ return h("section",{class:`card ${accent?"accent":""}`},h("div",{class:"card-head"},h("div",{},h("div",{class:"card-title",text:title}),subtitle?h("div",{class:"card-subtitle",text:subtitle}):null),iconName?icon(iconName,18):null),content); }
 export function emptyState(title,copy,iconName="folder"){ return h("div",{class:"empty"},h("div",{},icon(iconName,32),h("strong",{text:title}),h("p",{text:copy}))); }
-export function skeletonPage(){ return h("div",{class:"grid two"},...Array.from({length:6},()=>h("div",{class:"card"},h("div",{class:"skeleton",style:{height:"18px",width:"42%"}}),h("div",{class:"skeleton",style:{height:"88px",marginTop:"18px"}}))); }
+export function skeletonPage(){ return h("div",{class:"grid two"},...Array.from({length:6},()=>h("div",{class:"card"},h("div",{class:"skeleton",style:{height:"18px",width:"42%"}}),h("div",{class:"skeleton",style:{height:"88px",marginTop:"18px"}})))); }
 
 export function modal({title,content,actions=[],wide=false,onClose}){
   const overlay=h("div",{class:"overlay"}); const close=()=>{overlay.remove(); onClose?.();};
