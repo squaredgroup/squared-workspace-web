@@ -5,7 +5,7 @@ function b64urlToBytes(value){
 }
 function bytesToB64url(value){
   if(value == null) return null;
-  const bytes = value instanceof ArrayBuffer ? new Uint8Array(value) : new Uint8Array(value.buffer || value);
+  const bytes = value instanceof ArrayBuffer ? new Uint8Array(value) : (ArrayBuffer.isView(value) ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength) : new Uint8Array(value));
   let raw=""; for(const byte of bytes) raw+=String.fromCharCode(byte);
   return btoa(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
 }

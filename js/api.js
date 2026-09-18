@@ -1,77 +1,7 @@
 import { state, setState } from "./store.js";
-import { apiURL } from "./config.js";
-
-const DEVICE = () => ({ name: navigator.userAgentData?.platform ? `Web · ${navigator.userAgentData.platform}` : "Navigateur Web", platform: "Web" });
-let refreshPromise = null;
-const REFRESH_TOKEN_KEY = "sq-workspace-web-refresh";
-
-export class APIError extends Error {
-  constructor(status, payload) {
-    super(payload?.message || payload?.error || `HTTP ${status}`);
-    this.status = status;
-    this.payload = payload || {};
-    this.code = this.payload.error;
-  }
-}
-
-function baseHeaders(extra = {}) { return { Accept: "application/json", "X-Workspace-Client": "web", ...extra }; }
-async function parseResponse(response) {
-  if (response.status === 204 || response.status === 304) return null;
-  const type = response.headers.get("content-type") || "";
-  if (type.includes("application/json")) return response.json();
-  if (type.startsWith("text/")) return response.text();
-  return response.blob();
-}
-function captureRevision(response) {
-  const etag = response.headers.get("etag");
-  if (etag) state.workspaceEtag = etag;
-}
-
-export async function request(path, options = {}) {
-  const original = {
-    method: options.method || "GET",
-    body: options.body,
-    rawBody: options.rawBody,
-    contentType: options.contentType,
-    auth: options.auth !== false,
-    retry: options.retry !== false,
-    headers: { ...(options.headers || {}) }
-  };
-  const h = baseHeaders(original.headers);
-  if (original.auth && state.accessToken) h.Authorization = `Bearer ${state.accessToken}`;
-  let payloadBody;
-  if (original.body !== undefined) {
-    h["Content-Type"] = "application/json";
-    payloadBody = JSON.stringify(original.body);
-  } else if (original.rawBody !== undefined) {
-    payloadBody = original.rawBody;
-    if (original.contentType) h["Content-Type"] = original.contentType;
-  }
-  const response = await fetch(apiURL(path), { method: original.method, headers: h, body: payloadBody, credentials: "omit", cache: "no-store", mode: "cors" });
-  captureRevision(response);
-  if (response.status === 401 && original.auth && original.retry) {
-    try {
-      await refreshSession();
-      return request(path, { ...original, retry: false });
-    } catch {
-      clearSession();
-    }
-  }
-  const payload = await parseResponse(response).catch(() => null);
-  if (!response.ok && response.status !== 304) throw new APIError(response.status, payload);
-  return { data: payload, response };
-}
-
-export function setSession(envelope) {
-  if (envelope?.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, envelope.refreshToken);
-  setState({ accessToken: envelope.accessToken || null, sessionId: envelope.sessionId || null, user: envelope.user || state.user, lastSyncAt: new Date() });
-  return envelope;
-}
-export function clearSession() {
-  try { state.realtime?.close(); } catch { /* noop */ }
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  setState({ accessToken: null, sessionId: null, user: null, workspace: null, workspaceEtag: null, domainCatalog: null, realtime: null });
-}
+import { request, setSession } from "./session.js";
+export { APIError, request, setSession, clearSession, refreshSession, logout, hasStoredSession, probeConnection } from "./session.js";
+const DEVICE = () => ({ name: "Navigateur Web", platform: "Web" });
 
 export async function passwordLogin(email, password) {
   const { data } = await request("/v1/auth/password", { method: "POST", auth: false, retry: false, body: { email, password, device: DEVICE() } });
@@ -85,18 +15,6 @@ export async function activateAccount(payload) { return setSession((await reques
 export async function requestPasswordReset(email) { await request("/v1/auth/password-reset/request", { method: "POST", auth: false, retry: false, body: { email } }); }
 export async function confirmPasswordReset(email, token, newPassword) { await request("/v1/auth/password-reset/confirm", { method: "POST", auth: false, retry: false, body: { email, token, newPassword } }); }
 export async function confirmEmailVerification(email, token) { await request("/v1/auth/email-verification/confirm", { method: "POST", auth: false, retry: false, body: { email, token } }); }
-export async function refreshSession() {
-  if (refreshPromise) return refreshPromise;
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) throw new Error("Aucune session persistante.");
-  refreshPromise = (async () => setSession((await request("/v1/auth/refresh", { method: "POST", auth: false, retry: false, body: { refreshToken, device: DEVICE() } })).data))().finally(() => { refreshPromise = null; });
-  return refreshPromise;
-}
-export async function logout() {
-  try { if (state.sessionId) await request(`/v1/sessions/${state.sessionId}`, { method: "DELETE" }); } catch { /* clear locally anyway */ }
-  clearSession();
-}
-
 export async function loadMe() { const { data } = await request("/v1/me"); setState({ user: data }); return data; }
 export async function updateMe(value) { const { data } = await request("/v1/me", { method: "PATCH", body: value }); setState({ user: data }); return data; }
 export async function loadSecurity() { return (await request("/v1/me/security")).data; }
@@ -158,7 +76,7 @@ export async function uploadFile(file, entityKind, entityId) {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const checksum = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
   const { data: upload } = await request("/v1/files/upload-url", { method: "POST", body: { fileName: file.name, contentType: file.type || "application/octet-stream", byteCount: file.size, checksum, entityKind, entityId } });
-  await request(`/v1/files/${upload.fileId}/content`, { method: "PUT", rawBody: bytes, contentType: file.type || "application/octet-stream" });
+  await request(`/v1/files/${upload.fileId}/content`, { method: "PUT", rawBody: bytes, contentType: file.type || "application/octet-stream", timeoutMs: 120000 });
   return (await request(`/v1/files/${upload.fileId}/complete`, { method: "POST", body: { checksum, byteCount: file.size } })).data;
 }
 export async function downloadFile(id) { const { data } = await request(`/v1/files/${id}/download-url`); location.href = data.url; }

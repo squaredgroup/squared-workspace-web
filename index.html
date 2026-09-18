@@ -7,6 +7,7 @@
   <meta name="color-scheme" content="dark light" />
   <meta name="description" content="Squared Workspace — espace de travail Squared Group." />
   <meta name="robots" content="noindex,nofollow" />
+  <meta name="referrer" content="no-referrer" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/assets/appicon-256.png" />
   <link rel="apple-touch-icon" href="/assets/appicon-256.png" />
@@ -15,6 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/auth.css" />
   <title>Squared Workspace</title>
 </head>
 <body>
@@ -28,26 +30,9 @@
     </main>
   </div>
   <div id="portal-root"></div>
-  <noscript>Squared Workspace nécessite JavaScript.</noscript>
+  <noscript><style>#app{display:none}</style><p style="padding:24px;color:white">Activez JavaScript pour ouvrir Squared Workspace.</p></noscript>
   <script src="/js/runtime-config.js"></script>
   <style>@keyframes sqspin{to{transform:rotate(360deg)}}</style>
-  <script type="module">
-    import("/js/app.js?v=20260918-1").catch((error) => {
-      console.error("Squared Workspace boot failure", error);
-      const app = document.querySelector("#app");
-      if (app) {
-        app.innerHTML = `
-          <main style="min-height:100vh;display:grid;place-items:center;background:#030503;color:#fff;font-family:Space Grotesk,system-ui,sans-serif;padding:24px">
-            <section style="max-width:620px;width:100%;border:1px solid #292929;border-radius:18px;background:#121214;padding:24px">
-              <div style="font-size:11px;color:#7BE84E;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Squared Workspace</div>
-              <h1 style="font-size:24px;margin:10px 0 8px">Impossible de démarrer l’application</h1>
-              <p style="font-size:12px;line-height:1.6;color:#a4aaa1;margin:0 0 18px">Une ressource Web n’a pas pu être chargée. Rechargez la page. Si le problème persiste, le diagnostic ci-dessous permettra de le corriger.</p>
-              <pre style="white-space:pre-wrap;word-break:break-word;background:#070807;border:1px solid #292929;border-radius:12px;padding:12px;color:#d2d6d0;font-size:10px;line-height:1.5">${String(error?.stack || error?.message || error)}</pre>
-              <button onclick="location.reload()" style="margin-top:14px;border:0;border-radius:11px;padding:11px 14px;background:#7BE84E;color:#081006;font-weight:700;cursor:pointer">Recharger</button>
-            </section>
-          </main>`;
-      }
-    });
-  </script>
+  <script type="module" src="/js/boot.js?v=20260918-auth3"></script>
 </body>
 </html>
