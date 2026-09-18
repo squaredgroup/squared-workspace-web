@@ -63,11 +63,12 @@ async function connectRealtime(){try{state.realtime?.close();if(!state.accessTok
 
 async function authenticated(){try{await Promise.all([loadMe(),loadWorkspace(),loadDomainCatalog().catch(()=>null)]);uiReady=true;buildShell();uiSignature=signature();connectRealtime()}catch(error){uiReady=false;toast(errorMessage(error),"error");renderAuth(authenticated)}}
 async function bootstrap(){
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").then(reg=>reg.update()).catch(()=>{});
   const params=new URLSearchParams(location.search);
   const publicAuthAction=params.has("auth") || location.pathname==="/reinitialisation" || location.pathname==="/verification-email";
-  if(publicAuthAction){renderAuth(authenticated);return}
-  try{await refreshSession();await authenticated()}catch{renderAuth(authenticated)}
+  renderAuth(authenticated);
+  if(publicAuthAction)return;
+  try{await refreshSession();await authenticated()}catch{/* login is already visible */}
 }
 
 window.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCommand()}if(e.key==="Escape")document.querySelector(".overlay")?.remove()});
