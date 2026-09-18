@@ -5,7 +5,7 @@
 **Wix**
 - conserve `squaredgroup.studio` et le site public ;
 - gère les DNS du domaine ;
-- crée le sous-domaine `workspace-app.squaredgroup.studio`.
+- crée le sous-domaine `workspace.app.squaredgroup.studio`.
 
 **GitHub Pages**
 - héberge uniquement le frontend Squared Workspace : HTML, CSS, JavaScript, images et PWA ;
@@ -22,7 +22,7 @@ squaredgroup.studio
         │
         ├── www / @ ─────────────── Wix Studio
         │
-        ├── workspace-app ───────── GitHub Pages
+        ├── workspace.app ───────── GitHub Pages
         │        Squared Workspace Web
         │
         └── workspace ───────────── Oracle Cloud
@@ -35,7 +35,7 @@ Dans Wix, ajouter :
 
 ```text
 Type   Host            Valeur
-CNAME  workspace-app   squaredgroup.github.io
+CNAME  workspace.app   squaredgroup.github.io
 ```
 
 Il ne faut pas remplacer le DNS de `workspace` : les clients Apple continuent à l'utiliser comme API.
@@ -48,7 +48,7 @@ Dans le dépôt `squaredgroup/squared-workspace-web` :
 Settings
 → Pages
 → Custom domain
-→ workspace-app.squaredgroup.studio
+→ workspace.app.squaredgroup.studio
 ```
 
 Puis activer **Enforce HTTPS** lorsque GitHub le permet.
@@ -57,7 +57,7 @@ Puis activer **Enforce HTTPS** lorsque GitHub le permet.
 
 Vérifier :
 
-- `https://workspace-app.squaredgroup.studio`
+- `https://workspace.app.squaredgroup.studio`
 - certificat HTTPS GitHub Pages actif ;
 - connexion / MFA / passkey ;
 - chargement du dashboard ;
