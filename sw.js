@@ -1,4 +1,4 @@
-const CACHE = "squared-workspace-github-pages-v1";
+const CACHE = "squared-workspace-github-pages-v2";
 const APP_SHELL = [
   "/", "/index.html", "/manifest.webmanifest", "/css/tokens.css", "/css/app.css",
   "/js/runtime-config.js", "/js/app.js", "/js/api.js", "/js/config.js", "/js/store.js", "/js/ui.js", "/js/webauthn.js",
