@@ -1,0 +1,29 @@
+diff --git a/Backend/src/config.ts b/Backend/src/config.ts
+--- a/Backend/src/config.ts
++++ b/Backend/src/config.ts
+@@
+   APPLE_CLIENT_ID: z.string().min(1),
+   PUBLIC_API_URL: z.string().url(),
++  WEB_APP_ORIGIN: z.string().url().default("https://workspace.app.squaredgroup.studio"),
+   SMTP_URL: z.string().optional(),
+
+diff --git a/Backend/src/server-foundation.ts b/Backend/src/server-foundation.ts
+--- a/Backend/src/server-foundation.ts
++++ b/Backend/src/server-foundation.ts
+@@
+-await app.register(cors, { origin: config.NODE_ENV === "production" ? false : true });
++const webAppOrigin = new URL(config.WEB_APP_ORIGIN).origin;
++await app.register(cors, {
++  origin: config.NODE_ENV === "production" ? [webAppOrigin] : true,
++  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
++  exposedHeaders: ["ETag", "X-Next-Cursor"],
++  maxAge: 86_400
++});
+
+diff --git a/Backend/.env.example b/Backend/.env.example
+--- a/Backend/.env.example
++++ b/Backend/.env.example
+@@
+ PUBLIC_API_URL=http://localhost:8080
++# Frontend Web autorisé à appeler l’API en production (CORS).
++WEB_APP_ORIGIN=https://workspace.app.squaredgroup.studio
