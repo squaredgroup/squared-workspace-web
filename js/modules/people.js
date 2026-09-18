@@ -1,0 +1,8 @@
+import { request } from "../api.js";
+import { h,pageHeader,card,row,button,modal,field,input,select,toast,errorMessage,emptyState } from "../ui.js";
+export async function renderPeople(subpage="personnes"){
+ const root=h("div");root.append(pageHeader({eyebrow:"People",title:"People",subtitle:"Profils, évaluations, compétences et développement des personnes autorisées."}));
+ try{const [{data},{data:overview}]=await Promise.all([request("/v1/people"),request("/v1/people/overview")]);const people=data.people||[];root.append(h("div",{class:"grid stats"},...[["Personnes actives",overview.activePeople],["Onboarding",overview.onboardingPeople],["Évaluations ouvertes",overview.openAssessments],["Profils à revoir",overview.profilesToReview]].map(([l,v])=>h("div",{class:"card"},h("div",{class:"stat-value",text:String(v??0)}),h("div",{class:"stat-label",text:l}))));
+ const host=h("div",{class:"list"});for(const p of people)host.append(row({title:`${p.firstName||""} ${p.lastName||""}`.trim()||p.email,subtitle:`${p.title||""} · ${p.email||""}`,status:p.status,meta:p.relationshipLabel||p.relationshipCode||"",actions:[button("Détail",{small:true,onClick:async()=>{try{const d=(await request(`/v1/people/${p.id}`)).data;modal({title:`${p.firstName} ${p.lastName}`,content:h("pre",{class:"json-view",text:JSON.stringify(d,null,2)}),wide:true})}catch(e){toast(errorMessage(e),"error")}}})]}));root.append(card("Personnes",`${people.length} profil${people.length>1?"s":""} visible${people.length>1?"s":""}.`,host,{iconName:"users"}));
+ }catch(e){root.append(emptyState("People indisponible",errorMessage(e),"warning"))}return root;
+}
