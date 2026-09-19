@@ -94,6 +94,18 @@ export async function renderDashboard(today=false){
     )
   ));
 
+  if(projects.length){
+    root.append(card("Portefeuille actif","Les projets actuellement ouverts dans votre périmètre.",
+      h("div",{class:"list"},...projects.slice(0,6).map(project=>row({
+        title:titleOf(project),
+        subtitle:project?.payload?.clientName||project?.payload?.detail||"Projet Workspace",
+        status:project.status||project.payload?.status,
+        meta:updatedOf(project)?relativeDate(updatedOf(project)):"Actif"
+      }))),
+      {iconName:"folder",className:"section-gap"}
+    ));
+  }
+
   if(today){
     const focused=tasks.slice(0,6);
     root.append(card("Priorités ouvertes","Vos tâches actives, sans bruit supplémentaire.",
