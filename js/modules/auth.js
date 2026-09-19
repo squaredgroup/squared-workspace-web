@@ -47,7 +47,8 @@ function back(panel, onAuthenticated) {
 export function renderAuth(onAuthenticated, { message = "", restoring = false } = {}) {
   const app = document.querySelector("#app");
   const panel = h("section", { class: "auth-panel" });
-  const visual = h("section", { class: "auth-visual" }, h("div", { class: "auth-grid" }),
+  const showGrid = !authContext.action || authContext.action === "activation";
+  const visual = h("section", { class: "auth-visual" }, showGrid ? h("div", { class: "auth-grid" }) : null,
     h("img", { class: "auth-mark", src: "/assets/squaredgroup-logo.png", alt: "Squared Group" }),
     h("div", { class: "auth-visual-copy" }, h("div", { class: "auth-kicker", text: "Squared Executive Workspace" }),
       h("h1", { text: "Tout le groupe. Un seul système." }),

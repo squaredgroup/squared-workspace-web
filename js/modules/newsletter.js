@@ -1,3 +1,11 @@
 import { request } from "../api.js";
-import { h,pageHeader,card,row,button,modal,field,input,textarea,toast,errorMessage,emptyState } from "../ui.js";
-export async function renderNewsletter(){const root=h("div");root.append(pageHeader({eyebrow:"Marketing",title:"Newsletter",subtitle:"Abonnés Wix et campagnes envoyées via Squared Workspace."}));try{const data=(await request("/v1/mailbox/newsletters/subscribers")).data;const subs=data.subscribers||[];root.append(h("div",{class:"grid stats"},...Object.entries(data.counts||{}).slice(0,4).map(([k,v])=>h("div",{class:"card"},h("div",{class:"stat-value",text:String(v)}),h("div",{class:"stat-label",text:k})))));root.append(card("Abonnés",`${subs.length} contact${subs.length>1?"s":""} synchronisé${subs.length>1?"s":""} avec Wix.`,subs.length?h("div",{class:"list"},...subs.slice(0,500).map(s=>row({title:s.email||s.name||s.id,subtitle:s.firstName||s.source||"Wix",status:s.status,meta:s.createdAt?new Date(s.createdAt).toLocaleDateString("fr-FR"):""}))):emptyState("Aucun abonné","La collection newsletter ne contient aucun abonné."),{iconName:"mail"}))}catch(e){root.append(emptyState("Newsletter indisponible",errorMessage(e),"warning"))}return root}
+import { h,pageHeader,card,row,errorMessage,emptyState,statCard,formatDate } from "../ui.js";
+export async function renderNewsletter(){
+  const root=h("div");root.append(pageHeader({eyebrow:"Marketing",title:"Newsletter",subtitle:"Abonnés et états de synchronisation de la newsletter Squared Group."}));
+  try{
+    const data=(await request("/v1/mailbox/newsletters/subscribers")).data,subscribers=data.subscribers||[],counts=Object.entries(data.counts||{}).slice(0,4);
+    if(counts.length)root.append(h("div",{class:"grid stats"},...counts.map(([key,value])=>statCard(String(key).replaceAll("_"," "),value,"Newsletter","mail"))));
+    root.append(card("Abonnés",`${subscribers.length} contact${subscribers.length>1?"s":""} synchronisé${subscribers.length>1?"s":""} avec Wix.`,subscribers.length?h("div",{class:"list"},...subscribers.slice(0,500).map(subscriber=>row({title:subscriber.email||subscriber.name||subscriber.id,subtitle:[subscriber.firstName,subscriber.source||"Wix"].filter(Boolean).join(" · "),status:subscriber.status,meta:subscriber.createdAt?formatDate(subscriber.createdAt,{dateOnly:true}):""}))):emptyState("Aucun abonné","La collection newsletter ne contient aucun abonné.","mail"),{iconName:"mail",className:counts.length?"section-gap":""}));
+  }catch(error){root.append(emptyState("Newsletter indisponible",errorMessage(error),"warning"))}
+  return root;
+}

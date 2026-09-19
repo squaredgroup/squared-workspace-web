@@ -1,7 +1,7 @@
 name: Deploy Squared Workspace Web
 on:
   push:
-    branches: [main, fix/browser-auth]
+    branches: [main, fix/browser-auth, feat/workspace-v2]
   workflow_dispatch:
 permissions:
   contents: read
