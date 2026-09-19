@@ -33,3 +33,25 @@ button,a,input,select,textarea,summary,[tabindex]{scroll-margin-block:calc(var(-
 @media(prefers-reduced-motion:reduce){.page-head,.modal,.overlay{animation:none!important}}
 
 @media(max-width:880px){.sidebar-backdrop{left:min(318px,88vw)!important;top:0!important;right:0!important;bottom:0!important;width:auto!important;height:auto!important}}
+
+/* Theme consistency fixes */
+.topbar{background:var(--sq-glass)!important;color:var(--sq-text)}
+.sidebar{background:linear-gradient(180deg,color-mix(in srgb,var(--sq-bg) 96%,transparent),color-mix(in srgb,var(--sq-shell) 94%,transparent))!important;color:var(--sq-text)}
+.modal-head{background:var(--sq-modal-glass)!important;color:var(--sq-text)}
+.pulse-item{background:var(--sq-panel-translucent)!important;color:var(--sq-text)}
+.card{background:linear-gradient(180deg,var(--sq-card),color-mix(in srgb,var(--sq-card) 93%,var(--sq-bg)))!important;color:var(--sq-text)}
+.nav-item:hover{background:var(--sq-hover)!important}
+.empty{background:color-mix(in srgb,var(--sq-surface) 46%,transparent)!important}
+.icon,.nav-icon,.group-chevron{filter:var(--sq-icon-filter)}
+.button.primary .icon,.subnav button.active .icon{filter:none!important}
+.top-actions button[aria-label="Déconnexion"] .icon{filter:brightness(0) saturate(100%) invert(31%) sepia(88%) saturate(3438%) hue-rotate(333deg) brightness(104%) contrast(104%)!important}
+html[data-theme="light"] .brand-logo{box-shadow:0 0 0 1px rgba(0,0,0,.04),0 10px 26px rgba(24,40,24,.08)}
+html[data-theme="light"] .topbar::after{background:linear-gradient(90deg,transparent,rgba(var(--sq-accent-rgb),.20),transparent)}
+html[data-theme="light"] .executive-hero{background:linear-gradient(135deg,rgba(var(--sq-accent-rgb),.10),rgba(255,255,255,.72) 48%,var(--sq-card))}
+html[data-theme="light"] .stat-icon,html[data-theme="light"] .pulse-icon,html[data-theme="light"] .route-card .icon-wrap{background:rgba(var(--sq-accent-rgb),.10)}
+html[data-theme="dark"] .stat-icon,html[data-theme="dark"] .pulse-icon,html[data-theme="dark"] .route-card .icon-wrap{background:rgba(var(--sq-accent-rgb),.085)}
+html[data-theme="dark"] .icon-button,html[data-theme="dark"] .button{color:var(--sq-text)}
+html[data-theme="light"] .system-state{background:rgba(255,255,255,.72)}
+html[data-theme="dark"] .system-state{background:rgba(17,18,20,.82)}
+html[data-theme="light"] .shortcut{background:#fff}
+html[data-theme="dark"] .shortcut{background:var(--sq-shell)}
