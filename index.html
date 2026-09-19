@@ -6,33 +6,33 @@
   <meta name="theme-color" content="#0D0D0E" />
   <meta name="color-scheme" content="dark light" />
   <meta name="description" content="Squared Workspace — espace de travail Squared Group." />
+  <meta name="application-name" content="Squared Workspace" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; base-uri &#39;none&#39;; object-src &#39;none&#39;; script-src &#39;self&#39;; style-src &#39;self&#39; &#39;unsafe-inline&#39; https://fonts.googleapis.com; font-src &#39;self&#39; https://fonts.gstatic.com; img-src &#39;self&#39; data: blob:; connect-src &#39;self&#39; https://workspace.squaredgroup.studio wss://workspace.squaredgroup.studio; worker-src &#39;self&#39;; manifest-src &#39;self&#39;; frame-src &#39;none&#39;; form-action &#39;self&#39;" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/assets/appicon-256.png" />
   <link rel="apple-touch-icon" href="/assets/appicon-256.png" />
+  <link rel="preload" href="/assets/squaredgroup-logo.png" as="image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/auth.css" />
+  <link rel="stylesheet" href="/css/v3.css" />
   <title>Squared Workspace</title>
 </head>
 <body>
-  <div id="app" aria-live="polite">
-    <main style="min-height:100vh;display:grid;place-items:center;background:#0D0D0E;color:#fff;font-family:Space Grotesk,system-ui,sans-serif">
-      <div style="text-align:center;padding:32px">
-        <div style="width:14px;height:14px;border:2px solid #2a2a2a;border-top-color:#7BE84E;border-radius:999px;margin:0 auto 14px;animation:sqspin .8s linear infinite"></div>
-        <strong style="font-size:14px">Squared Workspace</strong>
-        <div style="margin-top:6px;font-size:11px;color:#8f968d">Chargement de votre espace…</div>
-      </div>
-    </main>
-  </div>
+  <a class="skip-link" href="#workspace-main">Aller au contenu principal</a>
+  <div id="app"><main class="sq-initial" role="status" aria-label="Chargement de Squared Workspace"><div class="sq-initial-inner"><div class="sq-initial-spinner" aria-hidden="true"></div><strong>Squared Workspace</strong><span>Chargement de votre espace…</span></div></main></div>
   <div id="portal-root"></div>
-  <noscript><style>#app{display:none}</style><p style="padding:24px;color:white">Activez JavaScript pour ouvrir Squared Workspace.</p></noscript>
+  <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <noscript><style>#app{display:none}</style><p class="noscript">Activez JavaScript pour ouvrir Squared Workspace.</p></noscript>
   <script src="/js/runtime-config.js"></script>
-  <style>@keyframes sqspin{to{transform:rotate(360deg)}}</style>
-  <script type="module" src="/js/boot.js?v=20260919-workspace-v2"></script>
+  <script type="module" src="/js/boot.js?v=20260920-workspace-v3"></script>
 </body>
 </html>
