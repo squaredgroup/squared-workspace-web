@@ -120,8 +120,14 @@ function snapshotView(value){
   }
   if(typeof value==="object"){
     const entries=Object.entries(value);
-    return h("div",{class:"stack"},
-      h("div",{class:"grid two"},...entries.slice(0,8).map(([key,val])=>card(pretty(key),"",h("div",{class:"stat-value",text:Array.isArray(val)?String(val.length):(typeof val==="object"?"Disponible":String(val??"—"))}))),
+    const summaryCards=entries.slice(0,8).map(([key,val])=>{
+      const display=Array.isArray(val)?String(val.length):(val&&typeof val==="object"?"Disponible":String(val??"—"));
+      return card(pretty(key),"",h("div",{class:"stat-value",text:display}));
+    });
+    return h(
+      "div",
+      {class:"stack"},
+      h("div",{class:"grid two"},...summaryCards),
       advancedEditor("Voir les données techniques",h("pre",{class:"json-view",text:JSON.stringify(value,null,2)}))
     );
   }
