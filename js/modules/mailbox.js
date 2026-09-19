@@ -51,7 +51,7 @@ async function mailboxMain(){
       const data=await mailbox(folder,query,"ALL"),messages=data.messages||[];
       listHost.replaceChildren(
         toolbar(query,value=>{query=value;load()}),
-        messages.length?h("div",{class:"mail-list"},...messages.map(mail=>h("button",{class:`mail-item ${mail.isRead?"":"unread"} ${selected?.id===mail.id?"active":""}`,dataset:{id:String(mail.id)},type:"button",onClick:()=>open(mail)},h("strong",{text:mailTitle(mail)}),h("p",{text:`${sender(mail)} · ${bodyOf(mail).slice(0,110)}`}),h("p",{text:formatDate(mailDate(mail))}))):emptyState("Boîte vide","Aucun message dans ce dossier.","mail")
+        messages.length?h("div",{class:"mail-list"},...messages.map(mail=>h("button",{class:`mail-item ${mail.isRead?"":"unread"} ${selected?.id===mail.id?"active":""}`,dataset:{id:String(mail.id)},type:"button",onClick:()=>open(mail)},h("strong",{text:mailTitle(mail)}),h("p",{text:`${sender(mail)} · ${bodyOf(mail).slice(0,110)}`}),h("p",{text:formatDate(mailDate(mail))})))):emptyState("Boîte vide","Aucun message dans ce dossier.","mail")
       );
       if(!selected)detailHost.replaceChildren(emptyState("Sélectionnez un message","Le fil complet apparaîtra ici.","document"));
     }catch(error){listHost.replaceChildren(emptyState("Boîte indisponible",errorMessage(error),"warning"))}
