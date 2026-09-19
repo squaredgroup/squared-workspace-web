@@ -1,7 +1,7 @@
 name: Deploy Squared Workspace Web
 on:
   push:
-    branches: [main, feat/workspace-v3, fix/theme-icon-system]
+    branches: [main, feat/workspace-v3, fix/theme-icon-system, fix/active-sidebar-icon]
   workflow_dispatch:
 permissions:
   contents: read
