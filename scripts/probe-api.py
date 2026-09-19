@@ -12,6 +12,7 @@ API='https://workspace.squaredgroup.studio'
 WEB='https://workspace.app.squaredgroup.studio'
 JOBS=[
  ('health','GET','/health',WEB,None,None),
+ ('login-response','POST','/v1/auth/password',WEB,None,None),
  ('login-preflight','OPTIONS','/v1/auth/password',WEB,'POST','content-type,x-workspace-client'),
  ('read-preflight','OPTIONS','/v1/me',WEB,'GET','authorization,x-workspace-client'),
  ('write-preflight','OPTIONS','/v1/projects',WEB,'PATCH','authorization,content-type,if-match,x-workspace-client'),
@@ -22,11 +23,15 @@ JOBS=[
 def check(job):
  name,method,path,origin,wanted_method,wanted_headers=job
  headers={'Accept':'application/json','User-Agent':'Squared-Workspace-Browser-Check'}
+ data=None
  if origin:headers['Origin']=origin
  if wanted_method:headers['Access-Control-Request-Method']=wanted_method
  if wanted_headers:headers['Access-Control-Request-Headers']=wanted_headers
+ if name=='login-response':
+  headers['Content-Type']='application/json';headers['X-Workspace-Client']='web'
+  data=json.dumps({'email':'browser-cors-probe@example.invalid','password':'DefinitelyInvalidPassword123!','device':{'name':'GitHub CORS Probe','platform':'Web'}}).encode()
  try:
-  request=urllib.request.Request(API+path,method=method,headers=headers)
+  request=urllib.request.Request(API+path,method=method,headers=headers,data=data)
   try:response=urllib.request.urlopen(request,timeout=12)
   except urllib.error.HTTPError as error:response=error
   with response:
@@ -35,6 +40,7 @@ def check(job):
    methods=[v.strip().upper() for v in response.headers.get('Access-Control-Allow-Methods','').split(',')]
    allowed_headers=[v.strip().lower() for v in response.headers.get('Access-Control-Allow-Headers','').split(',')]
    if name=='untrusted-origin':ok=not allow
+   elif name=='login-response':ok=status in (400,401,403,429) and allow==WEB
    elif name=='passkey-related-origin':
     try:ok=status==200 and WEB in json.loads(response.read(8192)).get('origins',[])
     except (ValueError,TypeError):ok=False
@@ -43,7 +49,7 @@ def check(job):
    return {'check':name,'status':status,'ok':ok,'allowOrigin':allow,'allowMethods':methods,'allowHeaders':allowed_headers}
  except Exception as error:return {'check':name,'ok':False,'errorType':type(error).__name__}
 
-with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:results=list(pool.map(check,JOBS))
+with concurrent.futures.ThreadPoolExecutor(max_workers=7) as pool:results=list(pool.map(check,JOBS))
 Path('backend-probe.json').write_text(json.dumps(results,indent=2))
 summary='## Accès navigateur à l’API de production\n\nTest en lecture seule, sans identifiants.\n\n'
 for result in results:
