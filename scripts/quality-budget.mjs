@@ -10,7 +10,7 @@ const index=await fs.readFile("index.html","utf8");
 for(const required of ["Content-Security-Policy","class=\"skip-link\"","id=\"announcer\"","css/v3.css"])if(!index.includes(required))throw new Error("index.html: exigence manquante "+required);
 const sw=await fs.readFile("sw.js","utf8");
 if(!sw.includes("SKIP_WAITING"))throw new Error("Le service worker doit prendre en charge une activation explicite.");
-if(/install[\s\S]{0,220}skipWaiting/.test(sw))throw new Error("Le service worker ne doit pas forcer skipWaiting pendant install.");
+const installBlock=(sw.split('self.addEventListener("install"')[1]||"").split('self.addEventListener("activate"')[0]||"";if(installBlock.includes("skipWaiting"))throw new Error("Le service worker ne doit pas forcer skipWaiting pendant install.");
 const cssFiles=["css/tokens.css","css/app.css","css/auth.css","css/v3.css"];
 const criticalJs=["js/boot.js","js/app.js","js/api.js","js/session.js","js/storage.js","js/auth-flow.js","js/config.js","js/store.js","js/ui.js","js/webauthn.js","js/modules/auth.js"];
 const gzipSize=async files=>{let total=0;for(const file of files)total+=zlib.gzipSync(await fs.readFile(file)).byteLength;return total};
