@@ -24,7 +24,9 @@ jobs:
           python3 -m pip install --disable-pip-version-check playwright==1.57.0
           python3 -m playwright install --with-deps chromium
       - name: Test browser flows and keyboard accessibility
-        run: python3 tests/browser_smoke.py
+        run: |
+          python3 tests/browser_smoke.py
+          python3 tests/standards_smoke.py
       - name: Prepare the static application only
         run: node scripts/stage.mjs
       - uses: actions/upload-pages-artifact@v4
