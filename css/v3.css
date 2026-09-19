@@ -31,3 +31,5 @@ button,a,input,select,textarea,summary,[tabindex]{scroll-margin-block:calc(var(-
 @media(hover:hover){.route-card:hover{box-shadow:inset 0 1px rgba(255,255,255,.03),0 18px 44px rgba(0,0,0,.12)}.card:hover{box-shadow:inset 0 1px rgba(255,255,255,.03),0 14px 36px rgba(0,0,0,.075)}}
 @media(pointer:coarse){.button:hover,.icon-button:hover,.nav-item:hover,.route-card:hover,.card:hover{transform:none}}
 @media(prefers-reduced-motion:reduce){.page-head,.modal,.overlay{animation:none!important}}
+
+@media(max-width:880px){.sidebar-backdrop{left:min(318px,88vw)!important;top:0!important;right:0!important;bottom:0!important;width:auto!important;height:auto!important}}
