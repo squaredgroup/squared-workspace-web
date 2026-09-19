@@ -55,3 +55,7 @@ html[data-theme="light"] .system-state{background:rgba(255,255,255,.72)}
 html[data-theme="dark"] .system-state{background:rgba(17,18,20,.82)}
 html[data-theme="light"] .shortcut{background:#fff}
 html[data-theme="dark"] .shortcut{background:var(--sq-shell)}
+
+/* Active sidebar icon must preserve the theme-aware Iconly color. */
+html[data-theme="dark"] .nav-item.active .nav-icon{filter:brightness(0) invert(1) drop-shadow(0 0 7px rgba(var(--sq-accent-rgb),.28))!important}
+html[data-theme="light"] .nav-item.active .nav-icon{filter:drop-shadow(0 0 7px rgba(var(--sq-accent-rgb),.20))!important}
