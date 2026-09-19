@@ -83,10 +83,14 @@ with sync_playwright() as p:
     assert page.locator('meta[name="theme-color"]').get_attribute("content")=="#0D0D0E"
     dark_filter=page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")
     assert dark_filter!="none"
+    active_nav_filter=page.locator(".nav-item.active .nav-icon").first.evaluate("el=>getComputedStyle(el).filter")
+    assert "invert(1)" in active_nav_filter,active_nav_filter
     page.get_by_role("button",name="Changer de thème",exact=True).click()
     assert page.locator("html").get_attribute("data-theme")=="light"
     assert page.locator('meta[name="theme-color"]').get_attribute("content")=="#F4F5F1"
     assert page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")=="none"
+    light_active_nav_filter=page.locator(".nav-item.active .nav-icon").first.evaluate("el=>getComputedStyle(el).filter")
+    assert "invert(1)" not in light_active_nav_filter,light_active_nav_filter
     topbar_rgb=page.locator(".topbar").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
     assert sum(topbar_rgb)/3>180,topbar_rgb
     pulse_rgb=page.locator(".pulse-item").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
