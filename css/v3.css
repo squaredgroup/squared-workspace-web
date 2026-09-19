@@ -1,0 +1,35 @@
+/* Squared Workspace V3 — standards, accessibility and interaction layer */
+html{scroll-padding-top:calc(var(--sq-topbar) + 18px);overscroll-behavior-y:none}body{min-height:100dvh}
+.skip-link{position:fixed;left:14px;top:10px;z-index:1000;transform:translateY(-160%);padding:10px 14px;border:2px solid var(--sq-accent);border-radius:10px;background:var(--sq-surface);color:var(--sq-text);font-size:12px;font-weight:700;transition:transform .16s ease}.skip-link:focus{transform:none}
+button,a,input,select,textarea,summary,[tabindex]{scroll-margin-block:calc(var(--sq-topbar) + 14px) 86px}:focus-visible{outline:2px solid #B7FF98!important;outline-offset:3px!important;box-shadow:none!important}.content:focus{outline:none!important}
+.icon-button,.button,.nav-group-head,.nav-item,.sidebar-search,.account-card,.mobile-tabs button{min-width:32px;min-height:32px}.button.small{min-height:34px}.link-button{display:inline-flex;align-items:center;min-height:32px;padding:0 4px}.nav-items[hidden]{display:none!important}
+.button:active,.icon-button:active,.nav-item:active,.sidebar-search:active{transform:translateY(0) scale(.985)}
+.command{width:min(760px,100%)}.command .modal-head{padding-bottom:10px}.command .modal-body{padding:0 8px 8px}.command-body{display:grid}.command-input{width:100%;height:62px;border:0;border-bottom:1px solid var(--sq-border);background:transparent;color:var(--sq-text);padding:0 14px;outline:0;font-size:14px}.command-input::placeholder{color:var(--sq-subtle)}.command-results{padding:7px 0;max-height:56vh;overflow:auto;overscroll-behavior:contain}.command-result{display:flex;align-items:center;gap:11px;width:100%;min-height:50px;padding:8px 11px;border:1px solid transparent;border-radius:11px;color:var(--sq-text);cursor:pointer;text-align:left}.command-result.selected{background:var(--sq-control);border-color:var(--sq-border)}.command-result span{font-size:11px}.command-result small{display:block;color:var(--sq-muted);font-size:9px;margin-top:2px}
+.update-banner{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));z-index:260;display:flex;align-items:center;gap:22px;width:min(620px,calc(100vw - 28px));padding:13px 14px 13px 16px;transform:translateX(-50%);border:1px solid rgba(var(--sq-accent-rgb),.28);border-radius:16px;background:color-mix(in srgb,var(--sq-elevated) 96%,transparent);backdrop-filter:blur(24px);box-shadow:var(--sq-shadow)}.update-banner>div:first-child{min-width:0;flex:1}.update-banner strong,.update-banner span{display:block}.update-banner strong{font-size:11px}.update-banner span{margin-top:3px;color:var(--sq-muted);font-size:9px;line-height:1.45}.update-actions{display:flex;gap:7px;flex:0 0 auto}
+.overlay,.modal{overscroll-behavior:contain}.toast-stack{pointer-events:none}.toast{pointer-events:auto}[aria-busy="true"]{cursor:progress}
+@media(pointer:coarse){.icon-button,.button,.nav-group-head,.nav-item,.sidebar-search,.account-card,.mobile-tabs button,.link-button,summary{min-height:44px}.button.small{min-height:40px}.row-actions{gap:8px}}
+@media(max-width:560px){.update-banner{align-items:flex-start;gap:10px;flex-direction:column}.update-actions{width:100%}.update-actions .button{flex:1}}
+@media(prefers-reduced-transparency:reduce){.sidebar,.topbar,.mobile-tabs,.modal-head,.update-banner{backdrop-filter:none!important;background:var(--sq-shell)!important}}
+@media(forced-colors:active){:focus-visible{outline:3px solid Highlight!important;outline-offset:2px!important}.nav-item.active::before,.state-dot,.brand-dot{background:Highlight!important}.badge::before{background:CanvasText!important}.button.primary{background:Highlight!important;color:HighlightText!important}}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.16s;animation-timing-function:ease-out}html[data-reduced-motion="true"]::view-transition-old(root),html[data-reduced-motion="true"]::view-transition-new(root){animation:none}
+
+/* Premium interaction polish */
+.workspace{position:relative}.workspace::before{content:"";position:fixed;pointer-events:none;z-index:-1;inset:0;background:radial-gradient(720px circle at 78% -8%,rgba(var(--sq-accent-rgb),.055),transparent 58%),radial-gradient(640px circle at 18% 100%,rgba(174,139,255,.028),transparent 58%)}
+.sidebar{background:linear-gradient(180deg,color-mix(in srgb,var(--sq-bg) 96%,transparent),color-mix(in srgb,var(--sq-shell) 94%,transparent));box-shadow:1px 0 0 rgba(255,255,255,.012) inset}
+.topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(var(--sq-accent-rgb),.15),transparent);pointer-events:none}
+.page-head{animation:sqPageIn var(--sq-duration) var(--sq-ease) both}.card,.route-card{box-shadow:inset 0 1px rgba(255,255,255,.025),0 10px 30px rgba(0,0,0,.055)}
+.stat-icon{transition:transform var(--sq-duration) var(--sq-ease-spring),background var(--sq-duration-fast) ease}.stat-card:hover .stat-icon{transform:translateY(-2px) scale(1.04);background:rgba(var(--sq-accent-rgb),.11)}
+.row{position:relative;overflow:hidden}.row::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;border-radius:99px;background:transparent;transition:background var(--sq-duration-fast) ease}.row:hover::before{background:rgba(var(--sq-accent-rgb),.55)}
+.sidebar-search,.account-card,.nav-item,.button,.icon-button,.route-card,.mail-item,.row{transition-duration:var(--sq-duration-fast);transition-timing-function:var(--sq-ease)}
+.badge{box-shadow:inset 0 1px rgba(255,255,255,.025)}
+.page-title{text-wrap:balance}.page-subtitle,.hero-copy{text-wrap:pretty}
+.modal{transform-origin:50% 44%;animation:sqModalIn var(--sq-duration) var(--sq-ease-spring) both}.overlay{animation:sqOverlayIn var(--sq-duration-fast) ease both}
+.toast{backdrop-filter:blur(18px)}
+@keyframes sqPageIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes sqModalIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes sqOverlayIn{from{opacity:0}to{opacity:1}}
+@media(hover:hover){.route-card:hover{box-shadow:inset 0 1px rgba(255,255,255,.03),0 18px 44px rgba(0,0,0,.12)}.card:hover{box-shadow:inset 0 1px rgba(255,255,255,.03),0 14px 36px rgba(0,0,0,.075)}}
+@media(pointer:coarse){.button:hover,.icon-button:hover,.nav-item:hover,.route-card:hover,.card:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.page-head,.modal,.overlay{animation:none!important}}
+
+@media(max-width:880px){.sidebar-backdrop{left:min(318px,88vw)!important;top:0!important;right:0!important;bottom:0!important;width:auto!important;height:auto!important}}
