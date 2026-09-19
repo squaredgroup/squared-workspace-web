@@ -40,7 +40,7 @@ async function mailboxMain(){
       const data=await mailboxThread(mail.id),thread=data.messages||[];
       detailHost.replaceChildren(h("div",{},
         h("div",{class:"toolbar"},button("Répondre",{kind:"primary",iconName:"send",onClick:()=>compose(load,thread.at(-1)||mail)}),button(mail.isStarred?"Retirer le favori":"Favori",{iconName:"star",onClick:async()=>{await updateMailboxMessage(mail.id,{isStarred:!mail.isStarred});await load()}}),button("Archiver",{iconName:"archive",onClick:async()=>{await updateMailboxMessage(mail.id,{folder:"ARCHIVED"});selected=null;await load()}})),
-        ...thread.map(message=>h("article",{class:"card",style:{marginBottom:"10px"}},h("div",{class:"card-title",text:mailTitle(message)}),h("div",{class:"card-subtitle",text:`${sender(message)} · ${formatDate(mailDate(message))}`}),h("div",{class:"mail-body",style:{marginTop:"14px"},text:bodyOf(message)}))
+        ...thread.map(message=>h("article",{class:"card",style:{marginBottom:"10px"}},h("div",{class:"card-title",text:mailTitle(message)}),h("div",{class:"card-subtitle",text:`${sender(message)} · ${formatDate(mailDate(message))}`}),h("div",{class:"mail-body",style:{marginTop:"14px"},text:bodyOf(message)})))
       ));
       if(!mail.isRead)await updateMailboxMessage(mail.id,{isRead:true}).catch(()=>{});
     }catch(error){detailHost.replaceChildren(emptyState("Lecture impossible",errorMessage(error),"warning"))}
