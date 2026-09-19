@@ -53,7 +53,7 @@ export function renderAuth(onAuthenticated, { message = "", restoring = false } 
     h("div", { class: "auth-visual-copy" }, h("div", { class: "auth-kicker", text: "Squared Executive Workspace" }),
       h("h1", { text: "Tout le groupe. Un seul système." }),
       h("p", { text: "Retrouvez vos projets, vos échanges et les outils de votre espace Squared Workspace." })));
-  app.replaceChildren(h("main", { class: "auth-screen" }, visual, panel));
+  app.replaceChildren(h("main", { id:"workspace-main", class: "auth-screen", tabindex:"-1" }, visual, panel));
   if (authContext.action === "activation") showActivation(panel, onAuthenticated);
   else if (authContext.action === "reset") showResetConfirm(panel, onAuthenticated);
   else if (authContext.action === "verify") showEmailVerification(panel, onAuthenticated);
