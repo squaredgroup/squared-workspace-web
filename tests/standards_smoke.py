@@ -74,6 +74,23 @@ with sync_playwright() as p:
 
     undersized=page.evaluate("""()=>[...document.querySelectorAll("button,summary,.link-button")].filter(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.visibility!=="hidden"&&s.display!=="none"&&r.width>0&&r.height>0&&(r.width<24||r.height<24)}).map(el=>({text:(el.innerText||el.getAttribute("aria-label")||"").trim(),w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height,className:el.className}))""")
     assert undersized==[],undersized
+
+    # Theme system: every Iconly asset loads and adapts between dark/light.
+    page.goto(origin+"/#/dashboard")
+    expect(page.get_by_role("heading",name="Tableau de bord",exact=True)).to_be_visible()
+    assert page.evaluate("""()=>[...document.querySelectorAll(".icon,.nav-icon,.group-chevron")].filter(img=>img.getClientRects().length&&(!img.complete||img.naturalWidth===0)).map(img=>img.getAttribute("src"))""")==[]
+    assert page.locator(".stat-icon img").evaluate_all("els=>els.every(img=>img.complete&&img.naturalWidth>0)")
+    assert page.locator('meta[name="theme-color"]').get_attribute("content")=="#0D0D0E"
+    dark_filter=page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")
+    assert dark_filter!="none"
+    page.get_by_role("button",name="Changer de thème",exact=True).click()
+    assert page.locator("html").get_attribute("data-theme")=="light"
+    assert page.locator('meta[name="theme-color"]').get_attribute("content")=="#F4F5F1"
+    assert page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")=="none"
+    topbar_rgb=page.locator(".topbar").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    assert sum(topbar_rgb)/3>180,topbar_rgb
+    pulse_rgb=page.locator(".pulse-item").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    assert sum(pulse_rgb)/3>180,pulse_rgb
     c.close()
 
     c=make_context(390);page=c.new_page();login(page)
