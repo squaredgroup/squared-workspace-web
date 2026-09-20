@@ -69,9 +69,9 @@ with sync_playwright() as p:
     assert sum(light_panel_rgb)/3>220,light_panel_rgb
     assert sum(light_input_rgb)/3>220,light_input_rgb
     for route,title in [
-        ("/#/activation?email=test%40example.invalid&token=fixture-auth-token-123456","Activer votre accès"),
-        ("/#/reinitialisation?email=test%40example.invalid&token=fixture-reset-token-1234567890","Nouveau mot de passe"),
-        ("/#/verification-email?email=test%40example.invalid&token=fixture-verify-token-1234567890","Vérifier votre adresse")
+        ("/?auth=activation&email=test%40example.invalid&token=fixture-auth-token-123456","Activer votre accès"),
+        ("/?auth=reset&email=test%40example.invalid&token=fixture-reset-token-1234567890","Nouveau mot de passe"),
+        ("/?auth=verify&email=test%40example.invalid&token=fixture-verify-token-1234567890","Vérifier votre adresse")
     ]:
         page.goto(origin+route)
         expect(page.get_by_role("heading",name=title,exact=True)).to_be_visible()
