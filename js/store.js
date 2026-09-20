@@ -1,4 +1,5 @@
 import { storage } from "./storage.js";
+import { SECTIONS } from "./config.js";
 const preferences=storage("local");
 const tab=storage("session");
 const listeners = new Set();
@@ -35,6 +36,8 @@ export function setState(patch){ Object.assign(state,patch); notify(); }
 export function updateState(mutator){ mutator(state); notify(); }
 export function setRoute(section,subpage=""){
   state.route={section,subpage}; state.sidebarOpen=false;
+  const group=SECTIONS[section]?.group;
+  if(group){state.openGroup=group;tab.set("sq-open-group",group)}
   const encoded = `#/${section}${subpage?`/${encodeURIComponent(subpage)}`:""}`;
   if(location.hash!==encoded) history.pushState(null,"",encoded);
   notify();
@@ -42,7 +45,8 @@ export function setRoute(section,subpage=""){
 export function setOpenGroup(group){ state.openGroup=group; tab.set("sq-open-group",group); notify(); }
 export function setAppearance(patch){ state.appearance={...state.appearance,...patch}; preferences.set("sq-web-appearance",JSON.stringify(state.appearance)); applyAppearance(); notify(); }
 export function applyAppearance(){
-  const mode=state.appearance.mode==="light"?"light":"dark";
+  const preference=["light","dark","system"].includes(state.appearance.mode)?state.appearance.mode:"dark";
+  const mode=preference==="system"?(colorScheme.matches?"light":"dark"):preference;
   const density=["dense","airy","balanced"].includes(state.appearance.density)?state.appearance.density:"balanced";
   const width=["focused","balanced","wide"].includes(state.appearance.contentWidth)?state.appearance.contentWidth:"balanced";
   document.documentElement.dataset.theme=mode;
@@ -57,7 +61,15 @@ export function applyAppearance(){
     document.documentElement.style.setProperty("--sq-accent",state.appearance.accent);
   }
 }
-window.addEventListener("hashchange",()=>{ state.route=initialRoute(); notify(); });
+const colorScheme=window.matchMedia?.("(prefers-color-scheme: light)")||{matches:false,addEventListener(){}};
+colorScheme.addEventListener?.("change",()=>{if(state.appearance.mode==="system"){applyAppearance();notify()}});
+window.addEventListener("hashchange",()=>{
+  state.route=initialRoute();
+  const group=SECTIONS[state.route.section]?.group;
+  if(group){state.openGroup=group;tab.set("sq-open-group",group)}
+  state.sidebarOpen=false;
+  notify();
+});
 window.addEventListener("online",()=>setState({online:true}));
 window.addEventListener("offline",()=>setState({online:false}));
 applyAppearance();

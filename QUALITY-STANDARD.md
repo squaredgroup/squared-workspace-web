@@ -34,3 +34,10 @@ Les mises à jour sont atomiques : le nouveau Service Worker prépare le shell, 
 3. Tests unitaires de session.
 4. Tests navigateur desktop/mobile, auth et clavier.
 5. Génération réussie de l’artefact GitHub Pages.
+
+## Couverture V4
+
+- Toutes les sections accessibles doivent rendre un titre, sortir de l’état de chargement et ne produire aucune erreur JavaScript avec une API synthétique.
+- Les actions visibles respectent les permissions effectives du membre avant tout appel serveur.
+- Notifications, recherche Messages, lecture/envoi d’e-mail, réglages synchronisés et navigation responsive disposent de scénarios navigateur dédiés.
+- Une branche `codex/**` et toute pull request vers `main` exécutent les mêmes validations que la production ; seul `main` peut déployer GitHub Pages.

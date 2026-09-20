@@ -1,14 +1,14 @@
 import { state,setAppearance } from "../store.js";
 import { updateMe,loadSecurity,updateSecurity,changePassword,listSessions,revokeSession,loadSettings,saveSettings,recoveryCodes,createPasskeyOptions,registerPasskey } from "../api.js";
 import { createPasskey } from "../webauthn.js";
-import { h,pageHeader,card,button,field,input,select,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor } from "../ui.js";
+import { h,pageHeader,card,button,field,input,select,validateControls,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor } from "../ui.js";
 
 function settingRow(title,copy,control){return h("div",{class:"setting-row"},h("div",{},h("strong",{text:title}),h("span",{text:copy})),control)}
 export async function renderProfile(){
   const u=state.user||{},root=h("div");
   root.append(pageHeader({eyebrow:"Compte",title:"Profil",subtitle:"Identité, coordonnées et sécurité de votre compte Squared Workspace."}));
-  const email=input(u.email||"",{type:"email"}),first=input(u.firstName||u.first_name||""),last=input(u.lastName||u.last_name||""),title=input(u.title||""),company=input(u.company||""),phone=input(u.phone||"");
-  const identity=h("div",{class:"form"},h("div",{class:"form-row"},field("Prénom",first),field("Nom",last)),field("Adresse e-mail",email),h("div",{class:"form-row"},field("Fonction",title),field("Entreprise",company)),field("Téléphone",phone),button("Enregistrer le profil",{kind:"primary",iconName:"check",onClick:async()=>{try{await updateMe({email:email.value.trim(),firstName:first.value.trim(),lastName:last.value.trim(),title:title.value.trim(),company:company.value.trim(),phone:phone.value.trim(),phoneCountryCode:u.phoneCountryCode||u.phone_country_code||"FR"});toast("Profil mis à jour")}catch(error){toast(errorMessage(error),"error")}}}));
+  const email=input(u.email||"",{type:"email",required:true,autocomplete:"email"}),first=input(u.firstName||u.first_name||"",{required:true,autocomplete:"given-name"}),last=input(u.lastName||u.last_name||"",{required:true,autocomplete:"family-name"}),title=input(u.title||"",{autocomplete:"organization-title"}),company=input(u.company||"",{autocomplete:"organization"}),phone=input(u.phone||"",{type:"tel",autocomplete:"tel"});
+  const identity=h("div",{class:"form"},h("div",{class:"form-row"},field("Prénom",first),field("Nom",last)),field("Adresse e-mail",email),h("div",{class:"form-row"},field("Fonction",title),field("Entreprise",company)),field("Téléphone",phone),button("Enregistrer le profil",{kind:"primary",iconName:"check",onClick:async()=>{try{if(!validateControls(email,first,last))return;await updateMe({email:email.value.trim(),firstName:first.value.trim(),lastName:last.value.trim(),title:title.value.trim(),company:company.value.trim(),phone:phone.value.trim(),phoneCountryCode:u.phoneCountryCode||u.phone_country_code||"FR"});toast("Profil mis à jour")}catch(error){toast(errorMessage(error),"error")}}}));
   root.append(h("div",{class:"grid two"},
     card("Identité",`${u.role||"Membre"} · informations visibles selon votre périmètre.`,identity,{iconName:"user"}),
     await securityCard()
@@ -42,8 +42,8 @@ async function securityCard(){
   return card("Sécurité","Passkeys, MFA et récupération du compte.",host,{iconName:"shield"});
 }
 function passwordModal(){
-  const current=input("",{type:"password",autocomplete:"current-password"}),next=input("",{type:"password",autocomplete:"new-password"});
-  modal({title:"Changer le mot de passe",content:h("div",{class:"form"},field("Mot de passe actuel",current),field("Nouveau mot de passe",next,"10 caractères minimum avec majuscule, minuscule et chiffre.")),actions:[{label:"Modifier",kind:"primary",icon:"check",onClick:async close=>{try{await changePassword(current.value,next.value);current.value="";next.value="";toast("Mot de passe modifié. Reconnectez-vous sur vos autres appareils.");close()}catch(error){toast(errorMessage(error),"error")}}}]});
+  const current=input("",{type:"password",autocomplete:"current-password",required:true}),next=input("",{type:"password",autocomplete:"new-password",required:true,minLength:10});
+  modal({title:"Changer le mot de passe",content:h("div",{class:"form"},field("Mot de passe actuel",current),field("Nouveau mot de passe",next,"10 caractères minimum avec majuscule, minuscule et chiffre.")),actions:[{label:"Modifier",kind:"primary",icon:"check",onClick:async close=>{try{if(!validateControls(current,next))return;await changePassword(current.value,next.value);current.value="";next.value="";toast("Mot de passe modifié. Reconnectez-vous sur vos autres appareils.");close()}catch(error){toast(errorMessage(error),"error")}}}]});
 }
 export async function renderSettings(){
   const root=h("div");root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Préférences synchronisées et réglages d’affichage du navigateur."}));
@@ -64,8 +64,7 @@ export async function renderSettings(){
         try{
           settings={...settings,appearanceMode:theme.value,dashboardDensity:density.value,contentWidth:width.value,language:language.value,timezone:timezone.value,compactSidebar:compact.checked,reducedMotion:motion.checked};
           await saveSettings(settings);
-          const effective=theme.value==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):theme.value;
-          setAppearance({mode:effective,density:density.value,contentWidth:width.value,compactSidebar:compact.checked,reducedMotion:motion.checked});
+          setAppearance({mode:theme.value,density:density.value,contentWidth:width.value,compactSidebar:compact.checked,reducedMotion:motion.checked});
           toast("Paramètres enregistrés");
         }catch(error){toast(errorMessage(error),"error",6000)}
       }})

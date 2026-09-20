@@ -12,4 +12,4 @@ function failure(error) {
   });
   card.append(title, copy, retry); page.append(card); root.replaceChildren(page);
 }
-import("./app.js?v=20260918-auth3").catch(failure);
+import("./app.js?v=20260920-workspace-v4").catch(failure);

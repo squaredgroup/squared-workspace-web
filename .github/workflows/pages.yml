@@ -1,7 +1,9 @@
 name: Deploy Squared Workspace Web
 on:
   push:
-    branches: [main, feat/workspace-v3, fix/theme-icon-system, fix/active-sidebar-icon, fix/auth-theme-system]
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +29,7 @@ jobs:
         run: |
           python3 tests/browser_smoke.py
           python3 tests/standards_smoke.py
+          python3 tests/product_flows.py
       - name: Prepare the static application only
         run: node scripts/stage.mjs
       - uses: actions/upload-pages-artifact@v4

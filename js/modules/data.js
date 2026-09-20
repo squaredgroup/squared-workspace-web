@@ -1,7 +1,7 @@
 import { CORE_DOMAIN_BY_SECTION,SPECIALIZED_BY_SECTION,SUBPAGE_DOMAIN_HINTS,SECTIONS,SECTION_DESCRIPTIONS } from "../config.js";
 import { state } from "../store.js";
 import { listCoreDomain,saveCoreEntity,archiveCoreEntity,listSpecialized,saveSpecialized,archiveSpecialized,uploadFile,loadWorkspace,loadDomainCatalog } from "../api.js";
-import { h,pageHeader,toolbar,row,button,modal,field,input,select,jsonEditor,safeJSON,emptyState,skeletonPage,toast,errorMessage,card,pretty,formatDate,advancedEditor,confirmAction,badge } from "../ui.js";
+import { h,pageHeader,toolbar,row,button,modal,field,input,select,jsonEditor,safeJSON,validateControls,emptyState,skeletonPage,toast,errorMessage,card,pretty,formatDate,advancedEditor,confirmAction,badge } from "../ui.js";
 
 function routeKinds(sectionKey,subpage){
   const hinted=SUBPAGE_DOMAIN_HINTS[`${sectionKey}:${subpage}`];
@@ -9,6 +9,8 @@ function routeKinds(sectionKey,subpage){
 }
 function catalogKind(kind){return state.domainCatalog?.kinds?.find(value=>value.kind===kind)}
 function fileKind(domain){return({documents:"document",deliverables:"deliverable",contracts:"contract"})[domain]||null}
+const coreWritePermission={projects:"manageProjects",missions:"manageMissions",tasks:"manageTasks",validations:"decideValidations",deliverables:"manageDeliverables",contracts:"manageContracts",documents:"manageDocuments",resources:"manageOrganization",clients:"manageClients",events:"manageTasks",notifications:"readWorkspace"};
+function canWriteCore(domain){const permission=coreWritePermission[domain];return Boolean(permission&&state.user?.permissions?.includes(permission))}
 function statusOptions(kind,fallback="active"){
   const values=catalogKind(kind)?.statuses||[];
   return values.length?values:[fallback,"active","draft","pending","completed","archived"];
@@ -29,6 +31,7 @@ function coreForm(domain,entity,reload){
   );
   modal({title:`${isEdit?"Modifier":"Créer"} · ${pretty(domain)}`,content,wide:true,actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
     try{
+      if(!validateControls(title,status))return;
       await saveCoreEntity(domain,{...(isEdit?{id:entity.id,version:entity.version}:{}),title:title.value.trim(),status:status.value.trim(),parentId:parent.value.trim()||null,payload:safeJSON(payload.value,{})});
       toast("Enregistré dans Workspace");close();await loadWorkspace();await reload();
     }catch(error){toast(errorMessage(error),"error",5500)}
@@ -49,6 +52,7 @@ function specializedForm(kind,entity,reload){
   const content=h("div",{class:"form"},field("Titre",title),field("Statut",status),...requiredInputs.map(item=>item.node),advancedEditor("Champs métier avancés",advanced));
   modal({title:`${isEdit?"Modifier":"Créer"} · ${pretty(kind)}`,content,wide:true,actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
     try{
+      if(!validateControls(title,status,...requiredInputs.map(item=>item.control)))return;
       const finalData=safeJSON(advanced.value,{});
       for(const {key,control} of requiredInputs){const raw=control.value.trim();if(raw)finalData[key]=raw}
       for(const key of ["title","name","legalName","subject"])if(key in finalData)finalData[key]=title.value.trim();
@@ -144,9 +148,9 @@ export async function renderDataSection(sectionKey,subpage=""){
     const body=h("div",{class:"grid"});root.lastChild.remove();
 
     if(core){
-      const items=await listCoreDomain(core);let panel;
-      const reload=async()=>{const next=await listCoreDomain(core);panel.querySelector(".domain-slot")?.replaceChildren(renderDomainList({kind:core,items:next,writable:true,reload,specialized:false}))};
-      const slot=h("div",{class:"domain-slot"},renderDomainList({kind:core,items,writable:true,reload,specialized:false}));
+      const items=await listCoreDomain(core),writable=canWriteCore(core);let panel;
+      const reload=async()=>{const next=await listCoreDomain(core);panel.querySelector(".domain-slot")?.replaceChildren(renderDomainList({kind:core,items:next,writable,reload,specialized:false}))};
+      const slot=h("div",{class:"domain-slot"},renderDomainList({kind:core,items,writable,reload,specialized:false}));
       panel=card(pretty(core),`${items.length} élément${items.length>1?"s":""} synchronisé${items.length>1?"s":""} avec Workspace.`,slot,{iconName:sectionKey});body.append(panel);
     }
 

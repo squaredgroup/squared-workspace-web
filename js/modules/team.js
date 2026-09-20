@@ -1,6 +1,6 @@
 import { state } from "../store.js";
 import { loadWorkspace,listInvitations,createInvitation,resendInvitation,revokeInvitation,changeMemberRole,changeMemberState,listCustomRoles,assignCustomRole,effectiveMemberAccess,memberSessions,revokeAdminSession } from "../api.js";
-import { h,pageHeader,card,row,button,modal,field,input,select,toast,errorMessage,emptyState,formatDate,confirmAction,statCard,advancedEditor,pretty } from "../ui.js";
+import { h,pageHeader,card,row,button,modal,field,input,select,validateControls,toast,errorMessage,emptyState,formatDate,confirmAction,statCard,advancedEditor,pretty } from "../ui.js";
 
 const ROLES=["OWNER","ADMIN","COLLABORATOR","PARTNER","CLIENT"];
 const has=permission=>state.user?.permissions?.includes(permission);
@@ -8,7 +8,7 @@ const memberName=member=>member.name||`${member.firstName||member.first_name||""
 function inviteDialog(reload){
   const email=input("",{type:"email",required:true,placeholder:"nom@entreprise.com"}),role=select("COLLABORATOR",ROLES);
   modal({title:"Inviter dans Workspace",content:h("div",{class:"form"},field("Adresse e-mail",email),field("Rôle socle",role),h("p",{class:"muted",text:"L’invitation expire après 7 jours. Vous pourrez ensuite affiner le rôle métier et le périmètre du membre."})),actions:[{label:"Envoyer l’invitation",kind:"primary",icon:"send",onClick:async close=>{
-    try{await createInvitation({email:email.value.trim(),role:role.value,customRoleIds:[],scopeType:null,scopeId:null,permissions:[],accessExpiresAt:null});toast("Invitation envoyée");close();await reload()}
+    try{if(!validateControls(email,role))return;await createInvitation({email:email.value.trim(),role:role.value,customRoleIds:[],scopeType:null,scopeId:null,permissions:[],accessExpiresAt:null});toast("Invitation envoyée");close();await reload()}
     catch(error){toast(errorMessage(error),"error",6500)}
   }}]});
 }

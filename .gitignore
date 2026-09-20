@@ -1,0 +1,5 @@
+_site/
+output/playwright/
+test-login-*.png
+test-results.json
+backend-probe.json

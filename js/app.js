@@ -46,12 +46,26 @@ function systemState(){
   const last=state.lastSyncAt?relativeDate(state.lastSyncAt):"Synchronisation";
   return h("div",{class:`system-state ${state.online?"":"offline"}`,role:"status","aria-live":"polite",title:state.online?`Dernière synchro ${last}`:"Connexion réseau indisponible"},h("i",{class:"state-dot"}),h("span",{text:state.online?"Synchronisé":"Hors ligne"}),h("strong",{text:state.online?last:""}));
 }
+function unreadNotifications(){return (state.workspace?.notifications||[]).filter(value=>!(value?.isRead??value?.is_read??value?.payload?.isRead??value?.payload?.is_read)).length}
+function notificationButton(){
+  const count=unreadNotifications();
+  return h("button",{class:"icon-button notification-trigger",type:"button","aria-label":count?`Notifications, ${count} non lue${count>1?"s":""}`:"Notifications",title:"Notifications",onClick:()=>setRoute("notifications")},icon("notification",17),count?h("span",{class:"notification-count",text:count>99?"99+":String(count)}):null);
+}
+async function refreshWorkspace(button){
+  if(state.loading||!state.online)return;
+  setState({loading:true});button.disabled=true;button.setAttribute("aria-busy","true");
+  try{await Promise.all([loadWorkspace(),loadDomainCatalog().catch(()=>null)]);await renderCurrent({focus:false});toast("Workspace synchronisé")}
+  catch(error){toast(errorMessage(error),"error",6000)}
+  finally{setState({loading:false});if(button.isConnected){button.disabled=false;button.removeAttribute("aria-busy")}}
+}
 function topbar(){
   const section=SECTIONS[state.route.section]||{};const sub=activeSubpage();
+  const refresh=iconButton("sync","Actualiser les données",event=>refreshWorkspace(event.currentTarget));refresh.classList.add("desktop-only");
+  const effectiveTheme=document.documentElement.dataset.theme||"dark";
   return h("header",{class:"topbar"},
     h("div",{class:"menu-toggle"},iconButton("grid","Ouvrir le menu",()=>setState({sidebarOpen:!state.sidebarOpen}))),
     h("div",{class:"breadcrumbs"},h("div",{class:"breadcrumb-line"},h("span",{text:section.group||"Workspace"}),sub?h("span",{class:"separator",text:"/"}):null,sub?h("span",{text:sub.title}):null),h("div",{class:"top-title",text:section.title||"Squared Workspace"})),
-    h("div",{class:"top-actions"},systemState(),iconButton(state.appearance.mode==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:state.appearance.mode==="light"?"dark":"light"})),iconButton("search","Recherche",openCommand),iconButton("logout","Déconnexion",async()=>{await logout()}))
+    h("div",{class:"top-actions"},systemState(),refresh,notificationButton(),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),iconButton("search","Recherche",openCommand),iconButton("logout","Déconnexion",async()=>{await logout()}))
   );
 }
 function subnav(){const s=SECTIONS[state.route.section];if(!s?.subpages?.length)return null;const pages=s.subpages.filter(p=>canAccessSubpage(p,state.user));return h("nav",{class:"subnav","aria-label":`Sous-navigation ${s.title}`},...pages.map(page=>h("button",{class:state.route.subpage===page.id?"active":"",type:"button","aria-current":state.route.subpage===page.id?"page":null,onClick:()=>setRoute(state.route.section,page.id),text:page.title})))}
@@ -79,6 +93,7 @@ async function sectionPage(section,subpage){
   if(SECTIONS[section]?.cms){const {renderCMS}=await import("./modules/cms.js");return renderCMS(section)}
   if(section==="mailbox"){const {renderMailbox}=await import("./modules/mailbox.js");return renderMailbox(subpage||"mailbox")}
   if(section==="messages"){const {renderMessages}=await import("./modules/messages.js");return renderMessages()}
+  if(section==="notifications"){const {renderNotifications}=await import("./modules/notifications.js");return renderNotifications()}
   if(section==="training"){const {renderTraining}=await import("./modules/training.js");return renderTraining()}
   if(section==="profile"||section==="settings"){const module=await import("./modules/profile.js");return section==="profile"?module.renderProfile():module.renderSettings()}
   if(section==="people"){const {renderPeople}=await import("./modules/people.js");return renderPeople(subpage)}

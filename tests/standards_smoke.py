@@ -102,6 +102,10 @@ with sync_playwright() as p:
     combo.fill("Projets");page.keyboard.press("Enter")
     expect(page.get_by_role("heading",name="Projets",exact=True)).to_be_visible()
     assert page.locator("#workspace-main").evaluate("el=>el===document.activeElement") is True
+    assert page.locator(".nav-group.open").count()==1
+    expect(page.locator(".nav-item.active")).to_contain_text("Projets")
+    expect(page.get_by_role("button",name="Nouveau",exact=True)).to_have_count(0)
+    expect(page.get_by_role("button",name="Modifier",exact=True)).to_have_count(0)
 
     undersized=page.evaluate("""()=>[...document.querySelectorAll("button,summary,.link-button")].filter(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.visibility!=="hidden"&&s.display!=="none"&&r.width>0&&r.height>0&&(r.width<24||r.height<24)}).map(el=>({text:(el.innerText||el.getAttribute("aria-label")||"").trim(),w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height,className:el.className}))""")
     assert undersized==[],undersized
@@ -137,4 +141,4 @@ with sync_playwright() as p:
     assert not page.locator(".workspace").evaluate("el=>el.classList.contains(\"sidebar-open\")")
     c.close();browser.close()
 server.shutdown()
-print("PASS standards V3: landmarks, modal focus, keyboard command palette, target sizes and responsive shell")
+print("PASS standards V4: landmarks, modal focus, keyboard command palette, permissions, target sizes and responsive shell")

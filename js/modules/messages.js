@@ -36,21 +36,21 @@ function newConversation(reload){
   });
 }
 export async function renderMessages(){
-  const root=h("div"),left=h("div"),right=h("div");let selected=null;let draw=()=>{};
+  const root=h("div"),left=h("div"),right=h("div");let selected=null,query="",draw=()=>{};
   const reload=async()=>{await loadWorkspace();draw()};
   root.append(pageHeader({eyebrow:"Communication",title:"Messages",subtitle:"Conversations internes synchronisées avec Squared Workspace.",actions:[button("Nouvelle conversation",{kind:"primary",iconName:"add",onClick:()=>newConversation(reload)})]}),h("div",{class:"split-view"},card("Conversations","Canaux auxquels vous avez accès.",left,{iconName:"messages"}),card("Discussion","Sélectionnez une conversation.",right,{iconName:"mail"})));
   await loadWorkspace();
 
   const open=async conversation=>{
     selected=conversation;draw();
-    const messages=conversationMessages(conversation),messageBox=textarea("",{placeholder:"Écrire un message…"});
+    const messages=conversationMessages(conversation),messageBox=textarea("",{placeholder:"Écrire un message…"}),count=h("span",{class:"composer-count",text:"0 / 4 000"});
     const threadItems=messages.length?messages.map(message=>{
       const mine=messageAuthorId(message)===state.user?.id;
       return h("article",{class:`message-bubble ${mine?"mine":""}`},h("div",{class:"message-bubble-head"},h("strong",{text:mine?"Vous":message.authorName||message.author||"Membre"}),h("span",{text:messageDate(message)?formatDate(messageDate(message)):""})),h("p",{text:messageBody(message)}));
     }):[emptyState("Aucun message","Commencez la conversation.")];
-    const thread=h("div",{class:"message-thread"},...threadItems);
+    const thread=h("div",{class:"message-thread",role:"log","aria-live":"polite","aria-label":`Messages de ${conversation.name||"la conversation"}`},...threadItems);
     const send=async()=>{
-      const text=messageBox.value.trim();if(!text)return;
+      const text=messageBox.value.trim();if(!text)return;if(text.length>4000){toast("Le message dépasse 4 000 caractères.","error");return}
       sendButton.disabled=true;
       try{
         await sendConversationMessage(conversation.id,text);messageBox.value="";await loadWorkspace();
@@ -58,23 +58,25 @@ export async function renderMessages(){
       }catch(error){toast(errorMessage(error),"error")}finally{sendButton.disabled=false}
     };
     const sendButton=button("Envoyer",{kind:"primary",iconName:"send",onClick:send});
+    messageBox.addEventListener("input",()=>{const length=messageBox.value.length;count.textContent=`${new Intl.NumberFormat("fr-FR").format(length)} / 4 000`;count.classList.toggle("warning",length>3600)});
     messageBox.addEventListener("keydown",event=>{if(event.key==="Enter"&&(event.metaKey||event.ctrlKey)){event.preventDefault();send()}});
     right.replaceChildren(h("div",{},
       h("div",{class:"card-head"},h("div",{},h("div",{class:"card-title",text:conversation.name||"Conversation"}),h("div",{class:"card-subtitle",text:participantNames(conversation)}))),
       thread,
       h("div",{class:"composer"},messageBox,sendButton),
-      h("div",{class:"muted",style:{marginTop:"7px"},text:"⌘/Ctrl + Entrée pour envoyer"})
+      h("div",{class:"composer-meta"},h("span",{text:"⌘/Ctrl + Entrée pour envoyer"}),count)
     ));
     requestAnimationFrame(()=>thread.scrollTo({top:thread.scrollHeight,behavior:"smooth"}));
     const last=messages.at(-1);markConversationRead(conversation.id,last?.id||null).catch(()=>{});
   };
   draw=()=>{
-    const conversations=state.workspace?.conversations||[];
-    const listContent=conversations.length?h("div",{class:"mail-list"},...conversations.map(conversation=>{
+    const conversations=state.workspace?.conversations||[],normalized=query.trim().toLowerCase();
+    const filtered=conversations.filter(conversation=>{const last=conversationMessages(conversation).at(-1);return `${conversation.name||""} ${participantNames(conversation)} ${last?messageBody(last):""}`.toLowerCase().includes(normalized)});
+    const listContent=filtered.length?h("div",{class:"mail-list"},...filtered.map(conversation=>{
       const messages=conversationMessages(conversation),last=messages.at(-1);
-      return h("button",{class:`mail-item ${conversation.unread?"unread":""} ${selected?.id===conversation.id?"active":""}`,type:"button",onClick:()=>open(conversation)},h("strong",{text:conversation.name||"Conversation"}),h("p",{text:last?messageBody(last).slice(0,90):participantNames(conversation)}),h("p",{text:last&&messageDate(last)?formatDate(messageDate(last)):`${messages.length} message(s)`}));
-    })):emptyState("Aucune conversation","Créez une conversation avec un membre Workspace.");
-    left.replaceChildren(listContent);
+      return h("button",{class:`mail-item ${conversation.unread?"unread":""} ${selected?.id===conversation.id?"active":""}`,type:"button","aria-pressed":String(selected?.id===conversation.id),onClick:()=>open(conversation)},h("strong",{text:conversation.name||"Conversation"}),h("p",{text:last?messageBody(last).slice(0,90):participantNames(conversation)}),h("p",{text:last&&messageDate(last)?formatDate(messageDate(last)):`${messages.length} message(s)`}));
+    })):emptyState(normalized?"Aucun résultat":"Aucune conversation",normalized?"Aucune conversation ne correspond à cette recherche.":"Créez une conversation avec un membre Workspace.","messages");
+    left.replaceChildren(h("input",{class:"search-input",type:"search",placeholder:"Rechercher une conversation…","aria-label":"Rechercher une conversation",value:query,onInput:event=>{query=event.target.value;draw()}}),h("div",{class:"section-gap"},listContent));
     if(!selected)right.replaceChildren(emptyState("Sélectionnez une conversation","Les messages et le champ de réponse apparaîtront ici.","mail"));
   };
   draw();return root;

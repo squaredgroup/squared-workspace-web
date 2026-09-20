@@ -14,7 +14,7 @@ function lessonContent(detail){
   return emptyState("Contenu indisponible","Cette leçon ne contient pas encore de contenu affichable.","document");
 }
 export async function renderTraining(){
-  const root=h("div");root.append(pageHeader({eyebrow:"Squared BUILD",title:"Formation",subtitle:"Parcours, leçons et progression synchronisés avec Squared BUILD."}));
+  const root=h("div");root.append(pageHeader({eyebrow:"Squared BUILD",title:"Formation BUILD",subtitle:"Parcours, leçons et progression synchronisés avec Squared BUILD."}));
   try{
     let catalog=await trainingCatalog();const stats=catalog.stats||{};
     root.append(h("div",{class:"grid stats"},

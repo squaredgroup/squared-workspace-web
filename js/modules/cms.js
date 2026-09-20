@@ -1,5 +1,5 @@
 import { cmsCollections,cmsItems,saveCMSItem,deleteCMSItem } from "../api.js";
-import { h,pageHeader,card,row,button,toolbar,modal,field,input,textarea,toast,errorMessage,emptyState,pretty,confirmAction } from "../ui.js";
+import { h,pageHeader,card,row,button,toolbar,modal,field,input,textarea,validateControls,toast,errorMessage,emptyState,pretty,confirmAction } from "../ui.js";
 import { SECTIONS,SECTION_DESCRIPTIONS } from "../config.js";
 
 const sectionHints={siteServices:["service"],siteProducts:["product","produit"],siteReferences:["reference","référence","project"],siteReleases:["release","version","product"],siteTraining:["training","course","lesson","module","program","build"],sitePublications:["publication","blog","news","article"],siteMedia:["media","image","asset"],siteHelp:["help","faq","support","article"],siteInbox:["inbox","request","contact","lead"],siteSystem:[]};
@@ -13,10 +13,11 @@ function fieldInput(meta,value){
 function readValue(meta,element){if(meta.type==="BOOLEAN")return element.checked;if(["NUMBER","DECIMAL"].includes(meta.type))return element.value===""?null:Number(element.value);if(meta.type==="MULTI_REFERENCE")return element.value.split(",").map(v=>v.trim()).filter(Boolean);return element.value}
 function editor(collection,item,reload){
   const writable=collection.collectionType==="NATIVE",fields=collection.fields.filter(field=>!field.systemField&&!field.readOnly);
-  const controls=fields.map(meta=>({meta,el:fieldInput(meta,item?.data?.[meta.key])}));
+  const controls=fields.map(meta=>{const el=fieldInput(meta,item?.data?.[meta.key]);if(meta.required)el.required=true;return{meta,el}});
   const content=h("div",{class:"form"},...controls.map(({meta,el})=>field(meta.displayName||pretty(meta.key),el,`${meta.type}${meta.required?" · requis":""}`)));
   modal({title:`${item?"Modifier":"Créer"} · ${collection.displayName}`,content,wide:true,actions:writable?[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
     try{
+      if(!validateControls(...controls.map(value=>value.el)))return;
       const data={},references={};
       for(const {meta,el} of controls){const value=readValue(meta,el);if(meta.type==="MULTI_REFERENCE")references[meta.key]=value;else data[meta.key]=value}
       await saveCMSItem(collection.id,item?.id||null,{data,references});toast("Wix CMS synchronisé");close();await reload();

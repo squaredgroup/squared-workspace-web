@@ -62,7 +62,7 @@ export const SECTIONS = {
 
   marketing:{title:"Marketing",group:"Marketing",permissions:["manageMarketing"],subpages:enterprise(["Campagnes","Calendrier éditorial","Audiences","Formulaires","Acquisition","Référencement","Consentements"],"sparkles")}, siteNewsletter:{title:"Newsletter",group:"Marketing",permissions:["manageCMS"]},
 
-  messages:{title:"Messages",group:"Communication"},
+  messages:{title:"Messages",group:"Communication",permissions:["sendMessages"]},
   mailbox:{title:"E-mails",group:"Communication",permissions:["viewMail"],subpages:[p("Boîte mail","mailbox","Consultez, classez et recherchez les échanges externes.","mail"),p("Connexion","connections","Administrez la connexion sécurisée à Google Workspace.","sync",["manageMailSettings"]),p("Modèles","templates","Préparez des modèles personnalisés et dynamiques.","document",["sendMail","organizeMail","manageMailSettings"]),p("Identité & style","appearance","Contrôlez le branding et le rendu des e-mails envoyés.","image",["manageMailSettings"])]},
   notifications:{title:"Notifications",group:"Communication"}, activity:{title:"Activité",group:"Communication",subpages:[p("Activité","activity","Explorez les actions récentes de votre espace.","clock"),p("Journal d’audit","audit","Contrôlez les opérations sensibles et leur traçabilité.","shield")]},
 

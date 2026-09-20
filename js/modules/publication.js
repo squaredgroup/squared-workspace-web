@@ -1,12 +1,12 @@
 import { listCoreDomain,getProjectPublication,saveProjectPublication,projectPublicationCommand } from "../api.js";
-import { h,pageHeader,card,row,button,modal,field,input,textarea,toast,errorMessage,emptyState,confirmAction } from "../ui.js";
+import { h,pageHeader,card,row,button,modal,field,input,textarea,validateControls,toast,errorMessage,emptyState,confirmAction } from "../ui.js";
 
 const csv=value=>Array.isArray(value)?value.join(", "):"";
 const list=value=>value.split(",").map(x=>x.trim()).filter(Boolean);
 async function edit(project,publication,reload){
   const fields={
-    slug:input(publication?.slug||project.title?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||""),
-    excerpt:textarea(publication?.excerpt||"",{}),caseStudy:textarea(publication?.caseStudy||"",{}),projectType:input(publication?.projectType||""),
+    slug:input(publication?.slug||project.title?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"",{required:true,pattern:"[a-z0-9]+(?:-[a-z0-9]+)*"}),
+    excerpt:textarea(publication?.excerpt||"",{required:true,maxLength:320}),caseStudy:textarea(publication?.caseStudy||"",{}),projectType:input(publication?.projectType||""),
     tools:input(csv(publication?.tools)),tags:input(csv(publication?.tags)),websiteUrl:input(publication?.websiteUrl||"",{type:"url"}),imageUrl:input(publication?.imageUrl||"",{type:"url"}),
     seoTitle:input(publication?.seoTitle||""),seoDescription:textarea(publication?.seoDescription||"",{})
   };
@@ -21,6 +21,7 @@ async function edit(project,publication,reload){
   );
   modal({title:`Publication · ${project.title}`,content,wide:true,actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
     try{
+      if(!validateControls(fields.slug,fields.excerpt,fields.websiteUrl,fields.imageUrl))return;
       await saveProjectPublication(project.id,{slug:fields.slug.value.trim(),excerpt:fields.excerpt.value.trim(),caseStudy:fields.caseStudy.value,projectType:fields.projectType.value.trim(),tools:list(fields.tools.value),tags:list(fields.tags.value),websiteUrl:fields.websiteUrl.value.trim()||null,imageUrl:fields.imageUrl.value.trim()||null,seoTitle:fields.seoTitle.value.trim(),seoDescription:fields.seoDescription.value.trim(),featured:featured.checked});
       toast("Publication enregistrée");close();await reload();
     }catch(error){toast(errorMessage(error),"error",6000)}

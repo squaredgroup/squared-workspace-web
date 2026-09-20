@@ -1,12 +1,12 @@
 const PREFIX = "squared-workspace-github-pages-";
-const CACHE = `${PREFIX}workspace-v3-auth-theme`;
+const CACHE = `${PREFIX}workspace-v4-product-system`;
 const APP_SHELL = [
-  "/index.html", "/manifest.webmanifest", "/css/tokens.css", "/css/app.css", "/css/auth.css", "/css/v3.css",
+  "/index.html", "/manifest.webmanifest", "/css/tokens.css", "/css/app.css", "/css/auth.css", "/css/v3.css", "/css/v4.css",
   "/js/runtime-config.js", "/js/boot.js", "/js/app.js", "/js/api.js", "/js/session.js", "/js/storage.js", "/js/auth-flow.js",
   "/js/config.js", "/js/store.js", "/js/ui.js", "/js/webauthn.js",
   "/js/modules/auth.js", "/js/modules/dashboard.js", "/js/modules/data.js", "/js/modules/publication.js",
   "/js/modules/cms.js", "/js/modules/mailbox.js", "/js/modules/messages.js", "/js/modules/training.js",
-  "/js/modules/profile.js", "/js/modules/people.js", "/js/modules/newsletter.js", "/js/modules/security.js", "/js/modules/team.js",
+  "/js/modules/profile.js", "/js/modules/people.js", "/js/modules/newsletter.js", "/js/modules/security.js", "/js/modules/team.js", "/js/modules/notifications.js",
   "/assets/squaredgroup-logo.png", "/assets/appicon-256.png", "/assets/appicon-512.png"
 ];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)))});
