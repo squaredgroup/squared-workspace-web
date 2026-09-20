@@ -42,6 +42,15 @@
   --sq-modal-glass:rgba(21,22,24,.94);
   --sq-hover:rgba(255,255,255,.04);
   --sq-icon-filter:brightness(0) invert(1);
+  --sq-auth-card-bg:rgba(18,19,21,.86);
+  --sq-auth-card-border:rgba(255,255,255,.085);
+  --sq-auth-grid-line:rgba(255,255,255,.026);
+  --sq-auth-visual-gradient:linear-gradient(145deg,rgba(var(--sq-accent-rgb),.055),transparent 46%);
+  --sq-auth-panel-gradient:radial-gradient(circle at 70% 10%,rgba(var(--sq-accent-rgb),.055),transparent 34%);
+  --sq-auth-input-bg:#17181B;
+  --sq-auth-input-border:#303238;
+  --sq-auth-shadow:0 24px 80px rgba(0,0,0,.30);
+  --sq-auth-disabled-bg:color-mix(in srgb,var(--sq-accent) 58%,var(--sq-control));
 }
 html[data-theme="light"]{
   --sq-bg:#F4F5F1;
@@ -66,4 +75,13 @@ html[data-theme="light"]{
   --sq-modal-glass:rgba(255,255,255,.95);
   --sq-hover:rgba(17,21,16,.045);
   --sq-icon-filter:none;
+  --sq-auth-card-bg:rgba(255,255,255,.88);
+  --sq-auth-card-border:rgba(84,96,80,.15);
+  --sq-auth-grid-line:rgba(17,21,16,.038);
+  --sq-auth-visual-gradient:linear-gradient(145deg,rgba(var(--sq-accent-rgb),.12),rgba(255,255,255,.28) 42%,transparent 74%);
+  --sq-auth-panel-gradient:radial-gradient(circle at 72% 12%,rgba(var(--sq-accent-rgb),.10),transparent 34%);
+  --sq-auth-input-bg:#F4F6F1;
+  --sq-auth-input-border:#D4DAD0;
+  --sq-auth-shadow:0 24px 80px rgba(35,52,31,.10);
+  --sq-auth-disabled-bg:color-mix(in srgb,var(--sq-accent) 64%,#E8ECE4);
 }
