@@ -32,13 +32,14 @@ def fixture(route):
 
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,args=["--no-sandbox"])
-    def make_context(width=1280):
+    def make_context(width=1280,init=None):
         c=browser.new_context(viewport={"width":width,"height":900},service_workers="block")
         c.route("**/*",lambda r:r.continue_() if r.request.url.startswith(origin) else r.abort())
         c.route("https://workspace.squaredgroup.studio/**",fixture)
         c.route_web_socket("wss://workspace.squaredgroup.studio/**",lambda ws:ws.on_message(lambda message:None))
         c.route("https://fonts.googleapis.com/**",lambda r:r.abort())
         c.route("https://fonts.gstatic.com/**",lambda r:r.abort())
+        if init: c.add_init_script(init)
         return c
     def login(page):
         page.goto(origin)
@@ -47,6 +48,36 @@ with sync_playwright() as p:
         page.get_by_label("Mot de passe",exact=True).fill("FixturePassword123")
         page.get_by_role("button",name="Se connecter",exact=True).click()
         expect(page.get_by_role("heading",name="Tableau de bord",exact=True)).to_be_visible()
+
+    # Authentication surfaces must follow the active theme on every public auth flow.
+    c=make_context();page=c.new_page();page.goto(origin)
+    expect(page.get_by_role("heading",name="Connexion",exact=True)).to_be_visible()
+    dark_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    dark_input_rgb=page.get_by_label("Adresse e-mail",exact=True).evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    assert sum(dark_auth_rgb)/3<90,dark_auth_rgb
+    assert sum(dark_input_rgb)/3<90,dark_input_rgb
+    c.close()
+
+    light_init="""localStorage.setItem('sq-web-appearance',JSON.stringify({mode:'light',density:'balanced',contentWidth:'balanced'}));"""
+    c=make_context(init=light_init);page=c.new_page();page.goto(origin)
+    expect(page.get_by_role("heading",name="Connexion",exact=True)).to_be_visible()
+    assert page.locator("html").get_attribute("data-theme")=="light"
+    light_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    light_panel_rgb=page.locator(".auth-panel").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    light_input_rgb=page.get_by_label("Adresse e-mail",exact=True).evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    assert sum(light_auth_rgb)/3>220,light_auth_rgb
+    assert sum(light_panel_rgb)/3>220,light_panel_rgb
+    assert sum(light_input_rgb)/3>220,light_input_rgb
+    for route,title in [
+        ("/#/activation?email=test%40example.invalid&token=fixture-auth-token-123456","Activer votre accès"),
+        ("/#/reinitialisation?email=test%40example.invalid&token=fixture-reset-token-1234567890","Nouveau mot de passe"),
+        ("/#/verification-email?email=test%40example.invalid&token=fixture-verify-token-1234567890","Vérifier votre adresse")
+    ]:
+        page.goto(origin+route)
+        expect(page.get_by_role("heading",name=title,exact=True)).to_be_visible()
+        auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+        assert sum(auth_rgb)/3>220,(title,auth_rgb)
+    c.close()
 
     c=make_context();page=c.new_page();login(page)
     assert page.locator(".skip-link").get_attribute("href")=="#workspace-main"
