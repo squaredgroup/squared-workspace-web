@@ -5,7 +5,7 @@ import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredS
 import { renderAuth } from "./modules/auth.js";
 import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce } from "./ui.js";
 
-let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let updateBanner=null;let navigationPrefix=false;
+let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let updateBanner=null;let navigationPrefix=false;let activeViewTransition=null;
 const app=document.querySelector("#app");
 
 function accessibleSections(){return Object.keys(SECTIONS).filter(key=>canAccessSection(key,state.user))}
@@ -106,7 +106,7 @@ async function sectionPage(section,subpage){
 async function renderCurrent({focus=true}={}){
   if(!refs.content||!safeRoute())return;
   const generation=++renderGeneration;refs.content.setAttribute("aria-busy","true");refs.content.replaceChildren(skeletonPage());const section=state.route.section,subpage=state.route.subpage;
-  try{const page=await sectionPage(section,subpage);if(generation!==renderGeneration)return;const apply=()=>{refs.content.replaceChildren(page);const nav=subnav();if(nav)page.insertBefore(nav,page.children[1]||null);refs.content.setAttribute("aria-busy","false");document.title=`${SECTIONS[section]?.title||"Workspace"} — Squared Workspace`};if(document.startViewTransition&&!state.appearance.reducedMotion)document.startViewTransition(apply);else apply();window.scrollTo({top:0,behavior:"instant"});if(focus){refs.content.focus({preventScroll:true});announce(`${SECTIONS[section]?.title||"Workspace"} chargé`)}}
+  try{const page=await sectionPage(section,subpage);if(generation!==renderGeneration)return;const apply=()=>{refs.content.replaceChildren(page);const nav=subnav();if(nav)page.insertBefore(nav,page.children[1]||null);refs.content.setAttribute("aria-busy","false");document.title=`${SECTIONS[section]?.title||"Workspace"} — Squared Workspace`};if(document.startViewTransition&&!state.appearance.reducedMotion&&!activeViewTransition){const transition=document.startViewTransition(apply);activeViewTransition=transition;transition.finished.catch(()=>{}).finally(()=>{if(activeViewTransition===transition)activeViewTransition=null})}else apply();window.scrollTo({top:0,behavior:"instant"});if(focus){refs.content.focus({preventScroll:true});announce(`${SECTIONS[section]?.title||"Workspace"} chargé`)}}
   catch(error){if(generation!==renderGeneration)return;refs.content.setAttribute("aria-busy","false");refs.content.replaceChildren(emptyState("Impossible de charger la page",errorMessage(error),"warning"));announce("Impossible de charger la page")}
 }
 function commandEntries(){
