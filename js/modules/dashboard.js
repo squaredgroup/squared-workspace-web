@@ -1,7 +1,7 @@
 import { state,setRoute } from "../store.js";
 import { loadWorkspace,loadDomainCatalog,listSpecialized } from "../api.js";
 import { h,pageHeader,card,row,emptyState,statCard,formatDate,relativeDate,button,icon,progressBar } from "../ui.js";
-import { activeAnnouncement,loadWorkspaceWebContent,safePublicURL } from "../public-content.js";
+import { activeAnnouncement,loadWorkspaceWebContent,richContentNode,safePublicURL } from "../public-content.js";
 
 const arrays=workspace=>({
   projects:workspace?.projects||[],
@@ -42,7 +42,7 @@ function managedContent(content){
     h("article",{class:`managed-announcement ${item.featured?"featured":""}`},
       h("div",{class:"managed-kicker"},icon("notification",14),h("span",{text:"Annonce Workspace"})),
       h("strong",{text:item.title}),
-      h("p",{text:item.body||item.summary||"Une information vient d’être publiée."}),
+      richContentNode(item,item.body||item.summary||"Une information vient d’être publiée."),
       managedLink(item,"En savoir plus")
     )
   )));
@@ -62,7 +62,7 @@ function managedContent(content){
 
   if(releases.length||faqs.length)blocks.push(h("div",{class:"grid two managed-support-grid"},
     releases.length?card("Versions & nouveautés","Les dernières évolutions publiées par l’équipe.",h("div",{class:"list"},...releases.slice(0,5).map(item=>row({title:item.title,subtitle:item.summary||item.body||"Note de version",status:item.version||"Nouveau",meta:item._updatedDate?formatDate(item._updatedDate):"Publié"}))),{iconName:"sparkles"}):null,
-    faqs.length?card("Questions fréquentes","Réponses pilotées depuis les données du site.",h("div",{class:"managed-faq-list"},...faqs.slice(0,6).map(item=>h("details",{class:"managed-faq"},h("summary",{text:item.question||item.title}),h("p",{text:item.body||item.summary||"Réponse disponible prochainement."})))),{iconName:"support"}):null
+    faqs.length?card("Questions fréquentes","Réponses pilotées depuis les données du site.",h("div",{class:"managed-faq-list"},...faqs.slice(0,6).map(item=>h("details",{class:"managed-faq"},h("summary",{text:item.question||item.title}),richContentNode(item,item.body||item.summary||"Réponse disponible prochainement.")))),{iconName:"support"}):null
   ));
   return h("div",{class:"managed-site-content section-gap"},h("div",{class:"managed-section-heading"},h("div",{},h("span",{text:"Contenus du site"}),h("h2",{text:"Actualités & ressources"})),h("div",{class:"managed-sync"},h("i"),h("span",{text:"Piloté depuis Workspace"}))),...blocks);
 }
