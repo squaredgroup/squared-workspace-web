@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "validate": "node --experimental-vm-modules scripts/validate.mjs",
     "quality": "node scripts/quality-budget.mjs",
-    "test:unit": "vitest run tests/foundations.test.ts",
+    "test:unit": "vitest run tests/foundations.test.ts && node --test tests/public-content.test.mjs",
     "test:a11y": "node tests/accessibility.mjs",
     "build": "vite build",
     "stage": "node scripts/stage.mjs",
