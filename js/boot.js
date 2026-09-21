@@ -1,4 +1,5 @@
 const root = document.querySelector("#app");
+export {};
 function failure(error) {
   console.error("Squared Workspace startup", error?.name || "Error");
   const page = document.createElement("main"); page.className = "sq-boot";
@@ -12,4 +13,4 @@ function failure(error) {
   });
   card.append(title, copy, retry); page.append(card); root.replaceChildren(page);
 }
-import("./app.js?v=20260921-mail-v6").catch(failure);
+import("./app.js").catch(failure);

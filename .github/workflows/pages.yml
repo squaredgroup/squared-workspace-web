@@ -15,23 +15,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install the reproducible frontend toolchain
+        run: npm ci
+      - name: Type-check TypeScript foundations
+        run: npm run typecheck
       - name: Validate modules and static resources
-        run: node --experimental-vm-modules scripts/validate.mjs
+        run: npm run validate
       - name: Enforce security, accessibility and performance budgets
-        run: node scripts/quality-budget.mjs
+        run: npm run quality
       - name: Test session handling
         run: node --experimental-vm-modules --test tests/session.test.mjs
+      - name: Test typed UI foundations
+        run: npm run test:unit
+      - name: Build and prepare the production artifact
+        run: npm run build && npm run stage
       - name: Install browser test tools
         run: |
-          python3 -m pip install --disable-pip-version-check playwright==1.57.0
-          python3 -m playwright install --with-deps chromium
+          python3 -m pip install --disable-pip-version-check playwright==1.63.0
+          npx playwright install --with-deps chromium
+      - name: Audit WCAG 2.2 AA landmarks and components
+        run: npm run test:a11y
       - name: Test browser flows and keyboard accessibility
         run: |
           python3 tests/browser_smoke.py
           python3 tests/standards_smoke.py
-          python3 tests/product_flows.py
-      - name: Prepare the static application only
-        run: node scripts/stage.mjs
+          WORKSPACE_VISUAL_DIR=output/playwright python3 tests/product_flows.py
+      - name: Preserve desktop and mobile visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-visual-recipe
+          path: output/playwright
+          if-no-files-found: ignore
       - uses: actions/upload-pages-artifact@v4
         if: github.ref == 'refs/heads/main'
         with:
@@ -51,3 +70,22 @@ jobs:
       - name: Deploy validated application
         id: deployment
         uses: actions/deploy-pages@v4
+  deploy-cloudflare:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: github-pages
+          path: artifact
+      - name: Extract validated artifact
+        run: mkdir cloudflare-site && tar -xf artifact/artifact.tar -C cloudflare-site
+      - name: Deploy the same validated artifact to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy cloudflare-site --project-name=squared-workspace-web --branch=main

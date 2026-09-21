@@ -1,4 +1,6 @@
 _site/
+dist/
+node_modules/
 output/playwright/
 test-login-*.png
 test-results.json
