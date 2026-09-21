@@ -52,6 +52,13 @@ function appendInlineText(target,source){
   if(cursor<value.length)target.append(document.createTextNode(value.slice(cursor)));
 }
 
+function appendStyledText(target,source,rawMarks){
+  const value=String(source||""),marks=Array.isArray(rawMarks)?rawMarks.map(mark=>({style:String(mark?.style||"").toUpperCase(),location:Math.max(0,Number(mark?.location)||0),length:Math.max(0,Number(mark?.length)||0),url:String(mark?.url||"")})).filter(mark=>mark.length>0&&mark.location<value.length):[];
+  if(!marks.length){appendInlineText(target,value);return}
+  const boundaries=[...new Set([0,value.length,...marks.flatMap(mark=>[mark.location,Math.min(value.length,mark.location+mark.length)])])].sort((a,b)=>a-b);
+  for(let index=0;index<boundaries.length-1;index+=1){const start=boundaries[index],end=boundaries[index+1];if(end<=start)continue;const active=marks.filter(mark=>mark.location<=start&&mark.location+mark.length>=end);let content=document.createTextNode(value.slice(start,end));for(const style of ["BOLD","ITALIC","UNDERLINE","STRIKETHROUGH","LINK"]){const mark=active.find(candidate=>candidate.style===style);if(!mark)continue;const wrapper=node(style==="BOLD"?"strong":style==="ITALIC"?"em":style==="UNDERLINE"?"u":style==="STRIKETHROUGH"?"s":"a");if(style==="LINK"){const href=safePublicURL(mark.url);if(!href)continue;wrapper.href=href;if(!href.startsWith(location.origin)){wrapper.target="_blank";wrapper.rel="noopener noreferrer"}}wrapper.append(content);content=wrapper}target.append(content)}
+}
+
 function renderBlock(block){
   const kind=String(block.kind||"PARAGRAPH").toUpperCase(),wrapper=node("div",blockClass(block));
   if(kind==="DIVIDER")return node("hr",blockClass(block));
@@ -67,7 +74,7 @@ function renderBlock(block){
   if(["BULLETED_LIST","NUMBERED_LIST"].includes(kind)){
     const list=node(kind==="NUMBERED_LIST"?"ol":"ul");String(block.text||"").split("\n").map(value=>value.trim()).filter(Boolean).forEach(value=>{const item=node("li");appendInlineText(item,value);list.append(item)});wrapper.append(list);return wrapper;
   }
-  const copy=node(kind==="HEADING"?"h3":kind==="QUOTE"?"blockquote":"p");appendInlineText(copy,block.text||"");if(kind==="CALLOUT"){const mark=node("span","managed-rich-callout-mark");mark.textContent="!";wrapper.append(mark)}wrapper.append(copy);return wrapper;
+  const copy=node(kind==="HEADING"?"h3":kind==="QUOTE"?"blockquote":"p");appendStyledText(copy,block.text||"",block.marks);if(kind==="CALLOUT"){const mark=node("span","managed-rich-callout-mark");mark.textContent="!";wrapper.append(mark)}wrapper.append(copy);return wrapper;
 }
 
 export function richContentNode(item,fallback=""){
