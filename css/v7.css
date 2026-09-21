@@ -73,8 +73,9 @@ html[data-theme="light"] body::before{opacity:.32;background-image:linear-gradie
 /* Dashboard */
 .executive-hero{min-height:270px;padding:clamp(24px,3vw,38px);border-radius:26px;background:radial-gradient(600px 320px at 78% 0,rgba(var(--sq-accent-rgb),.13),transparent 65%),linear-gradient(135deg,rgba(var(--sq-accent-rgb),.075),rgba(255,255,255,.014) 48%,var(--sq-card));box-shadow:inset 0 1px rgba(255,255,255,.04),0 28px 72px rgba(0,0,0,.08)}
 .executive-hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(var(--sq-accent-rgb),.32),transparent)}
-.hero-title{max-width:760px;font-size:clamp(34px,4vw,56px);text-wrap:balance}
-.greeting-emoji{display:inline-block;margin-right:.08em;font-size:.82em;transform:translateY(-.03em);transform-origin:70% 70%}
+.hero-title{display:flex;max-width:760px;align-items:center;gap:.18em;font-size:clamp(34px,4vw,56px);text-wrap:balance}
+.greeting-emoji{display:inline-block;flex:0 0 auto;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:.94em;font-variant-emoji:emoji;line-height:1;transform:translateY(-.03em);animation:greetingWave 2.8s var(--sq-ease-spring) 1 both;transform-origin:72% 76%}
+@keyframes greetingWave{0%,44%,100%{transform:translateY(-.03em) rotate(0)}8%{transform:translateY(-.03em) rotate(13deg)}16%{transform:translateY(-.03em) rotate(-8deg)}24%{transform:translateY(-.03em) rotate(11deg)}32%{transform:translateY(-.03em) rotate(-5deg)}}
 .hero-copy{max-width:680px;font-size:12px}
 .hero-meta{margin-top:24px}
 .pulse-item{min-height:62px;background:color-mix(in srgb,var(--sq-panel-translucent) 90%,transparent);backdrop-filter:blur(18px)}
