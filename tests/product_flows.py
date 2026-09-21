@@ -161,6 +161,8 @@ with sync_playwright() as playwright:
     page.get_by_label("Mot de passe", exact=True).fill("FixturePassword123")
     page.get_by_role("button", name="Se connecter", exact=True).click()
     expect(page.get_by_role("heading", name="Tableau de bord", exact=True)).to_be_visible()
+    expect(page.get_by_role("img",name="Main qui salue",exact=True)).to_be_visible()
+    expect(page.locator(".greeting-emoji")).to_have_text("👋")
     expect(page.get_by_role("button", name="Notifications, 1 non lue", exact=True)).to_be_visible()
     if visual_dir:
         page.wait_for_timeout(400)
