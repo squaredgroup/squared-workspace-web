@@ -24,19 +24,33 @@ export function h(tag,attrs={},...children){
   return el;
 }
 export function icon(name,size=17,fill=false){return h("img",{class:"icon",src:iconPath(name,fill),alt:"",width:size,height:size,decoding:"async",draggable:"false",style:{width:`${size}px`,height:`${size}px`}})}
-export function button(label,{iconName,kind="",small=false,onClick,type="button",disabled=false,title="",ariaLabel="",pressed=null,className=""}={}){return h("button",{class:`button ${kind} ${small?"small":""} ${className}`.trim(),type,disabled,onClick,title,"aria-label":ariaLabel||null,"aria-pressed":pressed==null?null:String(pressed)},iconName?icon(iconName,14):null,h("span",{text:label}))}
+export function button(label,{iconName,kind="",small=false,onClick,type="button",disabled=false,title="",ariaLabel="",pressed=null,className=""}={}){
+  const node=h("button",{class:`button ${kind} ${small?"small":""} ${className}`.trim(),type,disabled,title,"aria-label":ariaLabel||null,"aria-pressed":pressed==null?null:String(pressed)},iconName?icon(iconName,14):null,h("span",{text:label}));
+  if(onClick)node.addEventListener("click",event=>{const result=onClick(event);if(result&&typeof result.finally==="function"){node.disabled=true;node.setAttribute("aria-busy","true");result.finally(()=>{if(node.isConnected){node.disabled=false;node.removeAttribute("aria-busy")}})}});
+  return node;
+}
 export function iconButton(iconName,label,onClick){return h("button",{class:"icon-button",type:"button","aria-label":label,title:label,onClick},icon(iconName,17))}
 export function pretty(value){if(value==null||value==="")return"—";const raw=String(value).replace(/[_-]+/g," ").replace(/([a-z])([A-Z])/g,"$1 $2");return raw.charAt(0).toUpperCase()+raw.slice(1)}
 export function badge(value){const normalized=String(value||"—").toLowerCase().replace(/[^a-z]+/g,"-");let tone="";if(/active|published|completed|approved|paid|ready|healthy|online|won|settled|accepted/.test(normalized))tone="active";else if(/pending|review|overdue|waiting|planned|draft|paused|degraded|expired/.test(normalized))tone="warning";else if(/failed|rejected|offline|lost|cancelled|error|void|breached|revoked|locked/.test(normalized))tone="danger";return h("span",{class:`badge ${tone} ${normalized}`,text:pretty(value)})}
 export function formatDate(value,{dateOnly=false}={}){if(!value)return"—";const d=new Date(value);if(Number.isNaN(d.valueOf()))return String(value);return new Intl.DateTimeFormat("fr-FR",dateOnly?{dateStyle:"medium"}:{dateStyle:"medium",timeStyle:"short"}).format(d)}
 export function relativeDate(value){if(!value)return"—";const d=new Date(value),delta=d.getTime()-Date.now(),abs=Math.abs(delta);if(!Number.isFinite(delta))return"—";const rtf=new Intl.RelativeTimeFormat("fr",{numeric:"auto"});if(abs<60e3)return"à l’instant";if(abs<3600e3)return rtf.format(Math.round(delta/60e3),"minute");if(abs<86400e3)return rtf.format(Math.round(delta/3600e3),"hour");return rtf.format(Math.round(delta/86400e3),"day")}
 export function number(value,options={}){const n=Number(value);return Number.isFinite(n)?new Intl.NumberFormat("fr-FR",options).format(n):"—"}
-export function field(label,control,hint=""){const hintId=hint?nextId("field-hint"):"";if(hintId)control.setAttribute("aria-describedby",hintId);return h("label",{class:"field"},h("span",{text:label}),control,hint?h("small",{id:hintId,class:"muted",text:hint}):null)}
+export function field(label,control,hint=""){const hintId=hint?nextId("field-hint"):"";if(hintId)control.setAttribute("aria-describedby",hintId);return h("label",{class:`field ${control.required?"required":""}`.trim()},h("span",{text:label}),control,hint?h("small",{id:hintId,class:"muted",text:hint}):null)}
 export function input(value="",opts={}){return h("input",{value,type:opts.type||"text",placeholder:opts.placeholder||"",name:opts.name||"",required:opts.required||false,autocomplete:opts.autocomplete||"off",min:opts.min,max:opts.max,step:opts.step,minlength:opts.minLength,maxlength:opts.maxLength,pattern:opts.pattern,inputmode:opts.inputMode})}
 export function textarea(value="",opts={}){const el=h("textarea",{name:opts.name||"",placeholder:opts.placeholder||"",required:opts.required||false,rows:opts.rows||null,spellcheck:opts.spellcheck??true,minlength:opts.minLength,maxlength:opts.maxLength});el.value=value??"";return el}
 export function select(value,options=[],name=""){const el=h("select",{name});for(const option of options){const v=typeof option==="string"?option:option.value;const label=typeof option==="string"?pretty(option):option.label;el.append(h("option",{value:v,selected:String(v)===String(value),text:label}))}return el}
 export function card(title,subtitle,content,{accent=false,iconName,className=""}={}){return h("section",{class:`card ${accent?"accent":""} ${className}`.trim()},h("div",{class:"card-head"},h("div",{},h("h2",{class:"card-title",text:title}),subtitle?h("div",{class:"card-subtitle",text:subtitle}):null),iconName?icon(iconName,18):null),content)}
 export function statCard(label,value,meta="",iconName="trend"){return h("section",{class:"card stat-card"},h("div",{class:"stat-top"},h("div",{},h("div",{class:"stat-value",text:number(value)}),h("div",{class:"stat-label",text:label})),h("div",{class:"stat-icon"},icon(iconName,16))),meta?h("div",{class:"stat-meta",text:meta}):h("div"))}
+export function progressBar(value,label="Progression"){
+  const normalized=Math.max(0,Math.min(100,Number(value)||0));
+  return h("div",{class:"progress-block"},h("div",{class:"progress-copy"},h("span",{text:label}),h("strong",{text:`${Math.round(normalized)} %`})),h("div",{class:"progress-track",role:"progressbar","aria-label":label,"aria-valuemin":"0","aria-valuemax":"100","aria-valuenow":String(Math.round(normalized))},h("i",{style:{width:`${normalized}%`}})));
+}
+export function segmentedControl({label,options,value,onChange}){
+  return h("div",{class:"segmented",role:"group","aria-label":label},...options.map(option=>h("button",{type:"button",class:String(option.value)===String(value)?"active":"","aria-pressed":String(String(option.value)===String(value)),title:option.label,onClick:()=>onChange?.(option.value)},option.icon?icon(option.icon,14):null,h("span",{text:option.label}))));
+}
+export function statePanel({tone="neutral",title,copy,action}){
+  return h("div",{class:`state-panel ${tone}`,role:tone==="danger"?"alert":"status"},h("div",{class:"state-panel-copy"},h("strong",{text:title}),h("span",{text:copy})),action||null);
+}
 export function emptyState(title,copy,iconName="folder"){return h("div",{class:"empty"},h("div",{},icon(iconName,31),h("strong",{text:title}),h("p",{text:copy})))}
 export function skeletonPage(){return h("div",{class:"grid two"},...Array.from({length:6},()=>h("div",{class:"card"},h("div",{class:"skeleton",style:{height:"18px",width:"42%"}}),h("div",{class:"skeleton",style:{height:"88px",marginTop:"18px"}}))))}
 function refreshModalLayers(){

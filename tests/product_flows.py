@@ -13,7 +13,8 @@ from urllib.parse import urlsplit
 
 from playwright.sync_api import expect, sync_playwright
 
-ROOT = Path(__file__).resolve().parents[1]
+PROJECT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT / "_site"
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -237,6 +238,10 @@ with sync_playwright() as playwright:
     expect(page.get_by_role("heading", name="Tableau de bord", exact=True)).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     expect(page.locator(".mobile-tabs")).to_be_visible()
+    expect(page.locator(".mobile-tabs").get_by_text("Tableau de bord", exact=True)).to_be_visible()
+    if visual_dir:
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(visual_dir / "dashboard-mobile.png"), full_page=True)
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('mailbox','mailbox')}""")
     page.get_by_role("button", name="Revue Workspace V4", exact=False).click()
     expect(page.get_by_title("Aperçu de l’e-mail")).to_be_visible()

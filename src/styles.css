@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@import "../css/tokens.css";
+@import "../css/app.css";
+@import "../css/auth.css";
+@import "../css/v3.css";
+@import "../css/v4.css";
+@import "../css/v7.css";
+
+@source "../index.html";
+@source "../js/**/*.js";
+
+@theme inline {
+  --font-sans: var(--sq-font);
+  --color-workspace: var(--sq-bg);
+  --color-surface: var(--sq-surface);
+  --color-card: var(--sq-card);
+  --color-accent: var(--sq-accent);
+  --color-content: var(--sq-text);
+  --color-muted: var(--sq-muted);
+  --radius-card: var(--sq-radius-card);
+  --shadow-panel: var(--sq-shadow);
+}

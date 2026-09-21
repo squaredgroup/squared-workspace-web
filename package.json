@@ -1,0 +1,30 @@
+{
+  "name": "squared-workspace-web",
+  "version": "7.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "validate": "node --experimental-vm-modules scripts/validate.mjs",
+    "quality": "node scripts/quality-budget.mjs",
+    "test:unit": "vitest run tests/foundations.test.ts",
+    "test:a11y": "node tests/accessibility.mjs",
+    "build": "vite build",
+    "stage": "node scripts/stage.mjs",
+    "check": "npm run typecheck && npm run validate && npm run quality && npm run test:unit && npm run build && npm run stage && npm run test:a11y"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "24.10.1",
+    "playwright": "1.63.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}

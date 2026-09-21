@@ -5,10 +5,14 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#0D0D0E",
   "theme_color": "#0D0D0E",
   "lang": "fr",
+  "id": "/",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "categories": [
     "business",
     "productivity"

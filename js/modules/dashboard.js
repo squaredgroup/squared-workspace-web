@@ -1,6 +1,6 @@
 import { state,setRoute } from "../store.js";
 import { loadWorkspace,loadDomainCatalog,listSpecialized } from "../api.js";
-import { h,pageHeader,card,row,emptyState,statCard,formatDate,relativeDate,button,icon,badge } from "../ui.js";
+import { h,pageHeader,card,row,emptyState,statCard,formatDate,relativeDate,button,icon,progressBar } from "../ui.js";
 
 const arrays=workspace=>({
   projects:workspace?.projects||[],
@@ -28,6 +28,9 @@ export async function renderDashboard(today=false){
   const data=arrays(workspace);
   const tasks=active(data.tasks),projects=active(data.projects),missions=active(data.missions),validations=active(data.validations);
   const unread=data.notifications.filter(v=>!(v.isRead??v.payload?.isRead)).length;
+  const completedTasks=data.tasks.filter(value=>/(completed|done|closed)/i.test(statusOf(value))).length;
+  const taskProgress=data.tasks.length?completedTasks/data.tasks.length*100:0;
+  const overdue=[...tasks,...missions].filter(value=>dueOf(value)&&new Date(dueOf(value)).getTime()<Date.now()).length;
   const name=(state.user?.firstName||state.user?.first_name||state.user?.name||"").split(" ")[0];
   const currentDate=new Intl.DateTimeFormat("fr-FR",{weekday:"long",day:"numeric",month:"long"}).format(new Date());
 
@@ -61,6 +64,12 @@ export async function renderDashboard(today=false){
     statCard("Tâches ouvertes",tasks.length,"Exécution opérationnelle","check"),
     statCard("Décisions",validations.length,"Validations à traiter","warning"),
     statCard("Notifications",unread,"Éléments non lus","notification")
+  ));
+
+  root.append(h("section",{class:"decision-grid section-gap","aria-label":"Centre de décision"},
+    h("article",{class:"decision-card primary"},h("div",{class:"decision-icon"},icon("check",18)),h("div",{},h("span",{text:"Avancement des tâches"}),h("strong",{text:data.tasks.length?`${completedTasks} sur ${data.tasks.length} terminées`:"Aucune tâche mesurée"}),progressBar(taskProgress,"Tâches terminées"))),
+    h("article",{class:`decision-card ${overdue?"warning":""}`},h("div",{class:"decision-icon"},icon(overdue?"warning":"clock",18)),h("div",{},h("span",{text:"Échéances dépassées"}),h("strong",{text:overdue?`${overdue} élément${overdue>1?"s":""} à reprendre`:"Aucun retard détecté"}),h("p",{text:overdue?"Ouvrez Aujourd’hui pour réorganiser les priorités.":"Le périmètre visible reste dans les délais."})),overdue?quick("Agir","today","clock"):null),
+    h("article",{class:"decision-card"},h("div",{class:"decision-icon"},icon("notification",18)),h("div",{},h("span",{text:"Signal à traiter"}),h("strong",{text:unread?`${unread} notification${unread>1?"s":""} non lue${unread>1?"s":""}`:"Tout est lu"}),h("p",{text:unread?"Les nouveaux événements sont regroupés au même endroit.":"Aucun signal ne demande votre attention."})),unread?quick("Consulter","notifications","notification"):null)
   ));
 
   const due=[...tasks,...missions,...validations]

@@ -10,7 +10,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright, expect
 
-ROOT = Path(__file__).resolve().parents[1]
+PROJECT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT / '_site'
 class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -76,7 +77,7 @@ with sync_playwright() as p:
             expect(page.locator('.auth-mobile-brand')).to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'horizontal overflow'
         assert not errors,errors
-        page.screenshot(path=str(ROOT / f'test-login-{width}.png'))
+        page.screenshot(path=str(PROJECT / f'test-login-{width}.png'))
         record(f'connexion visible / largeur {width}');c.close()
 
     c=context(init="localStorage.setItem('sq-web-appearance','{broken');");page=c.new_page();page.goto(origin+'/#/tasks/%ZZ')
@@ -142,5 +143,5 @@ with sync_playwright() as p:
     record('MFA obligatoire : pas de session avant seconde vérification');c.close()
     browser.close()
 server.shutdown()
-(ROOT/'test-results.json').write_text(json.dumps({'passed':len(results),'tests':results,'api':'mocked','productionAuthenticationTested':False},ensure_ascii=False,indent=2))
+(PROJECT/'test-results.json').write_text(json.dumps({'passed':len(results),'tests':results,'api':'mocked','productionAuthenticationTested':False},ensure_ascii=False,indent=2))
 print(f'{len(results)} tests navigateur réussis (API simulée).')
