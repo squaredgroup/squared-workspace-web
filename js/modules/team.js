@@ -1,6 +1,6 @@
 import { state } from "../store.js";
 import { loadWorkspace,listInvitations,createInvitation,resendInvitation,revokeInvitation,changeMemberRole,changeMemberState,listCustomRoles,assignCustomRole,effectiveMemberAccess,memberSessions,revokeAdminSession } from "../api.js";
-import { h,pageHeader,card,row,button,modal,field,input,select,validateControls,toast,errorMessage,emptyState,formatDate,confirmAction,statCard,advancedEditor,pretty } from "../ui.js";
+import { h,pageHeader,card,row,button,modal,field,input,select,validateControls,toast,errorMessage,emptyState,formatDate,confirmAction,statCard,advancedEditor,pretty,profileAvatar } from "../ui.js";
 
 const ROLES=["OWNER","ADMIN","COLLABORATOR","PARTNER","CLIENT"];
 const has=permission=>state.user?.permissions?.includes(permission);
@@ -25,7 +25,7 @@ function accessView(value){
 }
 function memberDialog(member,customRoles,reload){
   const role=select(member.role||"COLLABORATOR",ROLES),custom=select(member.customRoleId||"",[{value:"",label:"Aucun rôle métier"},...customRoles.map(item=>({value:item.id,label:item.name}))]);
-  const content=h("div",{class:"form"},h("div",{class:"detail-list"},
+  const content=h("div",{class:"form"},h("div",{class:"member-dialog-identity"},profileAvatar(member,{className:"member-avatar-large",size:56}),h("div",{},h("strong",{text:memberName(member)}),h("span",{text:member.title||member.role||"Membre Workspace"}))),h("div",{class:"detail-list"},
     h("div",{class:"detail-row"},h("span",{text:"Membre"}),h("strong",{text:memberName(member)})),
     h("div",{class:"detail-row"},h("span",{text:"E-mail"}),h("strong",{text:member.email||"—"}))
   ),field("Rôle socle",role),field("Rôle métier principal",custom));
@@ -66,6 +66,7 @@ export async function renderTeam(subpage="members"){
     const membersHost=members.length?h("div",{class:"list"},...members.map(member=>row({
       title:memberName(member),
       subtitle:[member.title,member.email].filter(Boolean).join(" · "),
+      leading:profileAvatar(member,{className:"member-avatar",size:38,ariaHidden:true}),
       status:member.role,
       meta:member.availability||"",
       actions:[

@@ -1,6 +1,6 @@
 import { state } from "../store.js";
 import { loadWorkspace,sendConversationMessage,createConversation,markConversationRead } from "../api.js";
-import { h,pageHeader,card,button,modal,field,input,textarea,toast,errorMessage,emptyState,formatDate } from "../ui.js";
+import { h,pageHeader,card,button,modal,field,input,textarea,toast,errorMessage,emptyState,formatDate,profileAvatar } from "../ui.js";
 
 const conversationMessages=conversation=>Array.isArray(conversation.messages)?conversation.messages:[];
 const memberId=member=>member.id||member.memberId||member.member_id;
@@ -8,6 +8,12 @@ const memberName=member=>member.name||`${member.firstName||member.first_name||""
 function messageAuthorId(message){return message.authorId||message.authorID||message.author_id||message.senderId||message.senderID}
 function messageDate(message){return message.createdAt||message.created_at||message.time}
 function messageBody(message){return message.body||message.text||""}
+function teamMember(id){return (state.workspace?.team||[]).find(member=>memberId(member)===id)}
+function conversationPerson(conversation){
+  if(conversation.avatarData||conversation.avatar_data)return{name:conversation.name||"Conversation",avatarData:conversation.avatarData||conversation.avatar_data};
+  const other=(conversation.participantIDs||conversation.participantIds||[]).find(id=>id!==state.user?.id);
+  return teamMember(other)||{name:conversation.name||"Conversation"};
+}
 function participantNames(conversation){
   if(Array.isArray(conversation.participants)&&conversation.participants.length)return conversation.participants.map(value=>typeof value==="string"?value:memberName(value)).join(" · ");
   return `${conversation.participantIDs?.length||0} participant(s)`;
@@ -19,7 +25,7 @@ function newConversation(reload){
   const picker=members.length?h("div",{class:"member-picker"},...members.map(member=>{
     const id=memberId(member),check=h("input",{type:"checkbox"});
     check.addEventListener("change",()=>check.checked?selected.add(id):selected.delete(id));
-    return h("label",{class:"member-choice"},check,h("span",{},h("strong",{text:memberName(member)}),h("small",{text:member.title||member.role||member.email||""})));
+    return h("label",{class:"member-choice"},check,profileAvatar(member,{className:"member-avatar",size:38,ariaHidden:true}),h("span",{},h("strong",{text:memberName(member)}),h("small",{text:member.title||member.role||member.email||""})));
   })):emptyState("Aucun membre disponible","Aucun autre membre n’est actuellement visible dans votre périmètre.","users");
   modal({
     title:"Nouvelle conversation",
@@ -45,8 +51,8 @@ export async function renderMessages(){
     selected=conversation;draw();
     const messages=conversationMessages(conversation),messageBox=textarea("",{placeholder:"Écrire un message…"}),count=h("span",{class:"composer-count",text:"0 / 4 000"});
     const threadItems=messages.length?messages.map(message=>{
-      const mine=messageAuthorId(message)===state.user?.id;
-      return h("article",{class:`message-bubble ${mine?"mine":""}`},h("div",{class:"message-bubble-head"},h("strong",{text:mine?"Vous":message.authorName||message.author||"Membre"}),h("span",{text:messageDate(message)?formatDate(messageDate(message)):""})),h("p",{text:messageBody(message)}));
+      const authorId=messageAuthorId(message),mine=authorId===state.user?.id,author=mine?state.user:(teamMember(authorId)||{name:message.authorName||message.author||"Membre",avatarData:message.authorAvatarData||message.author_avatar_data});
+      return h("article",{class:`message-bubble ${mine?"mine":""}`},h("div",{class:"message-bubble-head"},profileAvatar(author,{className:"message-avatar",size:28,ariaHidden:true}),h("div",{},h("strong",{text:mine?"Vous":message.authorName||message.author||memberName(author)}),h("span",{text:messageDate(message)?formatDate(messageDate(message)):""}))),h("p",{text:messageBody(message)}));
     }):[emptyState("Aucun message","Commencez la conversation.")];
     const thread=h("div",{class:"message-thread",role:"log","aria-live":"polite","aria-label":`Messages de ${conversation.name||"la conversation"}`},...threadItems);
     const send=async()=>{
@@ -74,7 +80,7 @@ export async function renderMessages(){
     const filtered=conversations.filter(conversation=>{const last=conversationMessages(conversation).at(-1);return `${conversation.name||""} ${participantNames(conversation)} ${last?messageBody(last):""}`.toLowerCase().includes(normalized)});
     const listContent=filtered.length?h("div",{class:"mail-list"},...filtered.map(conversation=>{
       const messages=conversationMessages(conversation),last=messages.at(-1);
-      return h("button",{class:`mail-item ${conversation.unread?"unread":""} ${selected?.id===conversation.id?"active":""}`,type:"button","aria-pressed":String(selected?.id===conversation.id),onClick:()=>open(conversation)},h("strong",{text:conversation.name||"Conversation"}),h("p",{text:last?messageBody(last).slice(0,90):participantNames(conversation)}),h("p",{text:last&&messageDate(last)?formatDate(messageDate(last)):`${messages.length} message(s)`}));
+      return h("button",{class:`mail-item conversation-item ${conversation.unread?"unread":""} ${selected?.id===conversation.id?"active":""}`,type:"button","aria-pressed":String(selected?.id===conversation.id),onClick:()=>open(conversation)},profileAvatar(conversationPerson(conversation),{className:"conversation-avatar",size:38,ariaHidden:true}),h("span",{class:"mail-item-content"},h("strong",{text:conversation.name||"Conversation"}),h("p",{text:last?messageBody(last).slice(0,90):participantNames(conversation)}),h("p",{text:last&&messageDate(last)?formatDate(messageDate(last)):`${messages.length} message(s)`})),h("span",{class:"conversation-unread","aria-hidden":"true",text:conversation.unread?String(conversation.unread):""}));
     })):emptyState(normalized?"Aucun résultat":"Aucune conversation",normalized?"Aucune conversation ne correspond à cette recherche.":"Créez une conversation avec un membre Workspace.","messages");
     left.replaceChildren(h("input",{class:"search-input",type:"search",placeholder:"Rechercher une conversation…","aria-label":"Rechercher une conversation",value:query,onInput:event=>{query=event.target.value;draw()}}),h("div",{class:"section-gap"},listContent));
     if(!selected)right.replaceChildren(emptyState("Sélectionnez une conversation","Les messages et le champ de réponse apparaîtront ici.","mail"));
