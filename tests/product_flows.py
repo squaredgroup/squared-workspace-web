@@ -47,7 +47,16 @@ WORKSPACE = {
     "conversations": [{"id": "conversation-1", "name": "Direction produit", "participantIDs": [USER["id"], "member-2"], "unread": 1, "messages": [{"id": "message-1", "authorId": "member-2", "authorName": "Équipe Design", "body": "La revue est prête.", "createdAt": "2026-09-20T08:30:00Z"}]}],
     "team": [{"id": USER["id"], "firstName": "Jordan", "lastName": "Alévêque", "email": USER["email"], "role": "OWNER", "isActive": True}, {"id": "member-2", "firstName": "Équipe", "lastName": "Design", "email": "design@example.invalid", "role": "COLLABORATOR", "isActive": True}],
 }
-MAIL = {"id": "mail-1", "subject": "Revue Workspace V4", "fromName": "Squared Design", "fromEmail": "design@example.invalid", "preview": "La revue est disponible.", "body": "La revue est disponible.", "isRead": False, "receivedAt": "2026-09-20T08:45:00Z"}
+MAIL = {
+    "id": "mail-1", "direction": "INBOUND", "folder": "INBOX", "status": "RECEIVED",
+    "subject": "Revue Workspace V4", "fromName": "Squared Design", "fromEmail": "design@example.invalid",
+    "toEmails": [USER["email"]], "ccEmails": ["direction@example.invalid"],
+    "preview": "La revue est disponible avec sa mise en page originale.",
+    "textBody": "Bonjour Jordan,\n\nLa revue est disponible avec sa mise en page originale.\n\nL’équipe Squared Design",
+    "htmlBody": """<html><body style="margin:0;background:#f4f6f2;padding:24px"><table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="560" style="background:#fff;border-radius:18px;padding:32px"><tr><td><p style="margin:0;color:#69d34d;font-weight:700">SQUARED DESIGN</p><h1 style="font-size:28px">La revue est disponible.</h1><p>Le Workspace est prêt pour la validation finale.</p><img src="https://tracking.example.invalid/pixel.png" alt="Illustration distante"><p><a href="javascript:alert('unsafe')">Consulter la revue</a></p><script>alert('unsafe')</script></td></tr></table></td></tr></table></body></html>""",
+    "attachments": [{"id": "attachment-1", "fileName": "Revue-Workspace-V4.pdf", "contentType": "application/pdf", "byteCount": 2483200}],
+    "isRead": False, "isStarred": True, "receivedAt": "2026-09-20T08:45:00Z",
+}
 SETTINGS = {"appearanceMode": "dark", "dashboardDensity": "balanced", "contentWidth": "balanced", "language": "fr-FR", "timezone": "Europe/Paris", "compactSidebar": False, "reducedMotion": False}
 requests = []
 visual_dir = Path(os.environ["WORKSPACE_VISUAL_DIR"]) if os.environ.get("WORKSPACE_VISUAL_DIR") else None
@@ -181,7 +190,27 @@ with sync_playwright() as playwright:
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('mailbox','mailbox')}""")
     expect(page.get_by_role("heading", name="E-mails", exact=True)).to_be_visible()
     page.get_by_role("button", name="Revue Workspace V4", exact=False).click()
-    expect(page.get_by_text("La revue est disponible.", exact=True).last).to_be_visible()
+    expect(page.get_by_role("heading", name="Revue Workspace V4", exact=True)).to_be_visible()
+    expect(page.get_by_text("E-MAIL ORIGINAL", exact=True)).to_be_visible()
+    expect(page.get_by_text("Revue-Workspace-V4.pdf", exact=True)).to_be_visible()
+    preview = page.get_by_title("Aperçu de l’e-mail")
+    expect(preview).to_be_visible()
+    assert preview.get_attribute("sandbox") == ""
+    expect(page.frame_locator('iframe[title="Aperçu de l’e-mail"]').get_by_text("Le Workspace est prêt pour la validation finale.", exact=True)).to_be_visible()
+    srcdoc = preview.get_attribute("srcdoc")
+    assert "tracking.example.invalid" not in srcdoc
+    assert "<script>" not in srcdoc
+    assert "javascript:alert" not in srcdoc
+    expect(page.get_by_role("button", name="Afficher les images", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Version texte", exact=True).click()
+    expect(page.frame_locator('iframe[title="Aperçu de l’e-mail"]').get_by_text("Bonjour Jordan,", exact=False)).to_be_visible()
+    page.get_by_role("button", name="Original", exact=True).click()
+    page.get_by_role("button", name="Afficher les images", exact=True).click()
+    assert "tracking.example.invalid" in preview.get_attribute("srcdoc")
+    page.get_by_role("button", name="Masquer les images", exact=True).click()
+    if visual_dir:
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(visual_dir / "mailbox-desktop.png"), full_page=True)
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('settings')}""")
     expect(page.get_by_role("heading", name="Paramètres", exact=True)).to_be_visible()
@@ -190,7 +219,10 @@ with sync_playwright() as playwright:
     expect(page.get_by_text("Paramètres enregistrés", exact=True)).to_be_visible()
     assert any(method == "PUT" and path == "/v1/settings" and body.get("appearanceMode") == "system" for method, path, body in requests if body)
 
-    assert not errors, errors
+    # Chromium's service-worker blocker probes every frame. A sandbox without
+    # allow-same-origin rejects that probe by design; keep all other page errors fatal.
+    unexpected_errors = [error for error in errors if "context is sandboxed and lacks the 'allow-same-origin' flag" not in error]
+    assert not unexpected_errors, unexpected_errors
     context.close()
 
     mobile = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
@@ -205,9 +237,13 @@ with sync_playwright() as playwright:
     expect(page.get_by_role("heading", name="Tableau de bord", exact=True)).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     expect(page.locator(".mobile-tabs")).to_be_visible()
+    page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('mailbox','mailbox')}""")
+    page.get_by_role("button", name="Revue Workspace V4", exact=False).click()
+    expect(page.get_by_title("Aperçu de l’e-mail")).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     if visual_dir:
         page.wait_for_timeout(400)
-        page.screenshot(path=str(visual_dir / "dashboard-mobile.png"), full_page=True)
+        page.screenshot(path=str(visual_dir / "mailbox-mobile.png"), full_page=True)
     mobile.close()
     browser.close()
 
