@@ -65,6 +65,15 @@ with sync_playwright() as p:
     for width in [1280,390]:
         c=context(width);page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(origin)
         expect(page.get_by_role('heading',name='Connexion',exact=True)).to_be_visible()
+        if width == 1280:
+            expect(page.locator('.auth-capabilities')).to_be_visible()
+            expect(page.get_by_text('Pilotez tout.',exact=False)).to_be_visible()
+            password=page.get_by_label('Mot de passe',exact=True);password.fill('FixturePassword123')
+            reveal=page.get_by_role('button',name='Afficher le mot de passe',exact=True);reveal.click()
+            assert password.get_attribute('type') == 'text'
+            expect(page.get_by_role('button',name='Masquer le mot de passe',exact=True)).to_be_visible()
+        else:
+            expect(page.locator('.auth-mobile-brand')).to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'horizontal overflow'
         assert not errors,errors
         page.screenshot(path=str(ROOT / f'test-login-{width}.png'))

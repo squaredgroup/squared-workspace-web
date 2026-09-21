@@ -1,5 +1,5 @@
 const PREFIX = "squared-workspace-github-pages-";
-const CACHE = `${PREFIX}workspace-v4-product-system`;
+const CACHE = `${PREFIX}workspace-v5-auth-experience`;
 const APP_SHELL = [
   "/index.html", "/manifest.webmanifest", "/css/tokens.css", "/css/app.css", "/css/auth.css", "/css/v3.css", "/css/v4.css",
   "/js/runtime-config.js", "/js/boot.js", "/js/app.js", "/js/api.js", "/js/session.js", "/js/storage.js", "/js/auth-flow.js",

@@ -53,9 +53,13 @@ with sync_playwright() as p:
     c=make_context();page=c.new_page();page.goto(origin)
     expect(page.get_by_role("heading",name="Connexion",exact=True)).to_be_visible()
     dark_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
-    dark_input_rgb=page.get_by_label("Adresse e-mail",exact=True).evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    dark_input_rgb=page.locator(".auth-control").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
     assert sum(dark_auth_rgb)/3<90,dark_auth_rgb
     assert sum(dark_input_rgb)/3<90,dark_input_rgb
+    page.get_by_role("button",name="Activer le thème clair",exact=True).click()
+    assert page.locator("html").get_attribute("data-theme")=="light"
+    page.get_by_role("button",name="Activer le thème sombre",exact=True).click()
+    assert page.locator("html").get_attribute("data-theme")=="dark"
     c.close()
 
     light_init="""localStorage.setItem('sq-web-appearance',JSON.stringify({mode:'light',density:'balanced',contentWidth:'balanced'}));"""
@@ -64,7 +68,7 @@ with sync_playwright() as p:
     assert page.locator("html").get_attribute("data-theme")=="light"
     light_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
     light_panel_rgb=page.locator(".auth-panel").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
-    light_input_rgb=page.get_by_label("Adresse e-mail",exact=True).evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    light_input_rgb=page.locator(".auth-control").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
     assert sum(light_auth_rgb)/3>220,light_auth_rgb
     assert sum(light_panel_rgb)/3>220,light_panel_rgb
     assert sum(light_input_rgb)/3>220,light_input_rgb
@@ -141,4 +145,4 @@ with sync_playwright() as p:
     assert not page.locator(".workspace").evaluate("el=>el.classList.contains(\"sidebar-open\")")
     c.close();browser.close()
 server.shutdown()
-print("PASS standards V4: landmarks, modal focus, keyboard command palette, permissions, target sizes and responsive shell")
+print("PASS standards V5: auth experience, landmarks, modal focus, keyboard command palette, permissions, target sizes and responsive shell")

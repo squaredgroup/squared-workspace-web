@@ -1,7 +1,10 @@
-import { h, button, field, input, toast, errorMessage } from "../ui.js";
+import { h, button, field, input, icon, toast, errorMessage } from "../ui.js";
 import { passwordLogin, passkeyOptions, verifyPasskey, verifyRecovery, activateAccount, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, probeConnection } from "../api.js";
 import { getPasskey, webauthnSupported } from "../webauthn.js";
 import { authContext, clearAuthContext } from "../auth-flow.js";
+import { setAppearance } from "../store.js";
+
+let authFieldId = 0;
 
 function authError(error) {
   if (error?.name === "NotAllowedError") return "Vérification annulée ou délai dépassé. Réessayez ou utilisez votre code de récupération.";
@@ -23,9 +26,44 @@ function newPassword() {
 }
 const passwordHint = () => h("p", { class: "muted", text: "10 caractères minimum, avec une majuscule, une minuscule et un chiffre." });
 const link = (text, onClick) => h("button", { class: "link-button", type: "button", text, onClick });
+function authField(label, control, { iconName = "lock", trailing = null } = {}) {
+  const id = control.id || `auth-control-${++authFieldId}`;
+  control.id = id;
+  return h("div", { class: "auth-field" },
+    h("label", { for: id, text: label }),
+    h("div", { class: "auth-control" }, icon(iconName, 17), control, trailing));
+}
+function passwordVisibility(control) {
+  const toggle = h("button", { class: "auth-field-action", type: "button", "aria-label": "Afficher le mot de passe", title: "Afficher le mot de passe" }, icon("eyeOff", 17));
+  toggle.addEventListener("click", () => {
+    const reveal = control.type === "password";
+    control.type = reveal ? "text" : "password";
+    toggle.setAttribute("aria-label", reveal ? "Masquer le mot de passe" : "Afficher le mot de passe");
+    toggle.title = reveal ? "Masquer le mot de passe" : "Afficher le mot de passe";
+    toggle.setAttribute("aria-pressed", String(reveal));
+    control.focus({ preventScroll: true });
+  });
+  return toggle;
+}
+function themeControl() {
+  const control = h("button", { class: "auth-theme", type: "button" });
+  const refresh = () => {
+    const dark = document.documentElement.dataset.theme !== "light";
+    control.replaceChildren(icon(dark ? "sun" : "moon", 16), h("span", { text: dark ? "Mode clair" : "Mode sombre" }));
+    control.setAttribute("aria-label", dark ? "Activer le thème clair" : "Activer le thème sombre");
+  };
+  control.addEventListener("click", () => {
+    setAppearance({ mode: document.documentElement.dataset.theme === "light" ? "dark" : "light" });
+    refresh();
+  });
+  refresh();
+  return control;
+}
 function show(panel, title, description, content, footer = null, notice = "") {
   const status = h("div", { class: "auth-status", role: "alert", "aria-live": "polite", text: notice });
-  panel.replaceChildren(h("div", { class: "auth-box" }, h("h2", { text: title }), h("p", { text: description }), content, status, footer));
+  panel.replaceChildren(h("div", { class: "auth-box" },
+    h("div", { class: "auth-card-kicker" }, h("span", { class: "auth-live-dot" }), "Identité sécurisée"),
+    h("h2", { text: title }), h("p", { text: description }), content, status, footer));
   return status;
 }
 function busyForm(form, status, submitAction) {
@@ -46,26 +84,40 @@ function back(panel, onAuthenticated) {
 }
 export function renderAuth(onAuthenticated, { message = "", restoring = false } = {}) {
   const app = document.querySelector("#app");
-  const panel = h("section", { class: "auth-panel" });
+  const stage = h("div", { class: "auth-stage" });
+  const panel = h("section", { class: "auth-panel" },
+    h("div", { class: "auth-panel-top" },
+      h("div", { class: "auth-mobile-brand" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "" }), h("div", {}, h("strong", { text: "Squared Workspace" }), h("span", { text: "Executive operating system" }))),
+      h("div", { class: "auth-panel-tools" }, h("div", { class: "auth-private" }, icon("lock", 14), h("span", { text: "Accès privé" })), themeControl())),
+    stage,
+    h("div", { class: "auth-panel-foot" }, h("span", { text: "Squared Group" }), h("span", { text: "Environnement sécurisé" })));
   const showGrid = !authContext.action || authContext.action === "activation";
   const visual = h("section", { class: "auth-visual" }, showGrid ? h("div", { class: "auth-grid" }) : null,
-    h("img", { class: "auth-mark", src: "/assets/squaredgroup-logo.png", alt: "Squared Group" }),
-    h("div", { class: "auth-visual-copy" }, h("div", { class: "auth-kicker", text: "Squared Executive Workspace" }),
-      h("h1", { text: "Tout le groupe. Un seul système." }),
-      h("p", { text: "Retrouvez vos projets, vos échanges et les outils de votre espace Squared Workspace." })));
+    h("div", { class: "auth-orb auth-orb-one" }), h("div", { class: "auth-orb auth-orb-two" }),
+    h("div", { class: "auth-brand" }, h("img", { class: "auth-mark", src: "/assets/squaredgroup-logo.png", alt: "" }), h("div", {}, h("strong", { text: "Squared Workspace" }), h("span", { text: "Executive operating system" }))),
+    h("div", { class: "auth-visual-copy" },
+      h("div", { class: "auth-visual-status" }, h("span", { class: "auth-live-dot" }), "Espace opérationnel"),
+      h("div", { class: "auth-kicker", text: "Le centre de commandement Squared" }),
+      h("h1", {}, "Pilotez tout.", h("br"), h("span", { text: "Restez alignés." })),
+      h("p", { text: "Projets, décisions, finances et communication réunis dans un environnement conçu pour faire avancer le groupe." }),
+      h("div", { class: "auth-capabilities" },
+        h("div", {}, icon("grid", 17), h("span", {}, h("strong", { text: "Vue unifiée" }), h("small", { text: "Toute l’activité au même endroit" }))),
+        h("div", {}, icon("shield", 17), h("span", {}, h("strong", { text: "Accès maîtrisé" }), h("small", { text: "Permissions et sessions protégées" }))),
+        h("div", {}, icon("sync", 17), h("span", {}, h("strong", { text: "Toujours synchronisé" }), h("small", { text: "Un espace commun, sur chaque appareil" })))))
+  );
   app.replaceChildren(h("main", { id:"workspace-main", class: "auth-screen", tabindex:"-1" }, visual, panel));
-  if (authContext.action === "activation") showActivation(panel, onAuthenticated);
-  else if (authContext.action === "reset") showResetConfirm(panel, onAuthenticated);
-  else if (authContext.action === "verify") showEmailVerification(panel, onAuthenticated);
-  else showLogin(panel, onAuthenticated, message, restoring);
+  if (authContext.action === "activation") showActivation(stage, onAuthenticated);
+  else if (authContext.action === "reset") showResetConfirm(stage, onAuthenticated);
+  else if (authContext.action === "verify") showEmailVerification(stage, onAuthenticated);
+  else showLogin(stage, onAuthenticated, message, restoring);
 }
 function showLogin(panel, onAuthenticated, message = "", restoring = false) {
   const email = control("", { name: "email", type: "email", autocomplete: "email", placeholder: "vous@squaredgroup.studio" });
   const password = control("", { name: "password", type: "password", autocomplete: "current-password" });
   const submit = button(restoring ? "Restauration de la session…" : "Se connecter", { kind: "primary", type: "submit", disabled: restoring });
-  const form = h("form", { class: "form" }, field("Adresse e-mail", email), field("Mot de passe", password), submit);
+  const form = h("form", { class: "form auth-login-form" }, authField("Adresse e-mail", email, { iconName: "mail" }), authField("Mot de passe", password, { iconName: "lock", trailing: passwordVisibility(password) }), submit);
   const footer = h("div", { class: "auth-secondary" }, link("Mot de passe oublié", () => showResetRequest(panel, onAuthenticated)), link("Activer un accès", () => showActivation(panel, onAuthenticated)));
-  const status = show(panel, "Connexion", "Accédez à votre espace Squared Workspace sécurisé.", form, footer, message);
+  const status = show(panel, "Connexion", "Retrouvez votre espace de travail et reprenez là où vous vous étiez arrêté.", form, footer, message);
   if (restoring) { [...panel.querySelectorAll("input,button")].forEach(e => { e.disabled = true; }); return; }
   busyForm(form, status, async () => {
     const result = await passwordLogin(email.value.trim(), password.value);
@@ -91,7 +143,9 @@ function showLogin(panel, onAuthenticated, message = "", restoring = false) {
     try { status.textContent = await probeConnection(); } catch (error) { status.textContent = authError(error); }
     finally { diagnostic.disabled = false; }
   });
-  panel.querySelector(".auth-box").append(h("div", { class: "auth-secondary" }, diagnostic));
+  panel.querySelector(".auth-box").append(
+    h("div", { class: "auth-trust" }, icon("shield", 16), h("div", {}, h("strong", { text: "Connexion protégée" }), h("span", { text: "Votre session reste privée et chiffrée." }))),
+    h("div", { class: "auth-diagnostic" }, h("span", {}, h("i", { class: "auth-live-dot" }), "Services Workspace"), diagnostic));
 }
 function showMFA(panel, challenge, email, onAuthenticated) {
   const code = control("", { name: "recovery-code", autocomplete: "one-time-code", placeholder: "Code de récupération", minLength: 8, maxLength: 40 });
