@@ -107,8 +107,12 @@ with sync_playwright() as p:
     combo.fill("Projets");page.keyboard.press("Enter")
     expect(page.get_by_role("heading",name="Projets",exact=True)).to_be_visible()
     assert page.locator("#workspace-main").evaluate("el=>el===document.activeElement") is True
-    assert page.locator(".nav-group.open").count()==1
+    assert page.locator(".nav-group.open").count()==page.locator(".nav-group").count()
+    assert page.locator('.nav-group-head[aria-expanded="true"]').count()==page.locator(".nav-group-head").count()
     expect(page.locator(".nav-item.active")).to_contain_text("Projets")
+    general_group=page.get_by_role("button",name="Général",exact=True)
+    general_group.click();expect(general_group).to_have_attribute("aria-expanded","false")
+    general_group.click();expect(general_group).to_have_attribute("aria-expanded","true")
     expect(page.get_by_role("button",name="Nouveau",exact=True)).to_have_count(0)
     expect(page.get_by_role("button",name="Modifier",exact=True)).to_have_count(0)
 

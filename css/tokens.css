@@ -27,7 +27,8 @@
   --sq-radius-control:13px;
   --sq-radius-small:10px;
   --sq-radius-pill:999px;
-  --sq-sidebar:292px;
+  --sq-sidebar:256px;
+  --sq-mobile-sidebar:min(286px,86vw);
   --sq-topbar:76px;
   --sq-content:1560px;
   --sq-shadow-sm:0 8px 24px rgba(0,0,0,.16);

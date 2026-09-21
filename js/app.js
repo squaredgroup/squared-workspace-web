@@ -1,5 +1,5 @@
 import { authContext } from "./auth-flow.js";
-import { state,setState,setRoute,setOpenGroup,subscribe,setAppearance } from "./store.js";
+import { state,setState,setRoute,setGroupOpen,subscribe,setAppearance } from "./store.js";
 import { SECTIONS,NAV_GROUPS,SECTION_DESCRIPTIONS,canAccessSection,canAccessSubpage,iconPath,realtimeURL } from "./config.js";
 import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredSession } from "./api.js";
 import { renderAuth } from "./modules/auth.js";
@@ -25,10 +25,10 @@ function activeSubpage(){
 function groupId(group){return "nav-group-"+group.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}
 function navGroup(group){
   const visible=group.sections.filter(key=>canAccessSection(key,state.user));if(!visible.length)return null;
-  const open=state.openGroup===group.name,id=groupId(group),container=h("div",{class:`nav-group ${open?"open":""}`});
-  container.append(h("button",{class:"nav-group-head",type:"button","aria-expanded":String(open),"aria-controls":id,onClick:()=>setOpenGroup(open?"":group.name)},h("span",{text:group.name}),h("img",{class:"group-chevron",src:iconPath("ChevronDown"),alt:"",width:14,height:14})));
+  const open=!state.closedGroups?.[group.name],id=groupId(group),container=h("div",{class:`nav-group ${open?"open":""}`});
+  container.append(h("button",{class:"nav-group-head",type:"button","aria-expanded":String(open),"aria-controls":id,onClick:()=>setGroupOpen(group.name,!open)},h("span",{text:group.name}),h("img",{class:"group-chevron",src:iconPath("ChevronDown"),alt:"",width:14,height:14})));
   const items=h("div",{id,class:"nav-items",hidden:!open});
-  if(open)for(const key of visible){const section=SECTIONS[key];items.append(h("button",{class:`nav-item ${state.route.section===key?"active":""}`,type:"button","aria-current":state.route.section===key?"page":null,onClick:()=>{if(state.openGroup!==group.name)setOpenGroup(group.name);setRoute(key,section.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")}},h("img",{class:"nav-icon",src:iconPath(key),alt:"",width:18,height:18,decoding:"async"}),h("span",{class:"nav-label",text:section.title})))}
+  if(open)for(const key of visible){const section=SECTIONS[key];items.append(h("button",{class:`nav-item ${state.route.section===key?"active":""}`,type:"button","aria-current":state.route.section===key?"page":null,onClick:()=>setRoute(key,section.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("img",{class:"nav-icon",src:iconPath(key),alt:"",width:18,height:18,decoding:"async"}),h("span",{class:"nav-label",text:section.title})))}
   container.append(items);return container;
 }
 function sidebar(){
@@ -171,6 +171,6 @@ window.addEventListener("keydown",event=>{
 });
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")swRegistration?.update().catch(()=>{})});
 setInterval(()=>{if(uiReady&&state.user)refreshChrome()},60*1000);
-function signature(){return JSON.stringify({route:state.route,openGroup:state.openGroup,sidebarOpen:state.sidebarOpen,appearance:state.appearance,online:state.online,lastSyncAt:state.lastSyncAt?.toISOString?.(),user:[state.user?.firstName,state.user?.first_name,state.user?.lastName,state.user?.last_name,state.user?.email,state.user?.role]})}
+function signature(){return JSON.stringify({route:state.route,closedGroups:state.closedGroups,sidebarOpen:state.sidebarOpen,appearance:state.appearance,online:state.online,lastSyncAt:state.lastSyncAt?.toISOString?.(),user:[state.user?.firstName,state.user?.first_name,state.user?.lastName,state.user?.last_name,state.user?.email,state.user?.role]})}
 subscribe(()=>{if(!uiReady||!state.user)return;const before=uiSignature?JSON.parse(uiSignature):{};const next=signature();if(next===uiSignature)return;const after=JSON.parse(next);uiSignature=next;if(!refs.shell){buildShell();return}const routeChanged=JSON.stringify(before.route)!==JSON.stringify(after.route);refreshChrome();if(routeChanged)renderCurrent({focus:true})});
 bootstrap().catch(error=>{resetInterface();toast(errorMessage(error),"error")});
