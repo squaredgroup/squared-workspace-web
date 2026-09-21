@@ -13,6 +13,7 @@ const sw=spawnSync(process.execPath,["--check","sw.js"],{stdio:"inherit"});if(sw
 const manifest=JSON.parse(await fs.readFile("manifest.webmanifest","utf8"));
 for(const icon of manifest.icons||[])await fs.access(path.join(root,icon.src.replace(/^\//,"")));
 const swSource=await fs.readFile("sw.js","utf8");for(const match of swSource.matchAll(/"(\/(?:js|css|assets)\/[^"*]+\.(?:js|css|png))"/g))await fs.access(path.join(root,match[1].slice(1)));
+if(!swSource.includes('if(url.pathname.startsWith("/js/")){event.respondWith(networkFirst'))throw new Error("Les modules JavaScript doivent être actualisés depuis le réseau avant le cache PWA");
 const config=await fs.readFile("js/config.js","utf8");const iconBlock=config.split("export const ICONS = {")[1].split("};")[0];
 for(const match of iconBlock.matchAll(/:\s*"([A-Za-z0-9]+)"/g))await fs.access(path.join(root,`assets/icons/IconlyRegular${match[1]}.svg`));
 console.log(`${paths.length} modules JavaScript liés, ressources, manifest et service worker validés.`);
