@@ -24,6 +24,25 @@ export function h(tag,attrs={},...children){
   return el;
 }
 export function icon(name,size=17,fill=false){return h("img",{class:"icon",src:iconPath(name,fill),alt:"",width:size,height:size,decoding:"async",draggable:"false",style:{width:`${size}px`,height:`${size}px`}})}
+export function avatarInitials(person={}){
+  const value=typeof person==="string"?person:(person.name||`${person.firstName||person.first_name||""} ${person.lastName||person.last_name||""}`.trim()||person.email||"");
+  return String(value).trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()||"SQ";
+}
+export function avatarDataURL(value){
+  if(typeof value!=="string"||!value)return"";
+  if(value.length>14_000_000)return"";
+  if(/^data:image\/(?:png|jpe?g);base64,[A-Za-z0-9+/=]+$/i.test(value))return value;
+  if(!/^[A-Za-z0-9+/=]+$/.test(value))return"";
+  const mime=value.startsWith("iVBORw0KGgo")?"image/png":value.startsWith("/9j/")?"image/jpeg":"";
+  return mime?`data:${mime};base64,${value}`:"";
+}
+export function profileAvatar(person={}, {className="avatar",size=36,label="",ariaHidden=false}={}){
+  const name=typeof person==="string"?person:(person.name||`${person.firstName||person.first_name||""} ${person.lastName||person.last_name||""}`.trim()||person.email||"Membre");
+  const source=avatarDataURL(typeof person==="object"?(person.avatarData||person.avatar_data):"");
+  const wrapper=h("span",{class:`profile-avatar ${className}`.trim(),style:{width:`${size}px`,height:`${size}px`,flexBasis:`${size}px`},role:ariaHidden?null:"img","aria-label":ariaHidden?null:(label||`Photo de profil de ${name}`),"aria-hidden":ariaHidden?"true":null},h("span",{class:"profile-avatar-initials",text:avatarInitials(person)}));
+  if(source)wrapper.append(h("img",{class:"profile-avatar-image",src:source,alt:"",decoding:"async",draggable:"false",onError:event=>event.currentTarget.remove()}));
+  return wrapper;
+}
 export function button(label,{iconName,kind="",small=false,onClick,type="button",disabled=false,title="",ariaLabel="",pressed=null,className=""}={}){
   const node=h("button",{class:`button ${kind} ${small?"small":""} ${className}`.trim(),type,disabled,title,"aria-label":ariaLabel||null,"aria-pressed":pressed==null?null:String(pressed)},iconName?icon(iconName,14):null,h("span",{text:label}));
   if(onClick)node.addEventListener("click",event=>{const result=onClick(event);if(result&&typeof result.finally==="function"){node.disabled=true;node.setAttribute("aria-busy","true");result.finally(()=>{if(node.isConnected){node.disabled=false;node.removeAttribute("aria-busy")}})}});
@@ -80,7 +99,7 @@ export function announce(message){const region=document.querySelector("#announce
 export function errorMessage(error){return error?.payload?.message||error?.message||"Une erreur est survenue."}
 export function pageHeader({eyebrow,title,subtitle,actions=[]}){return h("div",{class:"page-head"},h("div",{class:"page-head-main"},h("div",{class:"eyebrow",text:eyebrow}),h("h1",{class:"page-title",text:title}),h("div",{class:"page-subtitle",text:subtitle||""})),actions.length?h("div",{class:"page-actions"},...actions):null)}
 export function toolbar(search,onSearch,actions=[],label="Rechercher dans la liste"){const i=h("input",{class:"search-input",type:"search",placeholder:"Rechercher…",value:search||"","aria-label":label,onInput:e=>onSearch?.(e.target.value)});return h("div",{class:"toolbar"},i,h("div",{class:"spacer"}),...actions)}
-export function row({title,subtitle,status,meta,actions=[]}){return h("div",{class:"row"},h("div",{},h("div",{class:"row-title",text:title||"Sans titre"}),subtitle?h("div",{class:"row-sub",text:subtitle}):null),h("div",{class:"row-cell optional"},status?badge(status):""),h("div",{class:"row-cell optional",text:meta||""}),h("div",{class:"row-actions"},...actions))}
+export function row({title,subtitle,status,meta,actions=[],leading=null}){return h("div",{class:"row"},h("div",{class:"row-identity"},leading,h("div",{class:"row-copy"},h("div",{class:"row-title",text:title||"Sans titre"}),subtitle?h("div",{class:"row-sub",text:subtitle}):null)),h("div",{class:"row-cell optional"},status?badge(status):""),h("div",{class:"row-cell optional",text:meta||""}),h("div",{class:"row-actions"},...actions))}
 export function jsonEditor(value,name="json"){return textarea(JSON.stringify(value||{},null,2),{name})}
 export function safeJSON(raw,fallback={}){try{return JSON.parse(raw||"{}")}catch{return fallback}}
 export function validateControls(...controls){

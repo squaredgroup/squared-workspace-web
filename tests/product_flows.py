@@ -38,6 +38,7 @@ USER = {
     "id": "00000000-0000-4000-a000-000000000001", "firstName": "Jordan",
     "lastName": "Alévêque", "email": "product-test@example.invalid", "role": "OWNER",
     "permissions": PERMISSIONS,
+    "avatarData": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
 }
 SESSION = {"accessToken": "fixture-access", "refreshToken": "fixture-refresh-token-long-enough", "sessionId": "fixture-session", "user": USER}
 WORKSPACE = {
@@ -46,7 +47,7 @@ WORKSPACE = {
     "missions": [], "validations": [], "deliverables": [],
     "notifications": [{"id": "notification-1", "version": 1, "title": "Décision requise", "body": "Validez la version Web V4.", "kind": "Produit", "isRead": False, "createdAt": "2026-09-20T09:00:00Z"}],
     "conversations": [{"id": "conversation-1", "name": "Direction produit", "participantIDs": [USER["id"], "member-2"], "unread": 1, "messages": [{"id": "message-1", "authorId": "member-2", "authorName": "Équipe Design", "body": "La revue est prête.", "createdAt": "2026-09-20T08:30:00Z"}]}],
-    "team": [{"id": USER["id"], "firstName": "Jordan", "lastName": "Alévêque", "email": USER["email"], "role": "OWNER", "isActive": True}, {"id": "member-2", "firstName": "Équipe", "lastName": "Design", "email": "design@example.invalid", "role": "COLLABORATOR", "isActive": True}],
+    "team": [{"id": USER["id"], "firstName": "Jordan", "lastName": "Alévêque", "email": USER["email"], "role": "OWNER", "isActive": True, "avatarData": USER["avatarData"]}, {"id": "member-2", "firstName": "Équipe", "lastName": "Design", "email": "design@example.invalid", "role": "COLLABORATOR", "isActive": True}],
 }
 MAIL = {
     "id": "mail-1", "direction": "INBOUND", "folder": "INBOX", "status": "RECEIVED",
@@ -163,6 +164,8 @@ with sync_playwright() as playwright:
     expect(page.get_by_role("heading", name="Tableau de bord", exact=True)).to_be_visible()
     expect(page.get_by_role("img",name="Main qui salue",exact=True)).to_be_visible()
     expect(page.locator(".greeting-emoji")).to_have_text("👋")
+    expect(page.locator(".account-card .profile-avatar-image")).to_be_visible()
+    assert page.locator(".account-card .profile-avatar-image").evaluate("image=>image.naturalWidth>0")
     expect(page.get_by_role("button", name="Notifications, 1 non lue", exact=True)).to_be_visible()
     if visual_dir:
         page.wait_for_timeout(400)
@@ -174,6 +177,17 @@ with sync_playwright() as playwright:
         expect(page.locator("#workspace-main")).to_have_attribute("aria-busy", "false")
         expect(page.get_by_role("heading", name=section["title"], exact=True).first).to_be_visible()
         assert page.evaluate("document.documentElement.scrollWidth<=innerWidth"), section["key"]
+
+    page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('profile')}""")
+    expect(page.get_by_role("img", name="Photo de profil de Jordan Alévêque", exact=True)).to_be_visible()
+    expect(page.locator(".profile-identity .profile-avatar-image")).to_be_visible()
+    if visual_dir:
+        page.wait_for_timeout(200)
+        page.screenshot(path=str(visual_dir / "profile-photo-desktop.png"), full_page=True)
+
+    page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('team','members')}""")
+    expect(page.locator(".row .member-avatar .profile-avatar-image")).to_be_visible()
+    expect(page.locator(".row .member-avatar .profile-avatar-initials", has_text="ÉD")).to_be_visible()
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('notifications')}""")
     expect(page.get_by_text("Décision requise", exact=True)).to_be_visible()
