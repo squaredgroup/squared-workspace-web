@@ -11,6 +11,10 @@ test("les annonces respectent leur fenêtre de publication",()=>{
   assert.equal(activeAnnouncement({endsAt:"2026-09-20T12:00:00Z"},now),false);
 });
 
+test("le prédicat ne plante pas lorsqu’il est utilisé directement par Array.filter",()=>{
+  assert.equal([{title:"Information Workspace"}].filter(activeAnnouncement).length,1);
+});
+
 test("seuls les liens publics http et https sont acceptés",()=>{
   assert.equal(safePublicURL("javascript:alert(1)"),"");
   assert.equal(safePublicURL("https://docs.squaredgroup.studio/guide"),"https://docs.squaredgroup.studio/guide");

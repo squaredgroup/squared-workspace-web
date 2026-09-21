@@ -30,7 +30,7 @@ function managedLink(item,label="Ouvrir"){
 
 function managedContent(content){
   const role=String(state.user?.role||"").toLowerCase();
-  const announcements=content.announcements.filter(activeAnnouncement);
+  const announcements=content.announcements.filter(item=>activeAnnouncement(item));
   const onboarding=content.onboarding.filter(item=>!item.audience||String(item.audience).toLowerCase().split(/[,;]+/).map(value=>value.trim()).some(value=>!value||value==="tous"||role.includes(value)));
   const resources=[...content.resources,...content.downloads];
   const releases=content.releases;

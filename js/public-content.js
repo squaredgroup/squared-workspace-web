@@ -28,7 +28,8 @@ export function safePublicURL(value){
 }
 
 export function activeAnnouncement(item,now=new Date()){
-  const start=item?.startsAt?new Date(item.startsAt):null,end=item?.endsAt?new Date(item.endsAt):null,time=now.getTime();
+  const reference=now instanceof Date&&Number.isFinite(now.getTime())?now:new Date();
+  const start=item?.startsAt?new Date(item.startsAt):null,end=item?.endsAt?new Date(item.endsAt):null,time=reference.getTime();
   if(start&&!Number.isNaN(start.getTime())&&start.getTime()>time)return false;
   if(end&&!Number.isNaN(end.getTime())&&end.getTime()<time)return false;
   return true;
