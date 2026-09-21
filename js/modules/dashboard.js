@@ -89,7 +89,7 @@ export async function renderDashboard(today=false){
   root.append(h("section",{class:"executive-hero"},
     h("div",{},
       h("div",{class:"hero-kicker",text:today?currentDate:"Executive Workspace"}),
-      h("div",{class:"hero-title",text:`${greeting()}${name?", "+name:""}.`}),
+      h("div",{class:"hero-title"},h("span",{class:"greeting-emoji","aria-hidden":"true",text:"👋"}),h("span",{text:` ${greeting()}${name?", "+name:""}.`})),
       h("div",{class:"hero-copy",text:today?"Priorisez les tâches, décisions et échéances réellement utiles aujourd’hui.":"Le groupe, vos projets et vos décisions restent réunis dans un seul système opérationnel, avec les mêmes accès que dans Squared Workspace."}),
       h("div",{class:"hero-meta"},
         quick("Voir aujourd’hui","today","clock"),

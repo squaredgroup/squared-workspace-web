@@ -18,7 +18,7 @@ export const state = {
   workspaceEtag: null,
   domainCatalog: null,
   route: initialRoute(),
-  openGroup: tab.get("sq-open-group") || "Général",
+  closedGroups: tab.json("sq-closed-nav-groups", {}),
   sidebarOpen: false,
   commandOpen: false,
   notificationsOpen: false,
@@ -37,12 +37,22 @@ export function updateState(mutator){ mutator(state); notify(); }
 export function setRoute(section,subpage=""){
   state.route={section,subpage}; state.sidebarOpen=false;
   const group=SECTIONS[section]?.group;
-  if(group){state.openGroup=group;tab.set("sq-open-group",group)}
+  if(group&&state.closedGroups[group]){
+    state.closedGroups={...state.closedGroups};
+    delete state.closedGroups[group];
+    tab.set("sq-closed-nav-groups",JSON.stringify(state.closedGroups));
+  }
   const encoded = `#/${section}${subpage?`/${encodeURIComponent(subpage)}`:""}`;
   if(location.hash!==encoded) history.pushState(null,"",encoded);
   notify();
 }
-export function setOpenGroup(group){ state.openGroup=group; tab.set("sq-open-group",group); notify(); }
+export function setGroupOpen(group,open){
+  const closedGroups={...state.closedGroups};
+  if(open)delete closedGroups[group];else closedGroups[group]=true;
+  state.closedGroups=closedGroups;
+  tab.set("sq-closed-nav-groups",JSON.stringify(closedGroups));
+  notify();
+}
 export function setAppearance(patch){ state.appearance={...state.appearance,...patch}; preferences.set("sq-web-appearance",JSON.stringify(state.appearance)); applyAppearance(); notify(); }
 export function applyAppearance(){
   const preference=["light","dark","system"].includes(state.appearance.mode)?state.appearance.mode:"dark";
@@ -66,7 +76,11 @@ colorScheme.addEventListener?.("change",()=>{if(state.appearance.mode==="system"
 window.addEventListener("hashchange",()=>{
   state.route=initialRoute();
   const group=SECTIONS[state.route.section]?.group;
-  if(group){state.openGroup=group;tab.set("sq-open-group",group)}
+  if(group&&state.closedGroups[group]){
+    state.closedGroups={...state.closedGroups};
+    delete state.closedGroups[group];
+    tab.set("sq-closed-nav-groups",JSON.stringify(state.closedGroups));
+  }
   state.sidebarOpen=false;
   notify();
 });
