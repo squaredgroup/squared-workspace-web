@@ -106,7 +106,7 @@ async function renderCurrent({focus=true}={}){
   if(!refs.content||!safeRoute())return;
   const generation=++renderGeneration;refs.content.setAttribute("aria-busy","true");refs.content.replaceChildren(skeletonPage());const section=state.route.section,subpage=state.route.subpage;
   try{const page=await sectionPage(section,subpage);if(generation!==renderGeneration)return;const apply=()=>{refs.content.replaceChildren(page);const nav=subnav();if(nav)page.insertBefore(nav,page.children[1]||null);refs.content.setAttribute("aria-busy","false");document.title=`${SECTIONS[section]?.title||"Workspace"} — Squared Workspace`};if(document.startViewTransition&&!state.appearance.reducedMotion&&!activeViewTransition){const transition=document.startViewTransition(apply);activeViewTransition=transition;transition.finished.catch(()=>{}).finally(()=>{if(activeViewTransition===transition)activeViewTransition=null})}else apply();window.scrollTo({top:0,behavior:"instant"});if(focus){refs.content.focus({preventScroll:true});announce(`${SECTIONS[section]?.title||"Workspace"} chargé`)}}
-  catch(error){if(generation!==renderGeneration)return;refs.content.setAttribute("aria-busy","false");refs.content.replaceChildren(emptyState("Impossible de charger la page",errorMessage(error),"warning"));announce("Impossible de charger la page")}
+  catch(error){if(generation!==renderGeneration)return;refs.content.replaceChildren(emptyState("Chargement impossible",errorMessage(error),"warning"));refs.content.setAttribute("aria-busy","false");toast(errorMessage(error),"error",6000)}
 }
 function commandEntries(){
   const entries=[];
@@ -149,7 +149,7 @@ function connectRealtime(){
   try{
     const socket=new WebSocket(wsURL);state.realtime=socket;
     socket.addEventListener("open",()=>{reconnectDelay=1000;setState({lastSyncAt:new Date()})});
-    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}if(message.type==="connected")return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{try{await loadWorkspace();if(["dashboard","today","messages","notifications","activity"].includes(state.route.section))renderCurrent({focus:false})}catch{}},500)});
+    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}if(message.type==="connected")return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{try{await loadWorkspace();if(state.route.section==="messages")window.dispatchEvent(new Event("sq:messages-refresh"));else if(["dashboard","today","notifications","activity"].includes(state.route.section))renderCurrent({focus:false})}catch{}},500)});
     socket.addEventListener("close",()=>{if(socket!==state.realtime)return;state.realtime=null;if(uiReady&&state.accessToken&&state.online){realtimeReconnectTimer=setTimeout(connectRealtime,reconnectDelay);reconnectDelay=Math.min(30000,reconnectDelay*2)}});
   }catch{}
 }
