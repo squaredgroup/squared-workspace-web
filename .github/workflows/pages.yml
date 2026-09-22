@@ -52,6 +52,8 @@ jobs:
           WORKSPACE_VISUAL_DIR=output/playwright python3 tests/product_flows.py
       - name: Test mobile layouts and draft lifecycle
         run: WORKSPACE_VISUAL_DIR=output/playwright/mobile python3 tests/mobile_flows.py
+      - name: Test all mobile sections and modal lifecycle
+        run: WORKSPACE_VISUAL_DIR=output/playwright/mobile python3 tests/mobile_complete.py
       - name: Preserve desktop and mobile visual evidence
         if: always()
         uses: actions/upload-artifact@v4

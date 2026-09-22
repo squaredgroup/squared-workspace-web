@@ -13,7 +13,7 @@ export function h(tag,attrs={},...children){
     else if(key==="style"&&typeof value==="object") Object.assign(el.style,value);
     else if(key.startsWith("on")&&typeof value==="function") el.addEventListener(key.slice(2).toLowerCase(),value);
     else if(key==="dataset") Object.assign(el.dataset,value);
-    else if(["checked","disabled","selected","open","required","hidden","readonly","multiple","inert"].includes(key)) el[key]=Boolean(value);
+    else if(["checked","disabled","selected","open","required","hidden","readonly","multiple","inert"].includes(key)) el[key==="readonly"?"readOnly":key]=Boolean(value);
     else if(key==="value"&&"value" in el) el.value=value;
     else el.setAttribute(key,String(value));
   }
@@ -87,7 +87,9 @@ export function modal({title,content,actions=[],wide=false,onClose,role="dialog"
   overlay.append(panel);overlay.addEventListener("mousedown",event=>{if(closeOnBackdrop&&event.target===overlay)close()});
   panel.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();close();return}if(event.key!=="Tab")return;const nodes=visibleFocusable(panel);if(!nodes.length){event.preventDefault();panel.focus();return}const first=nodes[0],last=nodes.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
   (document.querySelector("#portal-root")||document.body).append(overlay);refreshModalLayers();
-  requestAnimationFrame(()=>{const target=(initialFocus?panel.querySelector(initialFocus):null)||panel.querySelector(".modal-body input,.modal-body textarea,.modal-body select,.modal-actions button:not([disabled])")||visibleFocusable(panel)[0]||panel;target.focus({preventScroll:true});});
+  // Focus the panel synchronously so Escape works even before the next animation frame.
+  panel.focus({preventScroll:true});
+  requestAnimationFrame(()=>{if(closed||!panel.isConnected||overlay.inert||document.activeElement!==panel)return;const target=(initialFocus?panel.querySelector(initialFocus):null)||panel.querySelector(".modal-body input,.modal-body textarea,.modal-body select,.modal-actions button:not([disabled])")||visibleFocusable(panel)[0]||panel;target.focus({preventScroll:true});});
   return{close,overlay,panel};
 }
 export function confirmAction({title="Confirmer",message,confirmLabel="Confirmer",danger=false,onConfirm}){
@@ -101,7 +103,7 @@ export function pageHeader({eyebrow,title,subtitle,actions=[]}){return h("div",{
 export function toolbar(search,onSearch,actions=[],label="Rechercher dans la liste"){const i=h("input",{class:"search-input",type:"search",placeholder:"Rechercher…",value:search||"","aria-label":label,onInput:e=>onSearch?.(e.target.value)});return h("div",{class:"toolbar"},i,h("div",{class:"spacer"}),...actions)}
 export function row({title,subtitle,status,meta,actions=[],leading=null}){return h("div",{class:"row"},h("div",{class:"row-identity"},leading,h("div",{class:"row-copy"},h("div",{class:"row-title",text:title||"Sans titre"}),subtitle?h("div",{class:"row-sub",text:subtitle}):null)),h("div",{class:"row-cell optional"},status?badge(status):""),h("div",{class:"row-cell optional",text:meta||""}),h("div",{class:"row-actions"},...actions))}
 export function jsonEditor(value,name="json"){return textarea(JSON.stringify(value||{},null,2),{name})}
-export function safeJSON(raw,fallback={}){try{return JSON.parse(raw||"{}")}catch{return fallback}}
+export function safeJSON(raw,fallback={}){try{return JSON.parse(raw||"{}") }catch{return fallback}}
 export function validateControls(...controls){
   const invalid=controls.flat().filter(control=>control&&typeof control.checkValidity==="function"&&!control.checkValidity());
   if(!invalid.length)return true;
