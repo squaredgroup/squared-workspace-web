@@ -13,4 +13,5 @@ function failure(error) {
   });
   card.append(title, copy, retry); page.append(card); root.replaceChildren(page);
 }
+import("./mobile.js").then(({initMobile})=>initMobile()).catch(error=>console.warn("Workspace mobile helpers", error?.name || "Error"));
 import("./app.js").catch(failure);

@@ -5,6 +5,7 @@
 @import "../css/v3.css";
 @import "../css/v4.css";
 @import "../css/v7.css";
+@import "../css/mobile.css";
 
 @source "../index.html";
 @source "../js/**/*.js";
@@ -19,4 +20,16 @@
   --color-muted: var(--sq-muted);
   --radius-card: var(--sq-radius-card);
   --shadow-panel: var(--sq-shadow);
+}
+
+/* Preserve native selection controls and contrast on touch-sized forms. */
+@media (max-width: 880px) {
+  .workspace .button.primary, .workspace .button.primary > span,
+  .modal .button.primary, .modal .button.primary > span { color: var(--sq-on-accent); }
+  .workspace input:is([type="checkbox"],[type="radio"]),
+  .modal input:is([type="checkbox"],[type="radio"]) {
+    width: 20px; height: 20px; min-width: 20px; min-height: 20px;
+    flex: 0 0 20px; accent-color: var(--sq-accent);
+  }
+  .workspace .member-choice, .modal .member-choice { min-height: 48px; }
 }
