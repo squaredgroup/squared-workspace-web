@@ -33,6 +33,12 @@ jobs:
         run: npm run test:unit
       - name: Build and prepare the production artifact
         run: npm run build && npm run stage
+      - name: Preserve inspectable production bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-preview
+          path: _site
+          retention-days: 7
       - name: Install browser test tools
         run: |
           python3 -m pip install --disable-pip-version-check playwright==1.63.0
