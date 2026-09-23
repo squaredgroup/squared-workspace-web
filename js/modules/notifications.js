@@ -1,48 +1,41 @@
-import { state } from "../store.js";
-import { loadWorkspace,saveCoreEntity } from "../api.js";
-import { h,pageHeader,card,button,emptyState,formatDate,relativeDate,toast,errorMessage,icon } from "../ui.js";
-
+import { state, setRoute } from "../store.js";
+import { canAccessSection } from "../config.js";
+import { loadWorkspace, saveCoreEntity } from "../api.js";
+import { h, pageHeader, button, emptyState, relativeDate, toast, errorMessage, icon } from "../ui.js";
+import { viewContext } from "../focus-state.js";
+import { normalize, notificationTarget, sectionForDomain, isFinished } from "../focus-model.js";
+import { openRecord, recordRow } from "../focus-records.js";
 const readState=value=>Boolean(value?.isRead??value?.is_read??value?.payload?.isRead??value?.payload?.is_read);
 const titleOf=value=>value?.title||value?.payload?.title||value?.payload?.subject||"Notification Workspace";
-const bodyOf=value=>value?.body||value?.message||value?.payload?.body||value?.payload?.message||value?.payload?.detail||"Une mise à jour est disponible dans votre espace.";
+const bodyOf=value=>value?.body||value?.message||value?.payload?.body||value?.payload?.message||value?.payload?.detail||"Une mise à jour est disponible.";
 const dateOf=value=>value?.createdAt||value?.created_at||value?.updatedAt||value?.updated_at||value?.payload?.createdAt||null;
-const categoryOf=value=>value?.kind||value?.type||value?.payload?.kind||value?.payload?.type||"Workspace";
-
-function period(value){
-  const date=new Date(dateOf(value));
-  if(Number.isNaN(date.valueOf()))return"Plus anciennes";
-  const age=Date.now()-date.getTime();
-  if(age<86400000&&new Date().getDate()===date.getDate())return"Aujourd’hui";
-  if(age<7*86400000)return"Cette semaine";
-  return"Plus anciennes";
-}
-function updatedNotification(value){
-  const now=new Date().toISOString();
-  return {...value,isRead:true,is_read:true,readAt:now,read_at:now,payload:{...(value.payload||{}),isRead:true,is_read:true,readAt:now,read_at:now}};
-}
-
 export async function renderNotifications(){
-  const root=h("div"),host=h("div");let filter="all",query="",notifications=[];
-  const reload=async()=>{await loadWorkspace();notifications=[...(state.workspace?.notifications||[])].sort((a,b)=>new Date(dateOf(b)||0)-new Date(dateOf(a)||0));draw()};
+  const root=h("div",{class:"focus-inbox"}),results=h("div"),decisions=h("section",{class:"focus-home-group"});
+  const context=viewContext("notifications",{query:"",filter:"all"});let notifications=[];
+  const search=h("input",{class:"search-input",type:"search",placeholder:"Rechercher une notification…","aria-label":"Rechercher une notification",value:context.query});
+  const all=button("Toutes",{pressed:context.filter==="all",onClick:()=>{context.filter="all";draw();}}),unread=button("Non lues",{pressed:context.filter==="unread",onClick:()=>{context.filter="unread";draw();}});
+  const controls=h("div",{class:"toolbar notification-toolbar"},h("div",{class:"segmented",role:"group","aria-label":"Filtrer les notifications"},all,unread),search);
+  const reload=async()=>{await loadWorkspace();notifications=[...(state.workspace?.notifications||[])].sort((a,b)=>new Date(dateOf(b)||0)-new Date(dateOf(a)||0));draw();};
   const markRead=async value=>{
     if(readState(value))return;
-    try{await saveCoreEntity("notifications",updatedNotification(value));toast("Notification marquée comme lue");await reload()}
-    catch(error){toast(errorMessage(error),"error",6000)}
+    const now=new Date().toISOString();
+    try{await saveCoreEntity("notifications",{...value,isRead:true,is_read:true,readAt:now,payload:{...(value.payload||{}),isRead:true,is_read:true,readAt:now}});toast("Notification marquée comme lue");await reload();}
+    catch(e){toast(errorMessage(e),"error");}
   };
-  const draw=()=>{
-    const normalized=query.trim().toLowerCase();
-    const visible=notifications.filter(value=>(filter==="all"||!readState(value))&&`${titleOf(value)} ${bodyOf(value)} ${categoryOf(value)}`.toLowerCase().includes(normalized));
-    const groups=["Aujourd’hui","Cette semaine","Plus anciennes"].map(label=>[label,visible.filter(value=>period(value)===label)]).filter(([,values])=>values.length);
-    const controls=h("div",{class:"toolbar notification-toolbar"},
-      h("div",{class:"segmented",role:"group","aria-label":"Filtrer les notifications"},
-        button("Toutes",{small:true,pressed:filter==="all",onClick:()=>{filter="all";draw()}}),
-        button("Non lues",{small:true,pressed:filter==="unread",onClick:()=>{filter="unread";draw()}})
-      ),
-      h("div",{class:"spacer"}),
-      h("input",{class:"search-input",type:"search",placeholder:"Rechercher une notification…","aria-label":"Rechercher une notification",value:query,onInput:event=>{query=event.target.value;draw()}})
-    );
-    host.replaceChildren(controls,visible.length?h("div",{class:"notification-groups"},...groups.map(([label,values])=>h("section",{class:"notification-group","aria-labelledby":`notifications-${label.replace(/\W/g,"-")}`},h("h2",{id:`notifications-${label.replace(/\W/g,"-")}`,text:label}),h("div",{class:"notification-list"},...values.map(value=>h("article",{class:`notification-card ${readState(value)?"read":"unread"}`},h("div",{class:"notification-icon"},icon(readState(value)?"check":"notification",17)),h("div",{class:"notification-copy"},h("div",{class:"notification-meta"},h("span",{text:categoryOf(value)}),h("time",{datetime:dateOf(value)||null,text:dateOf(value)?relativeDate(dateOf(value)):""})),h("h3",{text:titleOf(value)}),h("p",{text:bodyOf(value)})),readState(value)?null:button("Marquer comme lue",{small:true,kind:"ghost",onClick:()=>markRead(value)}))))))):emptyState(normalized?"Aucun résultat":filter==="unread"?"Tout est lu":"Aucune notification",normalized?"Aucune notification ne correspond à cette recherche.":filter==="unread"?"Vous n’avez aucune notification en attente.":"Les prochaines alertes et décisions apparaîtront ici.","notification"));
-  };
-  root.append(pageHeader({eyebrow:"Communication",title:"Notifications",subtitle:"Alertes, décisions et mises à jour qui demandent votre attention.",actions:[button("Actualiser",{iconName:"sync",onClick:reload})]}),card("Centre de notifications","Filtrez les éléments non lus et conservez une vue claire de l’activité utile.",host,{iconName:"notification"}));
-  await reload();return root;
+  function draw(){
+    all.setAttribute("aria-pressed",String(context.filter==="all"));unread.setAttribute("aria-pressed",String(context.filter==="unread"));
+    const term=normalize(context.query.trim());
+    const pending=canAccessSection("validations",state.user)?(state.workspace?.validations||[]).filter(item=>!isFinished(item)):[];
+    decisions.hidden=!pending.length;
+    decisions.replaceChildren(...[h("h2",{text:"Décisions en attente"}),h("p",{class:"focus-summary",text:"À examiner dans votre périmètre. Marquer une notification comme lue ne clôture pas une décision."}),...pending.slice(0,5).map(item=>recordRow("validations",item)),pending.length>5?button("Toutes les validations",{onClick:()=>setRoute("validations","pending")}):null].filter(Boolean));
+    const visible=notifications.filter(item=>(context.filter==="all"||!readState(item))&&normalize(`${titleOf(item)} ${bodyOf(item)}`).includes(term));
+    results.replaceChildren(...(visible.length?visible.map(value=>{
+      const target=notificationTarget(value),canOpen=target&&canAccessSection(sectionForDomain(target.domain),state.user);
+      return h("article",{class:`notification-card ${readState(value)?"read":"unread"}`},h("div",{class:"notification-icon"},icon("notification",20)),h("div",{class:"notification-copy"},h("div",{class:"notification-meta"},h("time",{text:dateOf(value)?relativeDate(dateOf(value)):""})),h("h3",{text:titleOf(value)}),h("p",{text:bodyOf(value)})),h("div",{class:"focus-notification-actions"},canOpen?button("Ouvrir l’élément",{onClick:()=>openRecord(target.domain,target.id)}):null,readState(value)?null:button("Marquer comme lue",{small:true,kind:"ghost",onClick:()=>markRead(value)})));
+    }):[emptyState(context.filter==="unread"?"Tout est lu":"Aucune notification",term?"Aucun résultat pour cette recherche.":"Les informations nouvelles apparaîtront ici.","notification")]));
+  }
+  search.addEventListener("input",()=>{context.query=search.value;draw();});
+  root.append(pageHeader({eyebrow:"Votre attention",title:"Notifications",subtitle:"Séparez les informations des décisions à prendre.",actions:[button("Actualiser",{iconName:"sync",onClick:reload})]}),decisions,controls,results);
+  if(state.online)await reload();else{notifications=[...(state.workspace?.notifications||[])];draw();}
+  return root;
 }

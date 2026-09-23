@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {dayKey,dueBucket,isMine,strictObject,putValue,isFinished,notificationTarget} from '../js/focus-model.js';
+test('calendar dates never shift with timezone',()=>{assert.equal(dayKey('2026-09-23','America/Los_Angeles'),'2026-09-23');assert.equal(dayKey('2026-09-23','Pacific/Auckland'),'2026-09-23');});
+test('invalid calendar dates stay undated',()=>{assert.equal(dayKey('2026-02-31'),'');assert.equal(dayKey('bad'),'');});
+test('timestamps use the selected timezone',()=>{assert.equal(dayKey('2026-09-22T23:30:00Z','Europe/Paris'),'2026-09-23');});
+test('actual date buckets distinguish future and missing dates',()=>{const now=new Date('2026-09-23T12:00:00Z');assert.equal(dueBucket({payload:{dueAt:'2026-09-24'}},now,'Europe/Paris'),'future');assert.equal(dueBucket({},now),'undated');assert.equal(dueBucket({dueAt:'2026-09-22'},now),'overdue');});
+test('unassigned tasks are not falsely personal',()=>{assert.equal(isMine({},'u1'),false);assert.equal(isMine({payload:{assigneeID:'u1'}},'u1'),true);assert.equal(isMine({assigneeIds:['u1']},'u1'),true);});
+test('invalid JSON cannot silently replace data',()=>{assert.throws(()=>strictObject('{bad'));assert.throws(()=>strictObject('[]'));assert.throws(()=>strictObject('{"__proto__":{}}'));assert.deepEqual(strictObject('{"custom":42}'),{custom:42});});
+test('aliases and unrelated payload are preserved',()=>{const data={payload:{due_at:'2026-09-23',custom:42}};putValue(data,['dueAt','due_at'],'2026-09-24');assert.deepEqual(data,{payload:{due_at:'2026-09-24',custom:42}});});
+test('reading and completion differ; targets are allowlisted',()=>{assert.equal(isFinished({status:'unapproved'}),false);assert.equal(isFinished({status:'approved'}),true);assert.deepEqual(notificationTarget({payload:{entityKind:'task',entityId:'t1'}}),{domain:'tasks',id:'t1'});assert.equal(notificationTarget({targetType:'javascript',targetId:'x'}),null);});
