@@ -155,7 +155,7 @@ export async function renderDataSection(sectionKey,subpage=""){
       const items=await listCoreDomain(core),writable=canWriteCore(core);let panel;
       const reload=async()=>{const next=await listCoreDomain(core);panel.querySelector(".domain-slot")?.replaceChildren(renderDomainList({kind:core,items:next,writable,reload,specialized:false}))};
       const slot=h("div",{class:"domain-slot"},renderDomainList({kind:core,items,writable,reload,specialized:false}));
-      panel=card(domainLabels[core]||pretty(core),`${items.length} élément${items.length>1?"s":""} synchronisé${items.length>1?"s":""} avec Workspace.`,slot,{iconName:sectionKey});body.append(panel);
+      panel=card("Liste · "+(domainLabels[core]||pretty(core)),`${items.length} élément${items.length>1?"s":""} synchronisé${items.length>1?"s":""} avec Workspace.`,slot,{iconName:sectionKey});body.append(panel);
     }
 
     for(const kind of kinds){

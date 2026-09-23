@@ -112,7 +112,7 @@ def flows(page):
     expect(page.locator('.sq-message-panel')).to_be_visible();expect(page.locator('.sq-conversation-list')).not_to_be_visible()
     box=page.get_by_placeholder('Écrire un message…');box.fill('Brouillon privé');box.focus()
     page.evaluate('window.dispatchEvent(new Event("sq:messages-refresh"))');expect(box).to_have_value('Brouillon privé');expect(box).to_be_focused()
-    go(page,'tasks');go(page,'messages');expect(box).to_have_value('Brouillon privé')
+    go(page,'tasks');go(page,'messages');page.locator('.conversation-item').filter(has_text='Direction produit').click();expect(box).to_have_value('Brouillon privé')
     check_width(page,'message-open-390');page.screenshot(path=str(OUT/'messages-390.png'),full_page=True)
     page.get_by_role('button',name='Envoyer',exact=True).click();expect(box).to_have_value('')
     expect(page.get_by_role('button',name='Envoyer',exact=True)).to_be_disabled()
@@ -120,7 +120,7 @@ def flows(page):
     box.fill('FAIL_TEST');page.get_by_role('button',name='Envoyer',exact=True).click();expect(page.get_by_text('Échec simulé. Réessayez.').first).to_be_visible();expect(box).to_have_value('FAIL_TEST')
     # Simulate the browser connectivity signal; no background mutation queue.
     page.evaluate('window.dispatchEvent(new Event("offline"))');expect(page.get_by_role('button',name='Envoyer',exact=True)).to_be_disabled()
-    box.fill('Brouillon hors ligne');go(page,'tasks');go(page,'messages');expect(box).to_have_value('Brouillon hors ligne')
+    box.fill('Brouillon hors ligne');go(page,'tasks');go(page,'messages');page.locator('.conversation-item').filter(has_text='Direction produit').click();expect(box).to_have_value('Brouillon hors ligne')
     page.evaluate('window.dispatchEvent(new Event("online"))');box.fill('')
     page.locator('.sq-conversation-back').click();expect(query).to_be_visible()
     go(page,'mailbox');page.locator('.mail-list-pane .mail-item').first.click()

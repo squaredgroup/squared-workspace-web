@@ -12,13 +12,13 @@ const messageDate = message => message.createdAt || message.created_at || messag
 const messageBody = message => message.body || message.text || "";
 const teamMember = id => (state.workspace?.team || []).find(member => memberId(member) === id);
 const volatileDrafts = new Set();
-const drafts = new Map(); // Memory only: never cache private messages in localStorage or the service worker.
+// Draft content is held exclusively by the bounded, per-session draft store.
 const sending = new Set(), reading = new Set();
 let owner = "", selectedId = null, listQuery = "", unreadOnly = false;
 let activeRefresh = null, unsubscribeView = null, generation = 0;
 function resetMessages() {
   owner = ""; selectedId = null; listQuery = ""; unreadOnly = false;
-  drafts.clear(); volatileDrafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
+  volatileDrafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
   unsubscribeView?.(); unsubscribeView = null;
 }
 window.addEventListener("sq:session-ended", resetMessages);
@@ -57,7 +57,7 @@ function newConversation(reload) {
         await createConversation({ id, name: name.value.trim() || "Nouvelle conversation", participants: [], unread: 0, messages: [], participantIDs: ids, kind: ids.length === 2 ? "direct" : "team", createdAt: new Date().toISOString() });
         if (state.user?.id !== user) return;
         toast("Conversation créée"); close(); selectedId = id;
-        try { await reload(); } catch (error) { toast(`Conversation créée, mais actualisation impossible : ${errorMessage(error)}`, "error"); }
+        try { await loadWorkspace(); setRoute("messages","",id); } catch (error) { toast(`Conversation créée, mais actualisation impossible : ${errorMessage(error)}`, "error"); }
       } catch (error) { if (state.user?.id === user) toast(errorMessage(error), "error", 6000); }
       finally { creating = false; }
     } }]
@@ -67,7 +67,7 @@ export async function renderMessages() {
   const currentOwner = state.user?.id || "member";
   if (owner !== currentOwner) { resetMessages(); owner = currentOwner; }
   unsubscribeView?.(); const version = ++generation;
-  if(state.route.item)selectedId=state.route.item;
+  selectedId=state.route.item||null;
   const root = h("div", { class: "sq-messages" }), left = h("div"), right = h("div", { class: "sq-thread-content" });
   const leftCard = card("Conversations", "Canaux auxquels vous avez accès.", left, { iconName: "messages", className: "sq-conversation-list" });
   const rightCard = card("Discussion", "Sélectionnez une conversation.", right, { iconName: "mail", className: "sq-message-panel" });
@@ -99,7 +99,7 @@ export async function renderMessages() {
     });
     results.replaceChildren(filtered.length ? h("div", { class: "mail-list" }, ...filtered.map(conversation => {
       const messages = conversationMessages(conversation), last = messages.at(-1), unread = Math.max(0, Number(conversation.unread) || 0);
-      const draft = drafts.get(draftKey(conversation.id)) || getDraft(conversation.id);
+      const draft = getDraft(conversation.id);
       return h("button", { class: `mail-item conversation-item ${unread ? "unread" : ""} ${selectedId === conversation.id ? "active" : ""}`, type: "button", "aria-pressed": String(selectedId === conversation.id), onClick: () => openConversation(conversation.id, true) },
         profileAvatar(conversationPerson(conversation), { className: "conversation-avatar", size: 38, ariaHidden: true }),
         h("span", { class: "mail-item-content" }, h("strong", { text: conversation.name || "Conversation" }), h("p", { text: draft ? "Brouillon non envoyé" : last ? messageBody(last).slice(0, 90) : participantNames(conversation) }), h("p", { text: last && messageDate(last) ? formatDate(messageDate(last)) : `${messages.length} message(s)` })),
@@ -157,12 +157,11 @@ export async function renderMessages() {
     };
     threadSearch.addEventListener("input", () => { threadQuery = threadSearch.value; drawBubbles(); });
     thread.addEventListener("scroll", () => { latest.hidden = thread.scrollHeight - thread.clientHeight - thread.scrollTop < 100; }, { passive: true });
-    messageBox = textarea(drafts.get(key) || getDraft(conversation.id) || "", { placeholder: "Écrire un message…", maxLength: 4000, rows: 2 });
+    messageBox = textarea(getDraft(conversation.id) || "", { placeholder: "Écrire un message…", maxLength: 4000, rows: 2 });
     messageBox.setAttribute("aria-label", "Écrire un message");
     const box = messageBox, count = h("span", { class: "composer-count" });
     draftNote = h("p", { class: "sq-message-draft" });
     const updateDraft = () => {
-      if (box.value) drafts.set(key, box.value); else drafts.delete(key);
       const stored=saveDraft(conversation.id,box.value);
       box.dataset.draftStored=String(stored);
       if(box.value&&!stored)volatileDrafts.add(key);else volatileDrafts.delete(key);
@@ -177,7 +176,7 @@ export async function renderMessages() {
       try {
         await sendConversationMessage(conversation.id, text); sent = true;
         if (owner !== currentOwner || state.user?.id !== currentOwner) return;
-        drafts.delete(key); volatileDrafts.delete(key); saveDraft(conversation.id,""); box.value = ""; announce("Message envoyé");
+        volatileDrafts.delete(key); saveDraft(conversation.id,""); box.value = ""; announce("Message envoyé");
         try { await loadWorkspace(); }
         catch { toast("Message envoyé, mais actualisation impossible. Ne le renvoyez pas : actualisez la discussion après reconnexion.", "error", 7000); }
       } catch (error) { if (owner === currentOwner && state.user?.id === currentOwner) toast(errorMessage(error), "error"); }
