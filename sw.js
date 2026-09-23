@@ -1,5 +1,5 @@
 const PREFIX = "squared-workspace-";
-const CACHE = `${PREFIX}workspace-focus-20260923`;
+const CACHE = `${PREFIX}workspace-os-polish-20260923`;
 const BUILD_ASSETS = []; // @vite-assets
 const APP_SHELL = [
   "/", "/index.html", "/manifest.webmanifest", "/assets/squaredgroup-logo.png", "/assets/appicon-256.png", "/assets/appicon-512.png",
