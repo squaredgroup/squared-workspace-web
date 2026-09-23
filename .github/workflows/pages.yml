@@ -31,7 +31,10 @@ jobs:
         run: node --experimental-vm-modules --test tests/session.test.mjs
       - name: Test typed UI foundations
         run: npm run test:unit
+      - name: Test calendar rules and lossless data adapters
+        run: node --test tests/focus-model.test.mjs
       - name: Build and prepare the production artifact
+        id: build
         run: npm run build && npm run stage
       - name: Preserve inspectable production bundle
         uses: actions/upload-artifact@v4
@@ -44,16 +47,23 @@ jobs:
           python3 -m pip install --disable-pip-version-check playwright==1.63.0
           npx playwright install --with-deps chromium
       - name: Audit WCAG 2.2 AA landmarks and components
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: npm run test:a11y
       - name: Test browser flows and keyboard accessibility
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           python3 tests/browser_smoke.py
           python3 tests/standards_smoke.py
           WORKSPACE_VISUAL_DIR=output/playwright python3 tests/product_flows.py
       - name: Test mobile layouts and draft lifecycle
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: WORKSPACE_VISUAL_DIR=output/playwright/mobile python3 tests/mobile_flows.py
       - name: Test all mobile sections and modal lifecycle
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: WORKSPACE_VISUAL_DIR=output/playwright/mobile python3 tests/mobile_complete.py
+      - name: Test Focus tasks, exact links, search and reload-safe drafts
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: WORKSPACE_VISUAL_DIR=output/playwright/focus python3 tests/focus_flows.py
       - name: Preserve desktop and mobile visual evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,7 +72,7 @@ jobs:
           path: output/playwright
           if-no-files-found: ignore
       - uses: actions/upload-pages-artifact@v4
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && success()
         with:
           path: _site
   deploy:

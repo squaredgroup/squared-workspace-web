@@ -6,6 +6,7 @@
 @import "../css/v4.css";
 @import "../css/v7.css";
 @import "../css/mobile.css";
+@import "../css/focus.css";
 
 @source "../index.html";
 @source "../js/**/*.js";
@@ -22,7 +23,27 @@
   --shadow-panel: var(--sq-shadow);
 }
 
-/* Preserve native selection controls and contrast on touch-sized forms. */
+/* Shared semantic controls: do not inherit legacy full-width button rules. */
+.sq-message-panel .composer textarea {
+  display:block;
+  box-sizing:border-box;
+  border:1px solid var(--sq-border);
+  border-radius:14px;
+  padding:12px;
+  color:var(--sq-text);
+  background:var(--sq-control);
+  font:inherit;
+  line-height:1.5;
+}
+.sq-message-panel .message-thread {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:10px;
+}
+.sq-message-panel .message-thread>.message-bubble { flex-shrink:0; }
+.sq-message-panel .message-thread>.message-bubble.mine { align-self:flex-end; }
+.sq-message-panel .sq-message-date { flex-shrink:0; }
 @media (max-width: 880px) {
   .workspace .button.primary, .workspace .button.primary > span,
   .modal .button.primary, .modal .button.primary > span { color: var(--sq-on-accent); }
@@ -32,4 +53,27 @@
     flex: 0 0 20px; accent-color: var(--sq-accent);
   }
   .workspace .member-choice, .modal .member-choice { min-height: 48px; }
+  .workspace .focus-topbar .top-actions button[aria-label="Recherche"] { display:grid; }
+  .workspace .sq-message-panel .composer textarea {
+    flex:1 1 0;
+    width:0;
+    min-width:0;
+    min-height:64px;
+    font-size:16px;
+  }
+  .workspace .sq-message-panel .composer>.button {
+    flex:0 0 auto;
+    width:auto;
+    max-width:35%;
+    min-width:44px;
+  }
+  .workspace .focus-attention { display:block; }
+  .workspace .focus-attention>.button { margin-top:12px; }
+  .workspace .focus-record-meta {
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .workspace .domain-slot:has(>.focus-collection) { background:transparent; }
 }

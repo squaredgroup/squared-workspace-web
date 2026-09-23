@@ -1,4 +1,5 @@
-import { state, subscribe } from "../store.js";
+import { getDraft, saveDraft } from "../focus-state.js";
+import { state, subscribe, setRoute } from "../store.js";
 import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead } from "../api.js";
 import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce } from "../ui.js";
 
@@ -10,18 +11,19 @@ const messageAuthorId = message => message.authorId || message.authorID || messa
 const messageDate = message => message.createdAt || message.created_at || message.time;
 const messageBody = message => message.body || message.text || "";
 const teamMember = id => (state.workspace?.team || []).find(member => memberId(member) === id);
-const drafts = new Map(); // Memory only: never cache private messages in localStorage or the service worker.
+const volatileDrafts = new Set();
+// Draft content is held exclusively by the bounded, per-session draft store.
 const sending = new Set(), reading = new Set();
 let owner = "", selectedId = null, listQuery = "", unreadOnly = false;
 let activeRefresh = null, unsubscribeView = null, generation = 0;
 function resetMessages() {
   owner = ""; selectedId = null; listQuery = ""; unreadOnly = false;
-  drafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
+  volatileDrafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
   unsubscribeView?.(); unsubscribeView = null;
 }
 window.addEventListener("sq:session-ended", resetMessages);
 window.addEventListener("sq:messages-refresh", () => activeRefresh?.());
-window.addEventListener("beforeunload", event => { if (drafts.size) { event.preventDefault(); event.returnValue = ""; } });
+window.addEventListener("beforeunload", event => { if (volatileDrafts.size) { event.preventDefault(); event.returnValue = ""; } });
 function conversationPerson(conversation) {
   if (conversation.avatarData || conversation.avatar_data) return { name: conversation.name || "Conversation", avatarData: conversation.avatarData || conversation.avatar_data };
   const other = (conversation.participantIDs || conversation.participantIds || []).find(id => id !== state.user?.id);
@@ -55,7 +57,7 @@ function newConversation(reload) {
         await createConversation({ id, name: name.value.trim() || "Nouvelle conversation", participants: [], unread: 0, messages: [], participantIDs: ids, kind: ids.length === 2 ? "direct" : "team", createdAt: new Date().toISOString() });
         if (state.user?.id !== user) return;
         toast("Conversation créée"); close(); selectedId = id;
-        try { await reload(); } catch (error) { toast(`Conversation créée, mais actualisation impossible : ${errorMessage(error)}`, "error"); }
+        try { await loadWorkspace(); setRoute("messages","",id); } catch (error) { toast(`Conversation créée, mais actualisation impossible : ${errorMessage(error)}`, "error"); }
       } catch (error) { if (state.user?.id === user) toast(errorMessage(error), "error", 6000); }
       finally { creating = false; }
     } }]
@@ -65,6 +67,7 @@ export async function renderMessages() {
   const currentOwner = state.user?.id || "member";
   if (owner !== currentOwner) { resetMessages(); owner = currentOwner; }
   unsubscribeView?.(); const version = ++generation;
+  selectedId=state.route.item||null;
   const root = h("div", { class: "sq-messages" }), left = h("div"), right = h("div", { class: "sq-thread-content" });
   const leftCard = card("Conversations", "Canaux auxquels vous avez accès.", left, { iconName: "messages", className: "sq-conversation-list" });
   const rightCard = card("Discussion", "Sélectionnez une conversation.", right, { iconName: "mail", className: "sq-message-panel" });
@@ -76,7 +79,7 @@ export async function renderMessages() {
   const selected = () => conversations().find(conversation => conversation.id === selectedId);
   const draftKey = id => `${currentOwner}:${id}`;
   const reload = async () => { await loadWorkspace(); if (alive()) paint(); };
-  root.append(pageHeader({ eyebrow: "Communication", title: "Messages", subtitle: "Vos conversations, avec des brouillons conservés pendant cette session.", actions: [button("Nouvelle conversation", { kind: "primary", iconName: "add", onClick: () => newConversation(reload) })] }), h("div", { class: "split-view" }, leftCard, rightCard));
+  root.append(pageHeader({ eyebrow: "Communication", title: "Messages", subtitle: "Vos échanges et vos décisions, dans leur contexte.", actions: [button("Nouvelle conversation", { kind: "primary", iconName: "add", onClick: () => newConversation(reload) })] }), h("div", { class: "split-view" }, leftCard, rightCard));
   const search = h("input", { class: "search-input", type: "search", placeholder: "Rechercher une conversation…", "aria-label": "Rechercher une conversation", value: listQuery });
   const results = h("div", { class: "section-gap" });
   const resultCount = h("span", { class: "sr-only", role: "status", "aria-live": "polite" });
@@ -96,7 +99,7 @@ export async function renderMessages() {
     });
     results.replaceChildren(filtered.length ? h("div", { class: "mail-list" }, ...filtered.map(conversation => {
       const messages = conversationMessages(conversation), last = messages.at(-1), unread = Math.max(0, Number(conversation.unread) || 0);
-      const draft = drafts.get(draftKey(conversation.id));
+      const draft = getDraft(conversation.id);
       return h("button", { class: `mail-item conversation-item ${unread ? "unread" : ""} ${selectedId === conversation.id ? "active" : ""}`, type: "button", "aria-pressed": String(selectedId === conversation.id), onClick: () => openConversation(conversation.id, true) },
         profileAvatar(conversationPerson(conversation), { className: "conversation-avatar", size: 38, ariaHidden: true }),
         h("span", { class: "mail-item-content" }, h("strong", { text: conversation.name || "Conversation" }), h("p", { text: draft ? "Brouillon non envoyé" : last ? messageBody(last).slice(0, 90) : participantNames(conversation) }), h("p", { text: last && messageDate(last) ? formatDate(messageDate(last)) : `${messages.length} message(s)` })),
@@ -109,22 +112,24 @@ export async function renderMessages() {
     const busy = sending.has(draftKey(conversation.id));
     sendButton.disabled = busy || !state.online || !messageBox.value.trim() || messageBox.value.length > 4000;
     sendButton.setAttribute("aria-busy", String(busy)); messageBox.disabled = busy;
-    if (draftNote) draftNote.textContent = !state.online ? "Hors ligne : votre brouillon reste dans cette session. Il ne sera pas envoyé automatiquement." : messageBox.value ? "Brouillon gardé dans cette session uniquement, jusqu’à la fermeture ou la déconnexion." : "Les messages sont envoyés uniquement après validation.";
+    if (draftNote) draftNote.textContent = !state.online ? "Hors ligne : votre brouillon reste dans cette session. Il ne sera pas envoyé automatiquement." : messageBox.value ? (messageBox.dataset.draftStored==="true"?"Brouillon conservé dans cet onglet, y compris après rechargement, pendant 24 h maximum. Effacé à la déconnexion.":"Stockage indisponible : brouillon en mémoire uniquement. Copiez-le avant de recharger.") : "Les messages sont envoyés uniquement après validation.";
   }
   function backToList() {
     selectedId = null; shownConversation = null; root.classList.remove("sq-conversation-open"); drawList();
+    if(state.route.item){setRoute("messages");return;}
     requestAnimationFrame(() => { window.scrollTo({ top: listScroll, behavior: "instant" }); search.focus({ preventScroll: true }); });
   }
   function openConversation(id, userInitiated = false) {
     if (!alive()) return;
     if (selectedId !== id) { threadQuery = ""; threadSearchOpen = false; }
     if (userInitiated && !root.classList.contains("sq-conversation-open")) listScroll = window.scrollY;
+    if(userInitiated&&state.route.item!==id){setRoute("messages","",id);return;}
     selectedId = id; drawList(); drawThread(userInitiated);
   }
   function drawThread(userInitiated = false) {
     const conversation = selected();
     root.classList.toggle("sq-conversation-open", Boolean(conversation));
-    if (!conversation) { selectedId = null; right.replaceChildren(emptyState("Sélectionnez une conversation", "Les messages et le champ de réponse apparaîtront ici.", "mail")); return; }
+    if (!conversation) { if(state.route.item){root.classList.add("sq-conversation-open");right.replaceChildren(button("Retour aux conversations",{onClick:()=>{selectedId=null;setRoute("messages");}}),emptyState("Conversation indisponible","Elle n’existe plus ou ne fait pas partie de votre périmètre.","lock"));return;} selectedId = null; right.replaceChildren(emptyState("Sélectionnez une conversation", "Les messages et le champ de réponse apparaîtront ici.", "mail")); return; }
     const key = draftKey(conversation.id), messages = conversationMessages(conversation);
     const oldThread = right.querySelector(".message-thread"), oldScroll = oldThread?.scrollTop || 0;
     const atBottom = !oldThread || oldThread.scrollHeight - oldThread.clientHeight - oldThread.scrollTop < 60;
@@ -152,12 +157,14 @@ export async function renderMessages() {
     };
     threadSearch.addEventListener("input", () => { threadQuery = threadSearch.value; drawBubbles(); });
     thread.addEventListener("scroll", () => { latest.hidden = thread.scrollHeight - thread.clientHeight - thread.scrollTop < 100; }, { passive: true });
-    messageBox = textarea(drafts.get(key) || "", { placeholder: "Écrire un message…", maxLength: 4000, rows: 2 });
+    messageBox = textarea(getDraft(conversation.id) || "", { placeholder: "Écrire un message…", maxLength: 4000, rows: 2 });
     messageBox.setAttribute("aria-label", "Écrire un message");
     const box = messageBox, count = h("span", { class: "composer-count" });
     draftNote = h("p", { class: "sq-message-draft" });
     const updateDraft = () => {
-      if (box.value) drafts.set(key, box.value); else drafts.delete(key);
+      const stored=saveDraft(conversation.id,box.value);
+      box.dataset.draftStored=String(stored);
+      if(box.value&&!stored)volatileDrafts.add(key);else volatileDrafts.delete(key);
       count.textContent = `${new Intl.NumberFormat("fr-FR").format(box.value.length)} / 4 000`;
       count.classList.toggle("warning", box.value.length > 3600); updateSendState();
     };
@@ -169,7 +176,7 @@ export async function renderMessages() {
       try {
         await sendConversationMessage(conversation.id, text); sent = true;
         if (owner !== currentOwner || state.user?.id !== currentOwner) return;
-        drafts.delete(key); box.value = ""; announce("Message envoyé");
+        volatileDrafts.delete(key); saveDraft(conversation.id,""); box.value = ""; announce("Message envoyé");
         try { await loadWorkspace(); }
         catch { toast("Message envoyé, mais actualisation impossible. Ne le renvoyez pas : actualisez la discussion après reconnexion.", "error", 7000); }
       } catch (error) { if (owner === currentOwner && state.user?.id === currentOwner) toast(errorMessage(error), "error"); }

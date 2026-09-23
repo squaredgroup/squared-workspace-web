@@ -47,7 +47,7 @@ async function sharePage() {
   const section = state.route.section;
   if (!allowed(section)) return;
   const validSubpage = SECTIONS[section].subpages?.some(page => page.id === state.route.subpage && canAccessSubpage(page, state.user));
-  const url = `${location.origin}${location.pathname}#/${section}${validSubpage ? `/${encodeURIComponent(state.route.subpage)}` : ""}`;
+  const url = `${location.origin}${location.pathname}#/${section}${validSubpage ? `/${encodeURIComponent(state.route.subpage)}` : ""}${state.route.item?`?item=${encodeURIComponent(state.route.item)}`:""}`;
   try {
     if (navigator.share) await navigator.share({ title: `${SECTIONS[section].title} — Squared Workspace`, url });
     else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url); toast("Lien copié. Le destinataire devra disposer des accès nécessaires."); }
@@ -60,7 +60,9 @@ function showCopyLink(url) {
   const control = h("input", { value: url, readonly: true, "aria-label": "Lien de la rubrique", onFocus: event => event.target.select() });
   modal({ title: "Copier le lien", content: h("div", { class: "form" }, control, h("p", { class: "sq-install-copy", text: "Copiez ce lien. Les droits d’accès du destinataire restent nécessaires." })) });
 }
-function openTools() {
+let mobileCommands={};
+export function configureMobile(commands){mobileCommands=commands;}
+export function openTools() {
   if (!state.user || document.querySelector(".sq-tools-sheet")) return;
   const content = h("div", { class: "sq-mobile-tools" });
   const actions = h("div", { class: "sq-tools-grid" });
@@ -70,10 +72,10 @@ function openTools() {
   }
   content.append(h("p", { class: "sq-tools-status", role: "status", text: !state.online
     ? "Hors ligne. Les informations déjà affichées restent consultables. Les actions serveur ne sont pas mises en attente : réessayez une fois connecté."
-    : state.loading ? "Synchronisation en cours…" : state.lastSyncAt ? `Dernier chargement des données ${relativeDate(state.lastSyncAt)}.` : "Aucun chargement de données confirmé pour cette session." }));
+    : state.loading ? "Synchronisation en cours…" : state.lastSyncAt ? `Dernier chargement confirmé ${relativeDate(state.lastSyncAt)}.` : "Aucun chargement de données confirmé pour cette session." }));
   actions.append(
-    action("Actualiser les données", "sync", () => document.querySelector('.top-actions [aria-label="Actualiser les données"]')?.click(), !state.online || state.loading),
-    action("Rechercher partout", "search", () => document.querySelector(".sidebar-search")?.click()),
+    action("Actualiser les données", "sync", () => mobileCommands.refresh?.(), !state.online || state.loading),
+    action("Rechercher partout", "search", () => mobileCommands.search?.()),
     action("Changer de thème", "sun", () => setAppearance({ mode: document.documentElement.dataset.theme === "light" ? "dark" : "light" })),
     action("Partager cette rubrique", "Share", sharePage),
     action("Installer Workspace", "download", openInstall)
@@ -136,7 +138,7 @@ function syncDrawer(shell) {
 }
 function enhanceMailbox(shell) {
   const layout = shell.querySelector(".mail-workspace");
-  if (!layout) return;
+  if (!layout || layout.dataset.focusManaged === "true") return;
   if (mailSearchFocus && !mailSearchFocus.isConnected && document.activeElement === document.body) {
     const replacement = layout.querySelector('.mail-list-pane input[type="search"]');
     if (replacement && replacement.value === mailSearchFocus.value) {

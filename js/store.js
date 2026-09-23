@@ -4,10 +4,11 @@ const preferences=storage("local");
 const tab=storage("session");
 const listeners = new Set();
 const initialRoute = () => {
-  const raw = location.hash.replace(/^#\/?/, "");
+  const [raw, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
   const [section = "dashboard", subpage = ""] = raw.split("/");
   let decoded=""; try { decoded=decodeURIComponent(subpage || ""); } catch { /* malformed URL */ }
-  return { section: section || "dashboard", subpage: decoded };
+  const item = new URLSearchParams(query).get("item");
+  return { section: section || "dashboard", subpage: decoded, ...(item ? {item} : {}) };
 };
 
 export const state = {
@@ -34,15 +35,15 @@ export function subscribe(listener){ listeners.add(listener); return () => liste
 export function notify(){ for(const listener of listeners) listener(state); }
 export function setState(patch){ Object.assign(state,patch); notify(); }
 export function updateState(mutator){ mutator(state); notify(); }
-export function setRoute(section,subpage=""){
-  state.route={section,subpage}; state.sidebarOpen=false;
+export function setRoute(section,subpage="",item=""){
+  state.route={section,subpage,...(item?{item}: {})}; state.sidebarOpen=false;
   const group=SECTIONS[section]?.group;
   if(group&&state.closedGroups[group]){
     state.closedGroups={...state.closedGroups};
     delete state.closedGroups[group];
     tab.set("sq-closed-nav-groups",JSON.stringify(state.closedGroups));
   }
-  const encoded = `#/${section}${subpage?`/${encodeURIComponent(subpage)}`:""}`;
+  const encoded = `#/${section}${subpage?`/${encodeURIComponent(subpage)}`:""}${item?`?item=${encodeURIComponent(item)}`:""}`;
   if(location.hash!==encoded) history.pushState(null,"",encoded);
   notify();
 }

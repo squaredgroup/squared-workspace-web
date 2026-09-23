@@ -52,5 +52,14 @@ try{
   await page.locator(".managed-rich-block.is-callout.presentation-highlight").first().waitFor();
   if(await page.locator(".managed-rich-block.is-callout.presentation-highlight strong",{hasText:"importante"}).count()<1)throw new Error("Le contenu enrichi public ne restitue pas le texte en gras.");
   await audit(page,"dashboard");
-  console.log("Accessibilité WCAG 2.2 AA validée sur connexion et dashboard.");
+  await page.setViewportSize({width:390,height:844});
+  for(const mode of ["dark","light"]){
+    await page.evaluate(async mode=>{const m=await import('/js/store.js');m.setAppearance({mode,reducedMotion:true});},mode);
+    for(const section of ["dashboard","tasks","notifications","spaces"]){
+      await page.evaluate(async section=>{const m=await import('/js/store.js');m.setRoute(section);},section);
+      await page.waitForFunction(()=>document.querySelector('#workspace-main')?.getAttribute('aria-busy')==='false');
+      await audit(page,`mobile-${section}-${mode}`);
+    }
+  }
+  console.log("Audits axe : connexion, tableau de bord et 8 états mobiles clair/sombre.");
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
