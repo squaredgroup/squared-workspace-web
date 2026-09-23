@@ -3,7 +3,7 @@ import { canAccessSection } from "./config.js";
 import { loadWorkspace } from "./api.js";
 import { h, button, icon, emptyState, pageHeader, select } from "./ui.js";
 import { viewContext } from "./focus-state.js";
-import { dueOf, dueBucket, dayKey, isFinished, isMine, titleOf, domainLabels } from "./focus-model.js";
+import { dueOf, dueBucket, dayKey, isFinished, isMine, titleOf, domainLabels, sectionForDomain } from "./focus-model.js";
 import { recordRow, editRecord, canEditRecord } from "./focus-records.js";
 
 export async function renderFocusHome(todayOnly=false){
@@ -25,7 +25,7 @@ export async function renderFocusHome(todayOnly=false){
     const group=(title,domain,items,limit=4)=>{
       if(!items.length)return;
       const sorted=[...items].sort((a,b)=>String(dueOf(a)||"9999").localeCompare(String(dueOf(b)||"9999")));
-      blocks.push(h("section",{class:"focus-home-group"},h("div",{class:"focus-group-heading"},h("h2",{text:title}),h("span",{class:"focus-count",text:String(items.length)})),...sorted.slice(0,limit).map(item=>recordRow(domain,item,{compact:true,onRefresh:reload})),items.length>limit?button(`Voir les ${items.length} éléments`,{kind:"ghost",onClick:()=>setRoute(domain)}):null));
+      blocks.push(h("section",{class:"focus-home-group"},h("div",{class:"focus-group-heading"},h("h2",{text:title}),h("span",{class:"focus-count",text:String(items.length)})),...sorted.slice(0,limit).map(item=>recordRow(domain,item,{compact:true,onRefresh:reload})),items.length>limit?button(`Ouvrir ${domainLabels[domain]?.toLowerCase()||"la liste"}`,{kind:"ghost",onClick:()=>setRoute(sectionForDomain(domain))}):null));
     };
     if(decisions.length)blocks.push(h("section",{class:"focus-attention"},h("div",{},h("span",{class:"focus-kicker",text:"À examiner"}),h("h2",{text:`${decisions.length} validation${decisions.length>1?"s":""} en attente`}),h("p",{text:"Dans votre périmètre autorisé. Lire une demande ne la valide pas."})),button("Examiner",{iconName:"ArrowRight",onClick:()=>setRoute("validations","pending")})));
     group("En retard","tasks",tasks.filter(item=>dueBucket(item)==="overdue"),3);

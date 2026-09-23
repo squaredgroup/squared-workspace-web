@@ -1,3 +1,4 @@
+import { viewContext } from "../focus-state.js";
 import { mailbox,mailboxThread,updateMailboxMessage,sendMail,mailboxTemplates,mailboxStyle,saveMailboxStyle } from "../api.js";
 import { state } from "../store.js";
 import { h,pageHeader,card,button,toolbar,modal,field,input,textarea,select,validateControls,toast,errorMessage,emptyState,formatDate,relativeDate,row,profileAvatar } from "../ui.js";
@@ -99,34 +100,47 @@ function compose(reload,replyTo=null){
   }}]});
 }
 async function mailboxMain(){
-  const root=h("div"),listHost=h("div"),detailHost=h("div");let folder="INBOX",query="",filter="ALL",selected=null,searchTimer=null;
+  const context=viewContext("mailbox",{folder:"INBOX",query:"",filter:"ALL",selectedId:""});
+  let {folder,query,filter}=context,selected=null,searchTimer=null,generation=0,reading=0,listY=0;
+  const root=h("div",{class:"focus-mail"}),listHost=h("div"),detailHost=h("div"),results=h("div");
   const folderNav=h("nav",{class:"subnav","aria-label":"Dossiers de messagerie"});
-  const drawFolders=()=>folderNav.replaceChildren(...folders.map(item=>button(item.label,{small:true,pressed:folder===item.id,onClick:()=>{folder=item.id;selected=null;drawFolders();load()}})));
-  drawFolders();
-  root.append(pageHeader({eyebrow:"Communication",title:"E-mails",subtitle:"Retrouvez vos échanges tels qu’ils ont réellement été reçus, avec leur mise en page, leur fil et leurs pièces jointes.",actions:can("sendMail")?[button("Nouveau message",{kind:"primary",iconName:"add",onClick:()=>compose(load)})]:[]}),folderNav,h("div",{class:"mail-workspace"},h("section",{class:"mail-pane mail-list-pane","aria-label":"Liste des e-mails"},h("div",{class:"mail-pane-head"},h("div",{},h("h2",{text:"Boîte mail"}),h("p",{text:"Messages synchronisés"}))),listHost),h("section",{class:"mail-pane mail-detail-pane","aria-label":"Lecture de l’e-mail"},detailHost)));
-
+  const search=h("input",{class:"search-input",type:"search","aria-label":"Rechercher dans les e-mails",placeholder:"Rechercher un e-mail…",value:query});
+  const readFilter=select(filter,[{value:"ALL",label:"Tous les messages"},{value:"UNREAD",label:"Non lus"},{value:"ATTACHMENTS",label:"Avec pièces jointes"},{value:"RECENT",label:"7 derniers jours"}]);readFilter.setAttribute("aria-label","Filtrer les messages");
+  const layout=h("div",{class:"mail-workspace",dataset:{focusManaged:"true"}},h("section",{class:"mail-pane mail-list-pane","aria-label":"Liste des e-mails"},listHost),h("section",{class:"mail-pane mail-detail-pane","aria-label":"Lecture de l’e-mail"},detailHost));
+  const saveContext=()=>Object.assign(context,{folder,query,filter,selectedId:selected?.id||""});
+  const back=()=>{reading++;selected=null;context.selectedId="";layout.classList.remove("sq-mail-open");root.classList.remove("focus-reading");drawSelection();requestAnimationFrame(()=>{window.scrollTo({top:listY,behavior:"instant"});search.focus({preventScroll:true});});};
+  const drawFolders=()=>folderNav.replaceChildren(...folders.map(item=>button(item.label,{small:true,pressed:folder===item.id,onClick:()=>{folder=item.id;back();drawFolders();void load();}})));
+  root.append(pageHeader({eyebrow:"Communication",title:"E-mails",subtitle:"Vos échanges externes.",actions:can("sendMail")?[button("Nouveau message",{kind:"primary",iconName:"add",onClick:()=>compose(load)})]:[]}),folderNav,layout);
+  listHost.append(h("div",{class:"toolbar"},search,readFilter),results);
+  search.addEventListener("input",()=>{query=search.value;context.query=query;clearTimeout(searchTimer);searchTimer=setTimeout(()=>void load(),260);});
+  readFilter.addEventListener("change",()=>{filter=readFilter.value;void load();});
+  const drawSelection=()=>{for(const node of results.querySelectorAll(".mail-item")){const active=node.dataset.id===String(selected?.id||"");node.classList.toggle("active",active);node.setAttribute("aria-pressed",String(active));}};
   const open=async mail=>{
-    selected=mail;drawSelection();
+    const version=++reading;selected=mail;saveContext();drawSelection();listY=window.scrollY;
+    layout.classList.add("sq-mail-open");root.classList.add("focus-reading");
+    const backButton=()=>button("Retour aux e-mails",{className:"sq-mail-back",iconName:"ArrowLeft",onClick:back});
+    detailHost.replaceChildren(backButton(),h("p",{class:"focus-summary",role:"status",text:"Chargement du message…"}));
     try{
-      const data=await mailboxThread(mail.id),thread=data.messages||[];
-      const messages=thread.length?thread:[mail],latest=messages.at(-1)||mail;
-      detailHost.replaceChildren(h("div",{class:"mail-reader"},h("header",{class:"mail-reader-head"},h("div",{class:"mail-reader-copy"},h("div",{class:"mail-reader-eyebrow",text:isOutbound(latest)?"MESSAGE ENVOYÉ":"MESSAGE REÇU"}),h("h2",{text:mailTitle(latest)}),h("p",{text:`${messages.length} message${messages.length>1?"s":""} dans cette conversation`})),h("div",{class:"mail-reader-actions"},can("sendMail")?button("Répondre",{kind:"primary",iconName:"send",onClick:()=>compose(load,latest)}):null,can("organizeMail")?button(mail.isStarred?"Retirer le favori":"Favori",{iconName:"star",onClick:async()=>{await updateMailboxMessage(mail.id,{isStarred:!mail.isStarred});mail.isStarred=!mail.isStarred;await load();await open(mail)}}):null,can("organizeMail")?button("Archiver",{iconName:"archive",onClick:async()=>{await updateMailboxMessage(mail.id,{folder:"ARCHIVED"});selected=null;await load()}}):null)),h("div",{class:"mail-thread"},...messages.map((message,index)=>conversationMessage(message,index,messages.length)))));
-      if(!mail.isRead){mail.isRead=true;drawSelection();await updateMailboxMessage(mail.id,{isRead:true}).catch(()=>{})}
-    }catch(error){detailHost.replaceChildren(emptyState("Lecture impossible",errorMessage(error),"warning"))}
+      const data=await mailboxThread(mail.id);if(version!==reading)return;
+      const messages=data.messages?.length?data.messages:[mail],latest=messages.at(-1)||mail;
+      const secondary=h("details",{class:"focus-filters"},h("summary",{text:"Plus d’actions"}));
+      if(can("organizeMail"))secondary.append(button(mail.isStarred?"Retirer le favori":"Favori",{iconName:"star",onClick:async()=>{await updateMailboxMessage(mail.id,{isStarred:!mail.isStarred});mail.isStarred=!mail.isStarred;await open(mail);}}),button("Archiver",{iconName:"archive",onClick:async()=>{await updateMailboxMessage(mail.id,{folder:"ARCHIVED"});back();await load();}}));
+      detailHost.replaceChildren(h("div",{class:"mail-reader"},backButton(),h("header",{class:"mail-reader-head"},h("div",{class:"mail-reader-copy"},h("h2",{text:mailTitle(latest)}),h("p",{text:`${sender(latest)} · ${mailDate(latest)?formatDate(mailDate(latest)):""}`})),h("div",{class:"mail-reader-actions"},can("sendMail")?button("Répondre",{kind:"primary",iconName:"send",onClick:()=>compose(load,latest)}):null,can("organizeMail")?secondary:null)),h("div",{class:"mail-thread"},...messages.map((message,index)=>conversationMessage(message,index,messages.length)))));
+      if(matchMedia("(max-width:880px)").matches){window.scrollTo({top:0,behavior:"instant"});detailHost.querySelector(".sq-mail-back")?.focus({preventScroll:true});}
+      if(!mail.isRead){await updateMailboxMessage(mail.id,{isRead:true}).then(()=>{mail.isRead=true;drawSelection();}).catch(()=>{});}
+    }catch(e){if(version===reading)detailHost.replaceChildren(backButton(),emptyState("Lecture impossible",errorMessage(e),"warning"));}
   };
-  const drawSelection=()=>{for(const node of listHost.querySelectorAll(".mail-item")){const active=node.dataset.id===String(selected?.id||"");node.classList.toggle("active",active);node.setAttribute("aria-pressed",String(active));if(active&&selected?.isRead)node.classList.remove("unread")}};
-  const load=async()=>{
+  async function load(){
+    const current=++generation;saveContext();
     try{
-      const data=await mailbox(folder,query,filter),messages=data.messages||[];
-      const readFilter=select(filter,[{value:"ALL",label:"Tous les messages"},{value:"UNREAD",label:"Non lus"},{value:"ATTACHMENTS",label:"Avec pièces jointes"},{value:"RECENT",label:"7 derniers jours"}]);readFilter.setAttribute("aria-label","Filtrer les messages");readFilter.addEventListener("change",()=>{filter=readFilter.value;load()});
-      listHost.replaceChildren(
-        toolbar(query,value=>{query=value;clearTimeout(searchTimer);searchTimer=setTimeout(load,260)},[readFilter],"Rechercher dans les e-mails"),
-        messages.length?h("div",{class:"mail-list"},...messages.map(mail=>h("button",{class:`mail-item ${mail.isRead?"":"unread"} ${selected?.id===mail.id?"active":""}`,dataset:{id:String(mail.id)},type:"button","aria-pressed":String(selected?.id===mail.id),onClick:()=>open(mail)},profileAvatar(listPerson(mail),{className:"mail-avatar",size:36,ariaHidden:true}),h("span",{class:"mail-item-content"},h("span",{class:"mail-item-line"},h("strong",{text:listContact(mail)}),h("time",{datetime:mailDate(mail)||"",text:relativeDate(mailDate(mail))})),h("span",{class:"mail-item-subject"},h("span",{class:`mail-read-dot ${mail.isRead?"":"unread"}`,"aria-hidden":"true"}),h("span",{text:mailTitle(mail)}),statusLabel(mail)?h("em",{text:statusLabel(mail)}):null),h("span",{class:"mail-item-preview",text:previewOf(mail).slice(0,180)||"Aucun aperçu disponible"})),h("span",{class:`mail-star ${mail.isStarred?"active":""}`,title:mail.isStarred?"Favori":"",text:mail.isStarred?"★":""})))):emptyState("Boîte vide",filter==="UNREAD"?"Aucun message non lu dans ce dossier.":"Aucun message dans ce dossier.","mail")
-      );
-      if(!selected)detailHost.replaceChildren(h("div",{class:"mail-reader-empty"},emptyState("Sélectionnez un message","Son contenu réel, sa conversation et ses pièces jointes apparaîtront ici.","document")));
-    }catch(error){listHost.replaceChildren(emptyState("Boîte indisponible",errorMessage(error),"warning"))}
-  };
-  await load();return root;
+      const data=await mailbox(folder,query,filter);if(current!==generation)return;
+      const messages=data.messages||[];
+      results.replaceChildren(messages.length?h("div",{class:"mail-list"},...messages.map(mail=>h("button",{class:`mail-item ${mail.isRead?"":"unread"}`,dataset:{id:String(mail.id)},type:"button","aria-pressed":String(selected?.id===mail.id),onClick:()=>open(mail)},profileAvatar(listPerson(mail),{className:"mail-avatar",size:36,ariaHidden:true}),h("span",{class:"mail-item-content"},h("span",{class:"mail-item-line"},h("strong",{text:listContact(mail)}),h("time",{text:relativeDate(mailDate(mail))})),h("span",{class:"mail-item-subject",text:mailTitle(mail)}),h("span",{class:"mail-item-preview",text:previewOf(mail).slice(0,150)||"Aucun aperçu disponible"}))))):emptyState("Boîte vide","Aucun message ne correspond à ce dossier et à ces filtres.","mail"));
+      if(!selected)detailHost.replaceChildren(emptyState("Sélectionnez un message","Le contenu et les pièces jointes s’afficheront ici.","mail"));
+      drawSelection();
+    }catch(e){if(current===generation)results.replaceChildren(emptyState("Boîte indisponible",errorMessage(e),"warning"));}
+  }
+  drawFolders();await load();return root;
 }
 async function templatesView(){
   const root=h("div");root.append(pageHeader({eyebrow:"E-mails",title:"Modèles",subtitle:"Réponses et messages réutilisables disponibles dans Workspace."}));

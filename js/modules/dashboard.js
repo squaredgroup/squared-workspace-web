@@ -68,6 +68,7 @@ function managedContent(content){
 }
 
 export async function renderDashboard(today=false){
+  if(matchMedia("(max-width: 880px)").matches){const {renderFocusHome}=await import("../focus-home.js");return renderFocusHome(today);}
   const root=h("div");
   const managedContentPromise=loadWorkspaceWebContent().catch(()=>null);
   const workspace=await loadWorkspace();

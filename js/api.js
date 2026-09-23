@@ -45,6 +45,7 @@ export async function listCoreDomain(domain) {
     items.push(...(Array.isArray(data) ? data : []));
     cursor = response.headers.get("x-next-cursor"); guard += 1;
   } while (cursor && guard < 50);
+  if(cursor)throw new Error("Le périmètre dépasse la limite de chargement. Affinez la recherche ou ouvrez le module concerné.");
   return items;
 }
 export async function getCoreEntity(domain, id) { return (await request(`/v1/${domain}/${id}`)).data; }

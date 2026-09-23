@@ -40,6 +40,7 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
   if(editing&&!(Number(original.version)>0)){toast("Actualisez le détail avant de modifier cet élément.","error");return;}
   const title=input(record?titleOf(record):"",{required:true,maxLength:240,placeholder:domain==="tasks"?"Que faut-il faire ?":"Donnez un titre clair"});
   const status=select(valueOf(original,"status")||(domain==="tasks"?"pending":"draft"),statusOptions(domain,original));
+  if(domain==="validations")status.disabled=true;
   const description=textarea(valueOf(original,"description","detail","body")||"",{rows:4,maxLength:20000,placeholder:"Contexte, résultat attendu, informations utiles…"});
   const project=choiceWithCurrent(parentOf(original),list("projects").map(p=>({value:p.id,label:titleOf(p)})),"Aucun projet");
   const assignee=choiceWithCurrent(assigneeOf(original),list("team").map(m=>({value:m.id||m.memberId,label:memberName(m)})),"Non affecté");
@@ -77,12 +78,12 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
     try {
       await saveCoreEntity(domain,body);
       if(state.user?.id!==person)return;
-      dirty=false;close();toast(editing?"Modifications enregistrées":"Élément créé");
+      dirty=false;busy=false;close();toast(editing?"Modifications enregistrées":"Élément créé");
       try{await loadWorkspace();await reload();}catch{toast("Enregistrement confirmé. Actualisez la liste lorsque le réseau revient.","error");}
     }catch(e){if(state.user?.id===person){error.hidden=false;error.textContent=errorMessage(e);}}
     finally{busy=false;}
   };
-  dialog=modal({title:`${editing?"Modifier":"Créer"} · ${domainLabels[domain]||domain}`,content,wide:true,className:"focus-editor-dialog",beforeClose:()=>!dirty||window.confirm("Abandonner les modifications non enregistrées ?"),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
+  dialog=modal({title:`${editing?"Modifier":"Créer"} · ${domainLabels[domain]||domain}`,content,wide:true,className:"focus-editor-dialog",beforeClose:()=>!busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
   content.addEventListener("submit",e=>{e.preventDefault();void save(dialog.close);});
 }
 export async function finishTask(record,reload=async()=>{}) {
@@ -117,7 +118,7 @@ export function recordList(domain,items,reload,{writable=canEditRecord(domain)}=
   const status=select(context.status,[{value:"all",label:"Tous les statuts"},...states.map(value=>({value,label:statusLabel(value)}))]);status.setAttribute("aria-label","Filtrer par statut");
   const scope=select(context.scope,[{value:"all",label:"Périmètre visible"},{value:"mine",label:"Affecté à moi"},{value:"unassigned",label:"Non affecté"}]);scope.setAttribute("aria-label","Périmètre des éléments");
   const sort=select(context.sort,[{value:"due",label:"Échéances"},{value:"recent",label:"Plus récents"},{value:"title",label:"Titre A–Z"}]);sort.setAttribute("aria-label","Trier les éléments");
-  const filters=h("details",{class:"focus-filters"},h("summary",{},icon("sliders",18),h("span",{text:"Filtres et tri"})),filterBody=h("div",{class:"focus-filter-body"},field("Statut",status),field("Périmètre",scope),field("Trier",sort));filters.append(filterBody);
+  const filters=h("details",{class:"focus-filters"},h("summary",{},icon("sliders",18),h("span",{text:"Filtres et tri"}))),filterBody=h("div",{class:"focus-filter-body"},field("Statut",status),field("Périmètre",scope),field("Trier",sort));filters.append(filterBody);
   for(const [control,key] of [[status,"status"],[scope,"scope"],[sort,"sort"]])control.addEventListener("change",()=>{context[key]=control.value;context.limit=30;draw();});
   search.addEventListener("input",()=>{context.query=search.value;context.limit=30;draw();});
   const heading=h("div",{class:"focus-list-controls"},search,filters);

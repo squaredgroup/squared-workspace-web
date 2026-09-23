@@ -1,4 +1,7 @@
 import { CORE_DOMAIN_BY_SECTION,SPECIALIZED_BY_SECTION,SUBPAGE_DOMAIN_HINTS,SECTIONS,SECTION_DESCRIPTIONS } from "../config.js";
+import { editRecord, recordList, supportsRecord } from "../focus-records.js";
+import { strictObject, domainLabels } from "../focus-model.js";
+import { viewContext } from "../focus-state.js";
 import { state } from "../store.js";
 import { listCoreDomain,saveCoreEntity,archiveCoreEntity,listSpecialized,saveSpecialized,archiveSpecialized,uploadFile,loadWorkspace,loadDomainCatalog } from "../api.js";
 import { h,pageHeader,row,button,modal,field,input,select,jsonEditor,safeJSON,validateControls,emptyState,skeletonPage,toast,errorMessage,card,pretty,formatDate,advancedEditor,confirmAction,segmentedControl } from "../ui.js";
@@ -19,6 +22,7 @@ function subpageDescription(sectionKey,subpage){
   return SECTIONS[sectionKey]?.subpages?.find(value=>value.id===subpage)?.summary||SECTION_DESCRIPTIONS[sectionKey]||"Données synchronisées avec Squared Workspace.";
 }
 function coreForm(domain,entity,reload){
+  if(supportsRecord(domain))return editRecord(domain,entity,reload);
   const isEdit=Boolean(entity?.id);
   const title=input(entity?.title||"",{required:true,placeholder:"Titre"});
   const status=input(entity?.status||"active",{required:true,placeholder:"Statut"});
@@ -32,7 +36,7 @@ function coreForm(domain,entity,reload){
   modal({title:`${isEdit?"Modifier":"Créer"} · ${pretty(domain)}`,content,wide:true,actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
     try{
       if(!validateControls(title,status))return;
-      await saveCoreEntity(domain,{...(isEdit?{id:entity.id,version:entity.version}:{}),title:title.value.trim(),status:status.value.trim(),parentId:parent.value.trim()||null,payload:safeJSON(payload.value,{})});
+      await saveCoreEntity(domain,{...(isEdit?{id:entity.id,version:entity.version}:{}),title:title.value.trim(),status:status.value.trim(),parentId:parent.value.trim()||null,payload:strictObject(payload.value)});
       toast("Enregistré dans Workspace");close();await loadWorkspace();await reload();
     }catch(error){toast(errorMessage(error),"error",5500)}
   }}]});
@@ -53,7 +57,7 @@ function specializedForm(kind,entity,reload){
   modal({title:`${isEdit?"Modifier":"Créer"} · ${pretty(kind)}`,content,wide:true,actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
     try{
       if(!validateControls(title,status,...requiredInputs.map(item=>item.control)))return;
-      const finalData=safeJSON(advanced.value,{});
+      const finalData=strictObject(advanced.value);
       for(const {key,control} of requiredInputs){const raw=control.value.trim();if(raw)finalData[key]=raw}
       for(const key of ["title","name","legalName","subject"])if(key in finalData)finalData[key]=title.value.trim();
       for(const key of ["state","lifecycle","status"])if(key in finalData)finalData[key]=status.value;
@@ -89,39 +93,27 @@ function archiveAction({kind,item,specialized,reload}){
   });
 }
 function renderDomainList({kind,items,writable,reload,specialized=false}){
-  let query="",status="all",sort="recent",view="list";
-  const host=h("div");
-  const redraw=()=>{
-    const q=query.trim().toLowerCase();
-    const statuses=[...new Set(items.map(value=>String(value.status||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"fr"));
-    const filtered=items.filter(value=>(status==="all"||String(value.status||"")===status)&&`${value.title||""} ${value.status||""} ${JSON.stringify(value.data||value.payload||{})}`.toLowerCase().includes(q)).sort((a,b)=>{
-      if(sort==="title")return String(a.title||"").localeCompare(String(b.title||""),"fr");
-      if(sort==="status")return String(a.status||"").localeCompare(String(b.status||""),"fr");
-      return new Date(b.updatedAt||b.updated_at||b.createdAt||0)-new Date(a.updatedAt||a.updated_at||a.createdAt||0);
-    });
-    const search=h("input",{class:"search-input",type:"search",placeholder:`Rechercher dans ${pretty(kind).toLowerCase()}…`,value:query,"aria-label":`Rechercher dans ${pretty(kind)}`,onInput:event=>{query=event.target.value;redraw()}});
-    const statusSelect=select(status,[{value:"all",label:"Tous les statuts"},...statuses.map(value=>({value,label:pretty(value)}))]);statusSelect.className="filter-select";statusSelect.setAttribute("aria-label","Filtrer par statut");statusSelect.addEventListener("change",()=>{status=statusSelect.value;redraw()});
-    const sortSelect=select(sort,[{value:"recent",label:"Plus récents"},{value:"title",label:"Titre A–Z"},{value:"status",label:"Statut"}]);sortSelect.className="filter-select";sortSelect.setAttribute("aria-label","Trier les éléments");sortSelect.addEventListener("change",()=>{sort=sortSelect.value;redraw()});
-    const viewControl=segmentedControl({label:"Présentation",value:view,options:[{value:"list",label:"Liste",icon:"grid"},{value:"cards",label:"Cartes",icon:"folder"}],onChange:value=>{view=value;redraw()}});
-    const actions=writable?[button("Nouveau",{kind:"primary",iconName:"add",onClick:()=>specialized?specializedForm(kind,null,reload):coreForm(kind,null,reload)})]:[];
-    const collection=filtered.map(item=>row({
-      title:item.title||"Sans titre",
-      subtitle:`${pretty(kind)} · v${item.version||1}`,
-      status:item.status,
-      meta:formatDate(item.updatedAt||item.updated_at),
-      actions:[
-        writable?button("Modifier",{small:true,iconName:"edit",onClick:()=>specialized?specializedForm(kind,item,reload):coreForm(kind,item,reload)}):null,
-        !specialized&&fileKind(kind)?button("Fichier",{small:true,iconName:"upload",onClick:()=>attachFile(kind,item)}):null,
-        writable?button("Archiver",{small:true,kind:"ghost",iconName:"archive",onClick:()=>archiveAction({kind,item,specialized,reload})}):null
-      ].filter(Boolean)
-    }));
-    host.replaceChildren(
-      h("div",{class:"collection-toolbar"},h("div",{class:"collection-search"},search),statusSelect,sortSelect,viewControl,h("div",{class:"spacer"}),...actions),
-      h("div",{class:"collection-summary","aria-live":"polite"},h("strong",{text:String(filtered.length)}),h("span",{text:` résultat${filtered.length>1?"s":""} sur ${items.length}`}),(q||status!=="all")?button("Réinitialiser",{small:true,kind:"ghost",onClick:()=>{query="";status="all";sort="recent";redraw()}}):null),
-      filtered.length?h("div",{class:view==="cards"?"collection-cards":"list"},...collection):emptyState(q||status!=="all"?"Aucun résultat":"Aucun élément",q||status!=="all"?"Aucun élément ne correspond aux filtres actifs.":`Aucune donnée n’est disponible pour ${pretty(kind)}.`)
-    );
-  };
-  redraw();return host;
+  if(!specialized&&supportsRecord(kind))return recordList(kind,items,reload,{writable});
+  const saved=viewContext(`domain:${state.route.section}:${state.route.subpage}:${kind}`,{query:"",status:"all",sort:"recent",limit:40});
+  const host=h("div"),results=h("div",{class:"list"}),summary=h("div",{class:"collection-summary",role:"status"});
+  const search=h("input",{class:"search-input",type:"search",placeholder:"Rechercher dans la liste…",value:saved.query,"aria-label":`Rechercher dans ${pretty(kind)}`});
+  const statuses=[...new Set(items.map(v=>String(v.status||"")).filter(Boolean))];
+  const statusSelect=select(saved.status,[{value:"all",label:"Tous les statuts"},...statuses.map(value=>({value,label:pretty(value)}))]);statusSelect.className="filter-select";statusSelect.setAttribute("aria-label","Filtrer par statut");
+  const sortSelect=select(saved.sort,[{value:"recent",label:"Plus récents"},{value:"title",label:"Titre A–Z"},{value:"status",label:"Statut"}]);sortSelect.className="filter-select";sortSelect.setAttribute("aria-label","Trier les éléments");
+  const edit=item=>specialized?specializedForm(kind,item,reload):coreForm(kind,item,reload);
+  const more=button("Afficher la suite",{kind:"ghost",onClick:()=>{saved.limit+=40;draw();}});
+  host.append(h("div",{class:"collection-toolbar"},h("div",{class:"collection-search"},search),statusSelect,sortSelect,writable?button("Nouveau",{kind:"primary",iconName:"add",onClick:()=>edit(null)}):null),summary,results,more);
+  function draw(){
+    const q=saved.query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    const filtered=items.filter(value=>(saved.status==="all"||String(value.status||"")===saved.status)&&`${value.title||""} ${value.status||""} ${JSON.stringify(value.data||value.payload||{})}`.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().includes(q)).sort((a,b)=>saved.sort==="title"?String(a.title||"").localeCompare(String(b.title||""),"fr"):saved.sort==="status"?String(a.status||"").localeCompare(String(b.status||""),"fr"):new Date(b.updatedAt||b.updated_at||b.createdAt||0)-new Date(a.updatedAt||a.updated_at||a.createdAt||0));
+    summary.replaceChildren(...[h("strong",{text:String(filtered.length)}),h("span",{text:` résultat${filtered.length>1?"s":""} sur ${items.length}`}),q||saved.status!=="all"?button("Réinitialiser",{small:true,kind:"ghost",onClick:()=>{saved.query="";saved.status="all";saved.limit=40;search.value="";statusSelect.value="all";draw();}}):null].filter(Boolean));
+    results.replaceChildren(...(filtered.length?filtered.slice(0,saved.limit).map(item=>row({title:item.title||"Sans titre",subtitle:item.data?.description||item.payload?.description||pretty(kind),status:item.status,meta:formatDate(item.updatedAt||item.updated_at),actions:[writable?button("Modifier",{small:true,iconName:"edit",onClick:()=>edit(item)}):null,writable&&!specialized&&fileKind(kind)?button("Fichier",{small:true,iconName:"upload",onClick:()=>attachFile(kind,item)}):null,writable?button("Archiver",{small:true,kind:"ghost",iconName:"archive",onClick:()=>archiveAction({kind,item,specialized,reload})}):null].filter(Boolean)})):[emptyState("Aucun élément","Aucun résultat pour ce périmètre et ces filtres.")]));
+    more.hidden=filtered.length<=saved.limit;
+  }
+  search.addEventListener("input",()=>{saved.query=search.value;saved.limit=40;draw();});
+  statusSelect.addEventListener("change",()=>{saved.status=statusSelect.value;draw();});
+  sortSelect.addEventListener("change",()=>{saved.sort=sortSelect.value;draw();});
+  draw();return host;
 }
 function snapshotView(value){
   if(value==null)return emptyState("Module prêt","Ce module est disponible mais ne contient encore aucune donnée dans votre périmètre.");
@@ -163,7 +155,7 @@ export async function renderDataSection(sectionKey,subpage=""){
       const items=await listCoreDomain(core),writable=canWriteCore(core);let panel;
       const reload=async()=>{const next=await listCoreDomain(core);panel.querySelector(".domain-slot")?.replaceChildren(renderDomainList({kind:core,items:next,writable,reload,specialized:false}))};
       const slot=h("div",{class:"domain-slot"},renderDomainList({kind:core,items,writable,reload,specialized:false}));
-      panel=card(pretty(core),`${items.length} élément${items.length>1?"s":""} synchronisé${items.length>1?"s":""} avec Workspace.`,slot,{iconName:sectionKey});body.append(panel);
+      panel=card(domainLabels[core]||pretty(core),`${items.length} élément${items.length>1?"s":""} synchronisé${items.length>1?"s":""} avec Workspace.`,slot,{iconName:sectionKey});body.append(panel);
     }
 
     for(const kind of kinds){

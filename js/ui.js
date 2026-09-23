@@ -45,7 +45,7 @@ export function profileAvatar(person={}, {className="avatar",size=36,label="",ar
 }
 export function button(label,{iconName,kind="",small=false,onClick,type="button",disabled=false,title="",ariaLabel="",pressed=null,className=""}={}){
   const node=h("button",{class:`button ${kind} ${small?"small":""} ${className}`.trim(),type,disabled,title,"aria-label":ariaLabel||null,"aria-pressed":pressed==null?null:String(pressed)},iconName?icon(iconName,14):null,h("span",{text:label}));
-  if(onClick)node.addEventListener("click",event=>{const result=onClick(event);if(result&&typeof result.finally==="function"){node.disabled=true;node.setAttribute("aria-busy","true");result.finally(()=>{if(node.isConnected){node.disabled=false;node.removeAttribute("aria-busy")}})}});
+  if(onClick)node.addEventListener("click",event=>{const result=onClick(event);if(result&&typeof result.finally==="function"){node.disabled=true;node.setAttribute("aria-busy","true");Promise.resolve(result).catch(error=>toast(errorMessage(error),"error")).finally(()=>{if(node.isConnected){node.disabled=false;node.removeAttribute("aria-busy")}})}});
   return node;
 }
 export function iconButton(iconName,label,onClick){return h("button",{class:"icon-button",type:"button","aria-label":label,title:label,onClick},icon(iconName,17))}
@@ -79,10 +79,10 @@ function refreshModalLayers(){
   overlays.forEach((overlay,index)=>{const top=index===overlays.length-1;overlay.inert=!top;if(top)overlay.removeAttribute("aria-hidden");else overlay.setAttribute("aria-hidden","true");});
 }
 function visibleFocusable(panel){return [...panel.querySelectorAll(focusableSelector)].filter(el=>!el.hidden&&el.getAttribute("aria-hidden")!=="true"&&el.getClientRects().length>0)}
-export function modal({title,content,actions=[],wide=false,onClose,role="dialog",className="",initialFocus="",closeOnBackdrop=true}){
+export function modal({title,content,actions=[],wide=false,onClose,role="dialog",className="",initialFocus="",closeOnBackdrop=true,beforeClose}){
   const previousFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;
   const overlay=h("div",{class:"overlay"}),titleId=nextId("dialog-title");let closed=false;
-  const close=()=>{if(closed)return;closed=true;overlay.remove();refreshModalLayers();onClose?.();const remaining=[...document.querySelectorAll("#portal-root > .overlay")].at(-1);if(remaining){(visibleFocusable(remaining)[0]||remaining.querySelector(".modal"))?.focus?.();}else if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+  const close=()=>{if(closed||beforeClose?.()===false)return;closed=true;overlay.remove();refreshModalLayers();onClose?.();const remaining=[...document.querySelectorAll("#portal-root > .overlay")].at(-1);if(remaining){(visibleFocusable(remaining)[0]||remaining.querySelector(".modal"))?.focus?.();}else if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
   const panel=h("div",{class:`modal ${wide?"wide":""} ${className}`.trim(),role,"aria-modal":"true","aria-labelledby":titleId,tabindex:"-1"},h("div",{class:"modal-head"},h("h3",{id:titleId,text:title}),iconButton("close","Fermer",close)),h("div",{class:"modal-body"},content),actions.length?h("div",{class:"modal-actions"},...actions.map(action=>button(action.label,{kind:action.kind,iconName:action.icon,onClick:()=>action.onClick?.(close),disabled:action.disabled}))):null);
   overlay.append(panel);overlay.addEventListener("mousedown",event=>{if(closeOnBackdrop&&event.target===overlay)close()});
   panel.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();close();return}if(event.key!=="Tab")return;const nodes=visibleFocusable(panel);if(!nodes.length){event.preventDefault();panel.focus();return}const first=nodes[0],last=nodes.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});

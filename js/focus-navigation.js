@@ -1,11 +1,12 @@
 import { state, setRoute, setState, setAppearance } from "./store.js";
-import { SECTIONS, NAV_GROUPS, canAccessSection, canAccessSubpage } from "./config.js";
+import { SECTIONS, ICONS, NAV_GROUPS, canAccessSection, canAccessSubpage } from "./config.js";
 import { h, icon, button, iconButton, pageHeader, emptyState, profileAvatar } from "./ui.js";
 import { normalize } from "./focus-model.js";
 import { viewContext } from "./focus-state.js";
 import { storage } from "./storage.js";
 // Add an explicit catalogue destination without renaming or breaking legacy URLs.
 SECTIONS.spaces={title:"Espaces",group:"Général"};
+ICONS.spaces="Grid";
 const allowed=key=>canAccessSection(key,state.user);
 const go=key=>setRoute(key,SECTIONS[key]?.subpages?.find(p=>canAccessSubpage(p,state.user))?.id||"");
 export function focusTabs(){

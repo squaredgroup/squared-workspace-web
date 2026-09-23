@@ -11,8 +11,8 @@ for(const required of ["Content-Security-Policy","class=\"skip-link\"","id=\"ann
 const sw=await fs.readFile("sw.js","utf8");
 if(!sw.includes("SKIP_WAITING"))throw new Error("Le service worker doit prendre en charge une activation explicite.");
 const installBlock=(sw.split('self.addEventListener("install"')[1]||"").split('self.addEventListener("activate"')[0]||"";if(installBlock.includes("skipWaiting"))throw new Error("Le service worker ne doit pas forcer skipWaiting pendant install.");
-const cssFiles=["css/tokens.css","css/app.css","css/auth.css","css/v3.css","css/v4.css","css/v7.css","css/mobile.css"];
-const criticalJs=["js/boot.js","js/app.js","js/api.js","js/session.js","js/storage.js","js/auth-flow.js","js/config.js","js/store.js","js/ui.js","js/webauthn.js","js/modules/auth.js","js/mobile.js"];
+const cssFiles=["css/tokens.css","css/app.css","css/auth.css","css/v3.css","css/v4.css","css/v7.css","css/mobile.css","css/focus.css","src/styles.css"];
+const criticalJs=["js/boot.js","js/app.js","js/api.js","js/session.js","js/storage.js","js/auth-flow.js","js/config.js","js/store.js","js/ui.js","js/webauthn.js","js/modules/auth.js","js/mobile.js","js/focus-model.js","js/focus-state.js","js/focus-records.js","js/focus-navigation.js","js/focus-search.js"];
 const gzipSize=async files=>{let total=0;for(const file of files)total+=zlib.gzipSync(await fs.readFile(file)).byteLength;return total};
 const jsGzip=await gzipSize(criticalJs),cssGzip=await gzipSize(cssFiles);
 if(jsGzip>75000)throw new Error("Budget JS initial dépassé: "+jsGzip+" octets gzip > 75000");
