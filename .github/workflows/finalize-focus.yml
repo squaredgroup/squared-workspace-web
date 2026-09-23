@@ -1,0 +1,40 @@
+name: Finalize reviewed Focus source fixes
+on:
+  push:
+    branches: [codex/workspace-focus-20260923]
+    paths: ['scripts/finalize*.py', '.github/workflows/finalize-focus.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: codex/workspace-focus-20260923
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: |
+          python3 scripts/finalize-focus.py
+          python3 scripts/finalize-labels.py
+          find js -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --test tests/focus-model.test.mjs
+          git diff --check
+      - name: Commit source fixes on the isolated branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add js/modules/data.js js/modules/messages.js js/ui.js tests/mobile_flows.py
+          git commit -m 'fix: explicit form labels, conversation routes and bounded drafts'
+          git push origin HEAD:codex/workspace-focus-20260923
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focus-final-source
+          retention-days: 7
+          path: |
+            js
+            css
+            src
+            tests
