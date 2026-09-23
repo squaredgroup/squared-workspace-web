@@ -48,13 +48,15 @@ with sync_playwright() as p:
         page.get_by_label("Adresse e-mail",exact=True).fill(USER["email"])
         page.get_by_label("Mot de passe",exact=True).fill("FixturePassword123")
         page.get_by_role("button",name="Se connecter",exact=True).click()
-        expect(page.get_by_role("heading",name="Tableau de bord",exact=True)).to_be_visible()
+        if page.viewport_size["width"]<=880:
+            expect(page.locator(".focus-home")).to_be_visible()
+        else:
+            expect(page.get_by_role("heading",name="Tableau de bord",exact=True)).to_be_visible()
 
-    # Authentication surfaces must follow the active theme on every public auth flow.
     c=make_context();page=c.new_page();page.goto(origin)
     expect(page.get_by_role("heading",name="Connexion",exact=True)).to_be_visible()
-    dark_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
-    dark_input_rgb=page.locator(".auth-control").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    dark_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
+    dark_input_rgb=page.locator(".auth-control").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
     assert sum(dark_auth_rgb)/3<90,dark_auth_rgb
     assert sum(dark_input_rgb)/3<90,dark_input_rgb
     page.get_by_role("button",name="Activer le thème clair",exact=True).click()
@@ -67,9 +69,9 @@ with sync_playwright() as p:
     c=make_context(init=light_init);page=c.new_page();page.goto(origin)
     expect(page.get_by_role("heading",name="Connexion",exact=True)).to_be_visible()
     assert page.locator("html").get_attribute("data-theme")=="light"
-    light_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
-    light_panel_rgb=page.locator(".auth-panel").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
-    light_input_rgb=page.locator(".auth-control").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    light_auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
+    light_panel_rgb=page.locator(".auth-panel").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
+    light_input_rgb=page.locator(".auth-control").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
     assert sum(light_auth_rgb)/3>220,light_auth_rgb
     assert sum(light_panel_rgb)/3>220,light_panel_rgb
     assert sum(light_input_rgb)/3>220,light_input_rgb
@@ -80,7 +82,7 @@ with sync_playwright() as p:
     ]:
         page.goto(origin+route)
         expect(page.get_by_role("heading",name=title,exact=True)).to_be_visible()
-        auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+        auth_rgb=page.locator(".auth-box").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
         assert sum(auth_rgb)/3>220,(title,auth_rgb)
     c.close()
 
@@ -96,7 +98,9 @@ with sync_playwright() as p:
     page.keyboard.press("Shift+Tab")
     expect(page.get_by_role("button",name="Fermer")).to_be_focused()
     page.keyboard.press("Shift+Tab")
-    expect(combo).to_be_focused()
+    expect(dialog.get_by_role("button",name="Étendre aux autres données autorisées",exact=True)).to_be_focused()
+    page.keyboard.press("Tab")
+    expect(dialog.get_by_role("button",name="Fermer",exact=True)).to_be_focused()
     page.keyboard.press("Escape")
     expect(dialog).to_have_count(0)
     expect(trigger).to_be_focused()
@@ -119,7 +123,6 @@ with sync_playwright() as p:
     undersized=page.evaluate("""()=>[...document.querySelectorAll("button,summary,.link-button")].filter(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.visibility!=="hidden"&&s.display!=="none"&&r.width>0&&r.height>0&&(r.width<24||r.height<24)}).map(el=>({text:(el.innerText||el.getAttribute("aria-label")||"").trim(),w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height,className:el.className}))""")
     assert undersized==[],undersized
 
-    # Theme system: every Iconly asset loads and adapts between dark/light.
     page.goto(origin+"/#/dashboard")
     expect(page.get_by_role("heading",name="Tableau de bord",exact=True)).to_be_visible()
     assert page.evaluate("""()=>[...document.querySelectorAll(".icon,.nav-icon,.group-chevron")].filter(img=>img.getClientRects().length&&(!img.complete||img.naturalWidth===0)).map(img=>img.getAttribute("src"))""")==[]
@@ -135,19 +138,20 @@ with sync_playwright() as p:
     assert page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")=="none"
     light_active_nav_filter=page.locator(".nav-item.active .nav-icon").first.evaluate("el=>getComputedStyle(el).filter")
     assert "invert(1)" not in light_active_nav_filter,light_active_nav_filter
-    topbar_rgb=page.locator(".topbar").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    topbar_rgb=page.locator(".topbar").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
     assert sum(topbar_rgb)/3>180,topbar_rgb
-    pulse_rgb=page.locator(".pulse-item").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)""")
+    pulse_rgb=page.locator(".pulse-item").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
     assert sum(pulse_rgb)/3>180,pulse_rgb
     c.close()
 
     c=make_context(390);page=c.new_page();login(page)
     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     assert page.locator(".mobile-tabs").is_visible()
-    page.get_by_role("button",name="Ouvrir le menu",exact=True).click()
-    assert page.locator(".workspace").evaluate("el=>el.classList.contains(\"sidebar-open\")")
-    page.get_by_role("button",name="Fermer le menu",exact=True).click()
-    assert not page.locator(".workspace").evaluate("el=>el.classList.contains(\"sidebar-open\")")
+    page.locator(".mobile-tabs").get_by_role("button",name="Espace",exact=True).click()
+    expect(page.locator(".focus-spaces")).to_be_visible()
+    expect(page.get_by_label("Trouver un espace",exact=True)).to_be_visible()
+    page.locator(".mobile-tabs").get_by_role("button",name="Accueil",exact=True).click()
+    expect(page.locator(".focus-home")).to_be_visible()
     c.close();browser.close()
 server.shutdown()
-print("PASS standards V5: auth experience, landmarks, modal focus, keyboard command palette, permissions, target sizes and responsive shell")
+print("PASS standards: auth experience, landmarks, modal focus, keyboard command palette, permissions, target sizes and responsive shell")
