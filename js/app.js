@@ -103,6 +103,7 @@ async function sectionPage(section,subpage){
   if(state.route.item&&supportsRecord(domain))return renderRecord(domain,state.route.item);
   if(section==="dashboard"||section==="today"){const {renderDashboard}=await import("./modules/dashboard.js");return renderDashboard(section==="today")}
   if(section==="projects"&&subpage==="publication"){const {renderPublication}=await import("./modules/publication.js");return renderPublication()}
+  if(section==="siteHelp"){const {renderHelpCenter}=await import("./modules/help-center.js");return renderHelpCenter(subpage||"overview")}
   if(SECTIONS[section]?.cms){const {renderCMS}=await import("./modules/cms.js");return renderCMS(section)}
   if(section==="mailbox"){const {renderMailbox}=await import("./modules/mailbox.js");return renderMailbox(subpage||"mailbox")}
   if(section==="messages"){const {renderMessages}=await import("./modules/messages.js");return renderMessages()}
