@@ -63,7 +63,10 @@ function show(panel, title, description, content, footer = null, notice = "") {
   const status = h("div", { class: "auth-status", role: "alert", "aria-live": "polite", text: notice });
   panel.replaceChildren(h("div", { class: "auth-box" },
     h("div", { class: "auth-card-kicker" }, h("span", { class: "auth-live-dot" }), "Identité sécurisée"),
-    h("h2", { text: title }), h("p", { text: description }), content, status, footer));
+    h("div", { class: "auth-title-row" },
+      h("span", { class: "auth-title-mark", "aria-hidden": "true" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "", width: 46, height: 46 })),
+      h("div", { class: "auth-title-copy" }, h("h2", { text: title }), h("p", { text: description }))),
+    content, status, footer));
   return status;
 }
 function busyForm(form, status, submitAction) {
