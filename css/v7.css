@@ -224,3 +224,12 @@ html[data-compact-sidebar="true"]{--sq-sidebar:224px}
 .conversation-item{grid-template-columns:auto minmax(0,1fr) auto}.conversation-item .mail-item-content{align-self:center}.conversation-unread{display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--sq-accent);color:#071006;font-size:8px;font-weight:760}
 .message-bubble-head{align-items:center}.message-bubble-head>div{display:flex;align-items:baseline;gap:8px;min-width:0}.message-bubble-head strong,.message-bubble-head span{display:block}
 @media(max-width:560px){.profile-identity{align-items:flex-start}.profile-avatar-large{width:62px!important;height:62px!important;flex-basis:62px!important}.row-identity{gap:9px}}
+
+
+/* Help Center control center */
+.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.metric-card{min-height:92px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface);display:flex;flex-direction:column;justify-content:space-between}
+.metric-card strong{font-size:25px;letter-spacing:-.04em}.metric-card span{color:var(--muted);font-size:11px}
+.button-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:900px){.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.metric-grid{grid-template-columns:1fr 1fr}.metric-card{min-height:82px;padding:13px}.metric-card strong{font-size:21px}.button-row>.button{flex:1 1 100%}}
