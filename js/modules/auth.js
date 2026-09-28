@@ -71,7 +71,7 @@ function busyForm(form, status, submitAction) {
   form.addEventListener("submit", async event => {
     event.preventDefault();
     if (busy) return;
-    busy = true; status.textContent = "";
+    busy = true; status.textContent = ""; status.classList.remove("success");
     const buttons = [...form.querySelectorAll("button")];
     const old = buttons.map(b => b.disabled);
     buttons.forEach(b => { b.disabled = true; }); form.setAttribute("aria-busy", "true");
@@ -139,8 +139,9 @@ function showLogin(panel, onAuthenticated, message = "", restoring = false) {
     form.append(passkey);
   }
   const diagnostic = link("Vérifier la connexion au serveur", async () => {
-    diagnostic.disabled = true; status.textContent = "Vérification de la connexion…";
-    try { status.textContent = await probeConnection(); } catch (error) { status.textContent = authError(error); }
+    diagnostic.disabled = true; status.classList.remove("success"); status.textContent = "Vérification de la connexion…";
+    try { status.textContent = await probeConnection(); status.classList.add("success"); }
+    catch (error) { status.classList.remove("success"); status.textContent = authError(error); }
     finally { diagnostic.disabled = false; }
   });
   panel.querySelector(".auth-box").append(

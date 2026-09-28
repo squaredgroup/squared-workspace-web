@@ -66,6 +66,7 @@
 .link-button{border:0;background:transparent;color:var(--sq-accent);padding:0 3px;cursor:pointer;font-size:10px;font-weight:600;transition:color var(--sq-duration-fast),opacity var(--sq-duration-fast)}
 .link-button:hover{color:color-mix(in srgb,var(--sq-accent) 78%,white)}.auth-box .link-button:disabled{opacity:.55;cursor:progress}
 .auth-status{line-height:1.6;overflow-wrap:anywhere;margin-top:14px;padding:11px 12px;border:1px solid rgba(255,49,93,.22);border-radius:11px;background:rgba(255,49,93,.07);font-size:10px;color:#ff88a2}
+.auth-status.success{border-color:rgba(123,232,78,.28);background:rgba(123,232,78,.08);color:#a7f38a}
 .auth-status:empty{display:none}
 .auth-trust{display:flex;align-items:center;gap:11px;margin-top:20px;padding:12px 13px;border:1px solid var(--sq-border-soft);border-radius:13px;background:color-mix(in srgb,var(--sq-control) 56%,transparent)}
 .auth-trust>.icon{flex:0 0 auto;opacity:.72}.auth-trust strong,.auth-trust span{display:block}.auth-trust strong{font-size:10px;color:var(--sq-text-soft)}.auth-trust span{margin-top:2px;font-size:9px;color:var(--sq-subtle)}
