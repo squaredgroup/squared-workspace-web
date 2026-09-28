@@ -1,6 +1,6 @@
 import type { AsyncState } from "./types";
 
-export const workspaceVersion = "7.0.0";
+export const workspaceVersion = "8.0.0";
 
 export const stateCopy: Record<AsyncState, { title: string; description: string }> = {
   idle: { title: "Prêt", description: "Workspace est prêt à recevoir vos actions." },
@@ -12,5 +12,5 @@ export const stateCopy: Record<AsyncState, { title: string; description: string 
 
 export function applyProductMetadata(): void {
   document.documentElement.dataset.workspaceVersion = workspaceVersion;
-  document.documentElement.classList.add("supports-v7");
+  document.documentElement.classList.add("supports-v8");
 }

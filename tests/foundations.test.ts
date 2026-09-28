@@ -3,7 +3,7 @@ import { stateCopy, workspaceVersion } from "../src/components";
 
 describe("fondations Workspace", () => {
   it("expose une version produit explicite", () => {
-    expect(workspaceVersion).toBe("7.0.0");
+    expect(workspaceVersion).toBe("8.0.0");
   });
 
   it("définit une copie utilisateur pour chaque état asynchrone", () => {

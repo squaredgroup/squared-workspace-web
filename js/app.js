@@ -40,7 +40,7 @@ function sidebar(){
   const u=state.user;const nav=h("nav",{"aria-label":"Navigation principale"});
   for(const group of NAV_GROUPS){const node=navGroup(group);if(node)nav.append(node)}
   return h("aside",{class:"sidebar"},
-    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:42,height:42,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{},h("i",{class:"brand-dot"}),"Operating system")),h("span",{class:"version-pill",text:"V7"})),
+    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:42,height:42,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{},h("i",{class:"brand-dot"}),"Operating system")),h("span",{class:"version-pill",text:"V8"})),
     h("button",{class:"sidebar-search",type:"button",onClick:openCommand},icon("search",16),h("span",{text:"Rechercher"}),h("span",{class:"shortcut",text:"⌘ K"})),
     h("div",{class:"sidebar-context"},h("span",{text:"Espace actif"}),h("strong",{text:state.workspace?.workspace?.name||"Squared Group"}),h("small",{text:`${accessibleSections().length} espaces autorisés`})),
     nav,
