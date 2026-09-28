@@ -11,7 +11,7 @@ import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredS
 import { renderAuth } from "./modules/auth.js";
 import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar } from "./ui.js";
 
-let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let updateBanner=null;let navigationPrefix=false;let activeViewTransition=null;
+let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let navigationPrefix=false;let activeViewTransition=null;
 const app=document.querySelector("#app");
 
 function accessibleSections(){return Object.keys(SECTIONS).filter(key=>canAccessSection(key,state.user))}
@@ -152,18 +152,20 @@ async function refreshData(){
   const placeholder=h("button");await refreshWorkspace(placeholder);
 }
 configureMobile({refresh:refreshData,search:openCommand});
-function showUpdateBanner(registration){
-  if(updateBanner||!registration?.waiting)return;
-  updateBanner=h("div",{class:"update-banner",role:"status"},h("div",{},h("strong",{text:"Nouvelle version disponible"}),h("span",{text:"Workspace peut se mettre à jour sans interrompre votre session."})),h("div",{class:"update-actions"},h("button",{class:"button ghost",type:"button",text:"Plus tard",onClick:()=>{updateBanner?.remove();updateBanner=null}}),h("button",{class:"button primary",type:"button",text:"Actualiser",onClick:()=>{sessionStorage.setItem("sq-sw-reloading","1");registration.waiting?.postMessage({type:"SKIP_WAITING"})}})));document.body.append(updateBanner);announce("Une nouvelle version de Workspace est disponible.");
-}
-function activateOrOfferUpdate(registration,worker=registration?.waiting){
-  if(!navigator.serviceWorker.controller||!worker)return;
-  if(document.querySelector(".auth-screen")){sessionStorage.setItem("sq-sw-reloading","1");worker.postMessage({type:"SKIP_WAITING"});return}
-  showUpdateBanner(registration);
-}
 async function registerServiceWorker(){
   if(!("serviceWorker" in navigator))return;
-  try{const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});swRegistration=registration;if(registration.waiting)activateOrOfferUpdate(registration);registration.addEventListener("updatefound",()=>{const worker=registration.installing;if(!worker)return;worker.addEventListener("statechange",()=>{if(worker.state==="installed")activateOrOfferUpdate(registration,worker)})});navigator.serviceWorker.addEventListener("controllerchange",()=>{const requested=sessionStorage.getItem("sq-sw-reloading")==="1";const onAuthScreen=Boolean(document.querySelector(".auth-screen"));if(requested)sessionStorage.removeItem("sq-sw-reloading");if(requested||onAuthScreen)location.reload()});registration.update().catch(()=>{});setInterval(()=>registration.update().catch(()=>{}),60*60*1000)}catch{}
+  try{const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});swRegistration=registration;registration.waiting?.postMessage({type:"SKIP_WAITING"});await registration.update().catch(()=>{})}catch{}
+}
+async function ensureLatestRelease(){
+  const current=document.querySelector('meta[name="sq-release"]')?.content;
+  if(!current||current==="__SQUARED_RELEASE__")return false;
+  try{
+    const response=await fetch(`/release.json?check=${Date.now()}`,{cache:"no-store",headers:{"Cache-Control":"no-cache"}});
+    if(!response.ok)return false;
+    const latest=(await response.json())?.release;
+    if(!latest||latest===current){sessionStorage.removeItem("sq-release-requested");return false}
+    const target=new URL(location.href);target.searchParams.set("release",latest);sessionStorage.setItem("sq-release-requested",latest);location.replace(target.href);return true;
+  }catch{return false}
 }
 let realtimeReconnectTimer=null;let reconnectDelay=1000;
 function stopRealtime(){clearTimeout(realtimeReconnectTimer);clearTimeout(realtimeRefreshTimer);const old=state.realtime;state.realtime=null;try{old?.close()}catch{}}
@@ -179,7 +181,7 @@ function connectRealtime(){
 async function authenticated(){await Promise.all([loadMe(),loadWorkspace(),loadDomainCatalog().catch(()=>null)]);if(!state.user||!state.accessToken)return;uiReady=true;buildShell();uiSignature=signature();connectRealtime()}
 function resetInterface(reason=""){renderedRouteKey="";uiReady=false;uiSignature="";renderGeneration++;refs={};stopRealtime();document.querySelector("#portal-root")?.replaceChildren();document.querySelectorAll(".overlay").forEach(node=>node.remove());document.querySelector(".toast-stack")?.replaceChildren();if(app)app.inert=false;renderAuth(authenticated,{message:reason==="expired"?"Votre session a expiré. Reconnectez-vous.":""})}
 window.addEventListener("sq:session-ended",event=>resetInterface(event.detail?.reason));window.addEventListener("offline",stopRealtime);window.addEventListener("online",()=>{if(uiReady)connectRealtime()});
-async function bootstrap(){registerServiceWorker();const restoring=!authContext.action&&hasStoredSession();renderAuth(authenticated,{restoring});if(!restoring)return;try{await refreshSession();await authenticated()}catch(error){if(error.name!=="AbortError")renderAuth(authenticated,{message:errorMessage(error)})}}
+async function bootstrap(){if(await ensureLatestRelease())return;registerServiceWorker();const restoring=!authContext.action&&hasStoredSession();renderAuth(authenticated,{restoring});if(!restoring)return;try{await refreshSession();await authenticated()}catch(error){if(error.name!=="AbortError")renderAuth(authenticated,{message:errorMessage(error)})}}
 window.addEventListener("keydown",event=>{
   const editing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
   if(((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="k")||(!editing&&event.key==="/")){event.preventDefault();openCommand()}
@@ -191,7 +193,8 @@ window.addEventListener("keydown",event=>{
   }
   if(event.key==="Escape"&&!document.querySelector(".overlay")&&state.sidebarOpen)setState({sidebarOpen:false});
 });
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")swRegistration?.update().catch(()=>{})});
+window.addEventListener("pageshow",()=>{ensureLatestRelease()});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){swRegistration?.update().catch(()=>{});ensureLatestRelease()}});
 setInterval(()=>{if(uiReady&&state.user)refreshChrome()},60*1000);
 function signature(){return JSON.stringify({route:state.route,closedGroups:state.closedGroups,sidebarOpen:state.sidebarOpen,appearance:state.appearance,online:state.online,lastSyncAt:state.lastSyncAt?.toISOString?.(),user:[state.user?.firstName,state.user?.first_name,state.user?.lastName,state.user?.last_name,state.user?.email,state.user?.role]})}
 subscribe(()=>{if(!uiReady||!state.user)return;const before=uiSignature?JSON.parse(uiSignature):{};const next=signature();if(next===uiSignature)return;const after=JSON.parse(next);uiSignature=next;if(!refs.shell){buildShell();return}const routeChanged=JSON.stringify(before.route)!==JSON.stringify(after.route);refreshChrome();if(routeChanged)renderCurrent({focus:true})});
