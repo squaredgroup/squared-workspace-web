@@ -100,7 +100,7 @@ with sync_playwright() as p:
 
     c=context();page=c.new_page();page.route('https://workspace.squaredgroup.studio/v1/auth/password',lambda r:r.abort('failed'))
     page.goto(origin);page.get_by_label('Adresse e-mail',exact=True).fill(USER['email']);page.get_by_label('Mot de passe',exact=True).fill('incorrect');page.get_by_role('button',name='Se connecter',exact=True).click()
-    expect(page.get_by_role('alert')).to_contain_text('Impossible de joindre');record('erreur réseau affichée sans effacer la page');c.close()
+    expect(page.get_by_role('alert')).to_contain_text('service Workspace est momentanément injoignable');record('erreur réseau affichée sans effacer la page');c.close()
 
     c=context();page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));login(page)
     assert page.evaluate("localStorage.getItem('sq-workspace-web-refresh')") is None
