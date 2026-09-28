@@ -4,6 +4,7 @@ import { loadWorkspace } from "./api.js";
 import { h, button, icon, emptyState, pageHeader, select } from "./ui.js";
 import { viewContext } from "./focus-state.js";
 import { dueOf, dueBucket, dayKey, isFinished, isMine, titleOf, domainLabels, sectionForDomain } from "./focus-model.js";
+import { analyzeWorkspace } from "./data-insights.js";
 import { recordRow, editRecord, canEditRecord } from "./focus-records.js";
 
 export async function renderFocusHome(todayOnly=false){
@@ -34,7 +35,8 @@ export async function renderFocusHome(todayOnly=false){
     const events=Array.isArray(state.workspace?.events)?state.workspace.events:[];
     const upcoming=canAccessSection("planning",state.user)?events.filter(item=>!isFinished(item)&&dayKey(dueOf(item))>=dayKey(new Date())&&(context.scope==="all"||isMine(item,state.user?.id))):[];
     group("Prochains rendez-vous","events",upcoming,2);
-    const other=h("div",{class:"focus-home-secondary"});
+    const other=h("div",{class:"focus-home-secondary"}),quality=analyzeWorkspace(state.workspace);
+    if(quality.total)other.append(h("section",{class:`focus-data-health ${quality.status}`},h("div",{},h("span",{class:"focus-kicker",text:"Qualité des données"}),h("h2",{text:`${quality.score} / 100`}),h("p",{text:`${quality.overdue} en retard · ${quality.incomplete} à compléter · ${quality.stale} sans activité récente`})),button("Voir les tâches",{kind:"ghost",onClick:()=>setRoute("tasks")})));
     const undated=tasks.filter(item=>dueBucket(item)==="undated"),future=tasks.filter(item=>dueBucket(item)==="future");
     for(const [title,items] of [["À venir",future],["Sans échéance",undated]])if(items.length)other.append(h("details",{class:"focus-disclosure"},h("summary",{text:`${title} · ${items.length}`}),...items.slice(0,6).map(item=>recordRow("tasks",item)),items.length>6?button("Ouvrir les tâches",{onClick:()=>setRoute("tasks")}):null));
     if(!todayOnly){const projects=array("projects").filter(item=>!isFinished(item));if(projects.length)other.append(h("section",{class:"focus-home-group"},h("div",{class:"focus-group-heading"},h("h2",{text:"Vos projets"}),button("Tous",{kind:"ghost",onClick:()=>setRoute("projects","workspace")})),...projects.slice(0,3).map(item=>recordRow("projects",item))));}

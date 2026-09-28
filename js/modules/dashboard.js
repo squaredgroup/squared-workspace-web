@@ -1,6 +1,7 @@
 import { state,setRoute } from "../store.js";
 import { loadWorkspace,loadDomainCatalog,listSpecialized } from "../api.js";
 import { h,pageHeader,card,row,emptyState,statCard,formatDate,relativeDate,button,icon,progressBar } from "../ui.js";
+import { analyzeWorkspace } from "../data-insights.js";
 import { activeAnnouncement,loadWorkspaceWebContent,richContentNode,safePublicURL } from "../public-content.js";
 
 const arrays=workspace=>({
@@ -26,6 +27,20 @@ function quick(label,section,iconName,subpage=""){return button(label,{iconName,
 function managedLink(item,label="Ouvrir"){
   const href=safePublicURL(item.downloadURL||item.url);
   return href?h("a",{class:"button ghost small",href,target:"_blank",rel:"noopener noreferrer"},icon(item.downloadURL?"download":"external",14),h("span",{text:label})):null;
+}
+function dataQualityPanel(report){
+  if(!report.total)return h("section",{class:"workspace-health empty-health"},h("div",{class:"workspace-health-copy"},h("span",{text:"Qualité des données"}),h("h2",{text:"Le périmètre est prêt à être alimenté"}),h("p",{text:"Aucun enregistrement opérationnel n’est encore visible pour ce compte. Le score apparaîtra dès la première synchronisation."})),quick("Ouvrir les projets","projects","folder","workspace"));
+  const label=report.status==="healthy"?"Données fiables":report.status==="attention"?"Points à compléter":"Qualité à reprendre";
+  return h("section",{class:`workspace-health ${report.status}`},
+    h("div",{class:"workspace-health-score","aria-label":`Score de qualité ${report.score} sur 100`},h("strong",{text:String(report.score)}),h("span",{text:"/ 100"})),
+    h("div",{class:"workspace-health-copy"},h("span",{text:"Qualité des données"}),h("h2",{text:label}),h("p",{text:`${report.total} enregistrements répartis dans ${report.domains} domaines visibles. Le contrôle reste limité aux données réellement renvoyées par Workspace.`})),
+    h("div",{class:"workspace-health-signals"},
+      h("div",{},h("strong",{text:String(report.overdue)}),h("span",{text:"échéances dépassées"})),
+      h("div",{},h("strong",{text:String(report.incomplete)}),h("span",{text:"champs essentiels à compléter"})),
+      h("div",{},h("strong",{text:String(report.stale)}),h("span",{text:"éléments sans activité depuis 30 j"}))
+    ),
+    (report.overdue||report.incomplete)?quick("Revoir les tâches","tasks","check"):quick("Voir les projets","projects","folder","workspace")
+  );
 }
 
 function managedContent(content){
@@ -71,8 +86,9 @@ export async function renderDashboard(today=false){
   if(matchMedia("(max-width: 880px)").matches){const {renderFocusHome}=await import("../focus-home.js");return renderFocusHome(today);}
   const root=h("div");
   const managedContentPromise=loadWorkspaceWebContent().catch(()=>null);
-  const workspace=await loadWorkspace();
+  const workspace=state.online||!state.workspace?await loadWorkspace():state.workspace;
   const data=arrays(workspace);
+  const dataQuality=analyzeWorkspace(workspace);
   const tasks=active(data.tasks),projects=active(data.projects),missions=active(data.missions),validations=active(data.validations);
   const unread=data.notifications.filter(v=>!(v.isRead??v.payload?.isRead)).length;
   const completedTasks=data.tasks.filter(value=>/(completed|done|closed)/i.test(statusOf(value))).length;
@@ -112,6 +128,8 @@ export async function renderDashboard(today=false){
     statCard("Décisions",validations.length,"Validations à traiter","warning"),
     statCard("Notifications",unread,"Éléments non lus","notification")
   ));
+
+  root.append(dataQualityPanel(dataQuality));
 
   root.append(h("section",{class:"decision-grid section-gap","aria-label":"Centre de décision"},
     h("article",{class:"decision-card primary"},h("div",{class:"decision-icon"},icon("check",18)),h("div",{},h("span",{text:"Avancement des tâches"}),h("strong",{text:data.tasks.length?`${completedTasks} sur ${data.tasks.length} terminées`:"Aucune tâche mesurée"}),progressBar(taskProgress,"Tâches terminées"))),

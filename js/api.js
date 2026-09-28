@@ -37,16 +37,26 @@ export async function loadWorkspace() {
 }
 export async function loadDomainCatalog() { const { data } = await request("/v1/domain-data/catalog"); setState({ domainCatalog: data }); return data; }
 
-export async function listCoreDomain(domain) {
-  const items = []; let cursor = null; let guard = 0;
-  do {
+function stableItems(items){
+  const seen=new Set();
+  return items.filter(item=>{const key=item?.id?String(item.id):"";if(!key)return true;if(seen.has(key))return false;seen.add(key);return true});
+}
+async function paginate(loadPage){
+  const items=[],seenCursors=new Set();let cursor=null;
+  for(let page=0;page<50;page+=1){
+    const result=await loadPage(cursor);items.push(...(result.items||[]));cursor=result.cursor||null;
+    if(!cursor)return stableItems(items);
+    if(seenCursors.has(cursor))throw new Error("La pagination du serveur boucle sur la même page. Réessayez après synchronisation.");
+    seenCursors.add(cursor);
+  }
+  throw new Error("Le périmètre dépasse la limite de chargement. Affinez la recherche ou ouvrez le module concerné.");
+}
+export async function listCoreDomain(domain,{signal}={}) {
+  return paginate(async cursor=>{
     const url = `/v1/${domain}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`;
-    const { data, response } = await request(url);
-    items.push(...(Array.isArray(data) ? data : []));
-    cursor = response.headers.get("x-next-cursor"); guard += 1;
-  } while (cursor && guard < 50);
-  if(cursor)throw new Error("Le périmètre dépasse la limite de chargement. Affinez la recherche ou ouvrez le module concerné.");
-  return items;
+    const { data, response } = await request(url,{signal});
+    return {items:Array.isArray(data)?data:[],cursor:response.headers.get("x-next-cursor")};
+  });
 }
 export async function getCoreEntity(domain, id) { return (await request(`/v1/${domain}/${id}`)).data; }
 export async function saveCoreEntity(domain, entity) {
@@ -56,13 +66,11 @@ export async function saveCoreEntity(domain, entity) {
 }
 export async function archiveCoreEntity(domain, id) { await request(`/v1/${domain}/${id}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } }); }
 
-export async function listSpecialized(kind) {
-  const items = []; let cursor = null; let guard = 0;
-  do {
-    const { data } = await request(`/v1/domain-data/${kind}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
-    items.push(...(data.items || [])); cursor = data.nextCursor; guard += 1;
-  } while (cursor && guard < 50);
-  return items;
+export async function listSpecialized(kind,{signal}={}) {
+  return paginate(async cursor=>{
+    const { data } = await request(`/v1/domain-data/${kind}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,{signal});
+    return {items:Array.isArray(data?.items)?data.items:[],cursor:data?.nextCursor};
+  });
 }
 export async function getSpecialized(kind, id) { return (await request(`/v1/domain-data/${kind}/${id}`)).data; }
 export async function saveSpecialized(kind, entity) {

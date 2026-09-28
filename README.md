@@ -1,11 +1,11 @@
 # Squared Workspace Web
 
-Version Web statique de Squared Workspace, conçue pour GitHub Pages.
+Version Web de Squared Workspace, déployée sur Cloudflare Pages avec GitHub comme source versionnée et miroir de continuité.
 
 ## Architecture
 
 - `squaredgroup.studio` : site principal Wix Studio
-- `workspace.app.squaredgroup.studio` : cette application Web, servie par GitHub Pages
+- `workspace.app.squaredgroup.studio` : cette application Web, servie par Cloudflare Pages
 - `workspace.squaredgroup.studio` : backend Oracle/Fastify existant
 
 Le projet ne contient **aucun backend**. Toutes les données viennent de l'API Squared Workspace existante.
@@ -75,12 +75,15 @@ Le backend actuel génère encore ces URLs sur `workspace.squaredgroup.studio`. 
 redir @workspaceWebLinks https://workspace.app.squaredgroup.studio{uri} 302
 ```
 
-## PWA
+## Actualisation des versions
 
 Le projet contient :
 
 - `manifest.webmanifest`
-- `sw.js`
+- `sw.js`, limité à la purge des anciennes installations
 - icônes d'application
-- shell offline
 - navigation responsive desktop / tablette / mobile
+
+Le Service Worker ne met aucune réponse en cache. Chaque build génère un identifiant
+de version vérifié au chargement et au retour dans l’onglet. Les en-têtes Cloudflare
+interdisent également la conservation d’une ancienne interface par le navigateur ou le CDN.

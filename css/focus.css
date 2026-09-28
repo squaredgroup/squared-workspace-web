@@ -11,6 +11,7 @@ html[data-theme="light"] { --focus-accent:#286619; --focus-danger:#a51738; --sq-
 .focus-home-content { display:grid; gap:24px; }
 .focus-home-group,.focus-home-secondary,.focus-related { display:grid; gap:0; min-width:0; }
 .focus-home-secondary { gap:24px; }
+.focus-data-health{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid rgba(var(--sq-accent-rgb),.22);border-radius:17px;background:linear-gradient(135deg,rgba(var(--sq-accent-rgb),.08),var(--sq-card))}.focus-data-health>div{min-width:0;flex:1}.focus-data-health h2{margin:4px 0;font-size:22px}.focus-data-health p{margin:0;color:var(--sq-muted);font-size:12px;line-height:1.5}.focus-data-health.attention{border-color:rgba(255,190,92,.28)}.focus-data-health.critical{border-color:rgba(255,101,124,.3)}
 .focus-group-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
 .focus-group-heading h2,.focus-home-group>h2,.focus-related>h2,.focus-spaces h2 { margin:0; font-size:17px; letter-spacing:-.025em; line-height:1.4; }
 .focus-count { font-size:12px; font-variant-numeric:tabular-nums; background:var(--sq-control); color:var(--sq-muted); border-radius:20px; padding:4px 9px; }
@@ -97,6 +98,7 @@ html[data-theme="light"] :is(.modal,.workspace) .button.danger { color:var(--foc
   .workspace .focus-record>.button { font-size:12px; padding:8px; }
   .workspace .focus-attention { flex-wrap:wrap; gap:12px; }
   .workspace .focus-attention h2 { font-size:20px; }
+  .workspace .focus-data-health{align-items:flex-start;flex-wrap:wrap}.workspace .focus-data-health>.button{width:100%}
   .workspace .focus-list-controls>.button { min-height:48px; }
   .workspace .focus-space-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .workspace .focus-space-link { font-size:14px; }
