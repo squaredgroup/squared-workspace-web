@@ -37,14 +37,19 @@ Le fichier `js/runtime-config.js` contient :
 
 ```js
 window.SQUARED_CONFIG = Object.freeze({
-  apiBaseUrl: "https://workspace.squaredgroup.studio",
-  webBaseUrl: "https://workspace.app.squaredgroup.studio"
+  apiBaseUrl: `${location.origin}/api`,
+  webBaseUrl: location.origin
 });
 ```
 
-## CORS requis côté API
+En production Cloudflare Pages, `_worker.js` relaie uniquement `/health`, `/ready`,
+`/.well-known/webauthn` et `/v1/**` depuis `/api/**`. Les jetons restent dans les
+en-têtes et les réponses authentifiées sont forcées en `no-store`.
 
-Comme le frontend et l'API sont sur deux origines différentes, le backend doit autoriser :
+## CORS côté API
+
+Le relais même origine rend la connexion indépendante du CORS du backend. L’autorisation
+CORS directe reste recommandée pour le miroir GitHub Pages et les outils de diagnostic :
 
 ```text
 https://workspace.app.squaredgroup.studio

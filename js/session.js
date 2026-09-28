@@ -79,7 +79,7 @@ export async function request(path, options = {}) {
   } catch (error) {
     if (timedOut) throw new APIError(0, { error: "timeout", message: "Le serveur ne répond pas à temps. Réessayez sans fermer votre espace." });
     if (error instanceof APIError || error.name === "AbortError") throw error;
-    throw new APIError(0, { error: "network", message: navigator.onLine === false ? "Vous êtes hors ligne. Rétablissez votre connexion, puis réessayez." : "Impossible de joindre l’API depuis cette page. Vérifiez votre connexion ; la configuration CORS ou HTTPS du serveur peut aussi bloquer l’accès." });
+    throw new APIError(0, { error: "network", message: navigator.onLine === false ? "Vous êtes hors ligne. Rétablissez votre connexion, puis réessayez." : "Le service Workspace est momentanément injoignable. Réessayez dans quelques instants ou utilisez le diagnostic serveur." });
   } finally {
     clearTimeout(timeout); options.signal?.removeEventListener("abort", abort);
   }

@@ -1,5 +1,5 @@
 const PREFIX = "squared-workspace-";
-const CACHE = `${PREFIX}workspace-focus-20260923`;
+const CACHE = `${PREFIX}workspace-auth-proxy-20260928`;
 const BUILD_ASSETS = []; // @vite-assets
 const APP_SHELL = [
   "/", "/index.html", "/manifest.webmanifest", "/assets/squaredgroup-logo.png", "/assets/appicon-256.png", "/assets/appicon-512.png",
@@ -17,7 +17,7 @@ async function networkFirst(request,path){
 }
 self.addEventListener("fetch",event=>{
   const url=new URL(event.request.url);if(event.request.method!=="GET"||url.origin!==self.location.origin)return;
-  if(url.pathname.startsWith("/v1/")||url.pathname==="/health"||url.pathname==="/ready")return;
+  if(url.pathname.startsWith("/api/")||url.pathname.startsWith("/v1/")||url.pathname==="/health"||url.pathname==="/ready")return;
   if(event.request.mode==="navigate"){event.respondWith(fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put("/index.html",copy)))}return response}).catch(()=>caches.match("/index.html").then(hit=>hit||new Response("Workspace est hors ligne.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8"}}))));return}
   if(url.pathname.startsWith("/js/")){event.respondWith(networkFirst(event.request,url.pathname));return}
   const allowed=APP_SHELL.includes(url.pathname)||url.pathname.startsWith("/assets/");if(!allowed)return;

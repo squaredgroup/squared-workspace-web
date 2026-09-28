@@ -3,7 +3,7 @@ import { join } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 
-const staticEntries = ["404.html", "CNAME", ".nojekyll", "manifest.webmanifest", "assets", "js"];
+const staticEntries = ["404.html", "CNAME", ".nojekyll", "manifest.webmanifest", "_worker.js", "_routes.json", "assets", "js"];
 
 async function filesUnder(directory: string, prefix = ""): Promise<string[]> {
   const output: string[] = [];
@@ -37,6 +37,15 @@ function workspaceStaticAssets(): Plugin {
 
 export default defineConfig({
   plugins: [tailwindcss(), workspaceStaticAssets()],
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://workspace.squaredgroup.studio",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api/, "")
+      }
+    }
+  },
   build: {
     target: "es2022",
     sourcemap: true,

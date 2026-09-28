@@ -1,6 +1,6 @@
 export const APP_NAME = "Squared Workspace";
 
-export const API_BASE_URL = String(window.SQUARED_CONFIG?.apiBaseUrl || "https://workspace.squaredgroup.studio").replace(/\/$/, "");
+export const API_BASE_URL = String(window.SQUARED_CONFIG?.apiBaseUrl || `${location.origin}/api`).replace(/\/$/, "");
 export const WEB_BASE_URL = String(window.SQUARED_CONFIG?.webBaseUrl || location.origin).replace(/\/$/, "");
 export function apiURL(path = "") { return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`; }
 export function realtimeURL(path = "/v1/realtime") {
