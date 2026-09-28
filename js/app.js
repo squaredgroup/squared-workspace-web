@@ -156,9 +156,14 @@ function showUpdateBanner(registration){
   if(updateBanner||!registration?.waiting)return;
   updateBanner=h("div",{class:"update-banner",role:"status"},h("div",{},h("strong",{text:"Nouvelle version disponible"}),h("span",{text:"Workspace peut se mettre à jour sans interrompre votre session."})),h("div",{class:"update-actions"},h("button",{class:"button ghost",type:"button",text:"Plus tard",onClick:()=>{updateBanner?.remove();updateBanner=null}}),h("button",{class:"button primary",type:"button",text:"Actualiser",onClick:()=>{sessionStorage.setItem("sq-sw-reloading","1");registration.waiting?.postMessage({type:"SKIP_WAITING"})}})));document.body.append(updateBanner);announce("Une nouvelle version de Workspace est disponible.");
 }
+function activateOrOfferUpdate(registration,worker=registration?.waiting){
+  if(!navigator.serviceWorker.controller||!worker)return;
+  if(document.querySelector(".auth-screen")){sessionStorage.setItem("sq-sw-reloading","1");worker.postMessage({type:"SKIP_WAITING"});return}
+  showUpdateBanner(registration);
+}
 async function registerServiceWorker(){
   if(!("serviceWorker" in navigator))return;
-  try{const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});swRegistration=registration;if(registration.waiting&&navigator.serviceWorker.controller)showUpdateBanner(registration);registration.addEventListener("updatefound",()=>{const worker=registration.installing;if(!worker)return;worker.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller)showUpdateBanner(registration)})});navigator.serviceWorker.addEventListener("controllerchange",()=>{if(sessionStorage.getItem("sq-sw-reloading")==="1"){sessionStorage.removeItem("sq-sw-reloading");location.reload()}});registration.update().catch(()=>{});setInterval(()=>registration.update().catch(()=>{}),60*60*1000)}catch{}
+  try{const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});swRegistration=registration;if(registration.waiting)activateOrOfferUpdate(registration);registration.addEventListener("updatefound",()=>{const worker=registration.installing;if(!worker)return;worker.addEventListener("statechange",()=>{if(worker.state==="installed")activateOrOfferUpdate(registration,worker)})});navigator.serviceWorker.addEventListener("controllerchange",()=>{const requested=sessionStorage.getItem("sq-sw-reloading")==="1";const onAuthScreen=Boolean(document.querySelector(".auth-screen"));if(requested)sessionStorage.removeItem("sq-sw-reloading");if(requested||onAuthScreen)location.reload()});registration.update().catch(()=>{});setInterval(()=>registration.update().catch(()=>{}),60*60*1000)}catch{}
 }
 let realtimeReconnectTimer=null;let reconnectDelay=1000;
 function stopRealtime(){clearTimeout(realtimeReconnectTimer);clearTimeout(realtimeRefreshTimer);const old=state.realtime;state.realtime=null;try{old?.close()}catch{}}

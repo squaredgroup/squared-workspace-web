@@ -3,7 +3,7 @@ import { join } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 
-const staticEntries = ["404.html", "CNAME", ".nojekyll", "manifest.webmanifest", "_worker.js", "_routes.json", "assets", "js"];
+const staticEntries = ["404.html", "CNAME", ".nojekyll", "manifest.webmanifest", "_worker.js", "_routes.json", "_headers", "assets", "js"];
 
 async function filesUnder(directory: string, prefix = ""): Promise<string[]> {
   const output: string[] = [];
