@@ -36,7 +36,7 @@ html[data-theme="light"] .main::before{background-image:linear-gradient(to right
 .nav-item.active{border-color:transparent;background:linear-gradient(90deg,rgba(var(--sq-accent-rgb),.105),rgba(var(--sq-accent-rgb),.02) 78%,transparent);box-shadow:none}
 .nav-item.active::after{content:"";position:absolute;right:9px;width:4px;height:4px;border-radius:50%;background:var(--sq-accent);box-shadow:0 0 10px rgba(var(--sq-accent-rgb),.6)}
 .nav-icon{width:17px;height:17px}.nav-label{font-size:12px}
-.sidebar-footer{position:sticky;bottom:-12px;margin-top:auto;padding:16px 0 12px;background:linear-gradient(to bottom,transparent 0,var(--sq-shell) 24%)}
+.sidebar-footer{position:static;margin-top:auto;padding:16px 0 12px;background:linear-gradient(to bottom,transparent 0,var(--sq-shell) 24%)}
 .account-card{border-color:var(--sq-hairline);border-radius:12px;background:color-mix(in srgb,var(--sq-surface) 76%,transparent);box-shadow:none}
 
 .topbar{height:var(--sq-topbar);padding-inline:clamp(22px,2.5vw,40px);border-bottom-color:var(--sq-hairline);background:color-mix(in srgb,var(--sq-glass) 91%,transparent);box-shadow:0 12px 38px rgba(0,0,0,.025)}
