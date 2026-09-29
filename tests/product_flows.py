@@ -60,6 +60,8 @@ MAIL = {
     "isRead": False, "isStarred": True, "receivedAt": "2026-09-20T08:45:00Z",
 }
 SETTINGS = {"appearanceMode": "dark", "dashboardDensity": "balanced", "contentWidth": "balanced", "language": "fr-FR", "timezone": "Europe/Paris", "compactSidebar": False, "reducedMotion": False}
+PLANNING = {"week": None, "version": 0}
+SYSTEM_TEMPLATE = {"key": "notification", "name": "Notifications", "description": "Notification du compte", "tone": "neutral", "subject": "Notification Workspace", "body": "{{event.detail}}", "contentBlocks": [{"id": "00000000-0000-4000-8000-000000000001", "kind": "PARAGRAPH", "text": "{{event.detail}}", "url": "", "alternativeText": ""}], "visualStyle": None, "isCustomized": False, "revision": 0, "variables": ["event.detail"]}
 requests = []
 visual_dir = Path(os.environ["WORKSPACE_VISUAL_DIR"]) if os.environ.get("WORKSPACE_VISUAL_DIR") else None
 if visual_dir:
@@ -75,7 +77,7 @@ def respond(route, payload, status=200, headers=None):
 
 
 def fixture(route):
-    global SETTINGS
+    global SETTINGS, PLANNING, SYSTEM_TEMPLATE
     request = route.request
     path = urlsplit(request.url).path
     method = request.method
@@ -95,6 +97,13 @@ def fixture(route):
         if method == "PUT":
             SETTINGS = body
         return respond(route, SETTINGS)
+    if path == "/v1/me/personal-planning":
+        if method == "PUT":
+            if body["expectedVersion"] != PLANNING["version"]:
+                return respond(route, {"error": "version_conflict"}, 409)
+            PLANNING = {"week": body["week"], "version": PLANNING["version"] + 1}
+            return respond(route, {"version": PLANNING["version"]})
+        return respond(route, PLANNING)
     if path == "/v1/sessions":
         return respond(route, [{"id": "fixture-session", "device_name": "Navigateur Web", "platform": "Web", "last_seen_at": "2026-09-20T09:00:00Z"}])
     if path == "/v1/people":
@@ -122,6 +131,15 @@ def fixture(route):
         return respond(route, {"id": "sent-mail"}, 201)
     if path == "/v1/mailbox/templates":
         return respond(route, {"templates": []})
+    if path == "/v1/mailbox/system-templates":
+        return respond(route, {"templates": [SYSTEM_TEMPLATE]})
+    if path == "/v1/mailbox/system-templates/notification/preview":
+        return respond(route, {"subject": body["subject"], "text": body["body"], "html": "<!doctype html><html><body><h1>Aperçu Workspace</h1></body></html>"})
+    if path == "/v1/mailbox/system-templates/notification" and method == "PUT":
+        if body["expectedRevision"] != SYSTEM_TEMPLATE["revision"]:
+            return respond(route, {"error": "system_mail_template_conflict"}, 409)
+        SYSTEM_TEMPLATE = {**SYSTEM_TEMPLATE, **body, "revision": SYSTEM_TEMPLATE["revision"] + 1, "isCustomized": True}
+        return respond(route, {"template": SYSTEM_TEMPLATE})
     if path == "/v1/mailbox/style":
         return respond(route, {})
     if path == "/v1/notifications":
@@ -209,6 +227,24 @@ with sync_playwright() as playwright:
     composer.fill("Validation fonctionnelle terminée.")
     page.get_by_role("button", name="Envoyer", exact=True).click()
     expect(page.get_by_role("log", name="Messages de Direction produit").get_by_text("Validation fonctionnelle terminée.", exact=True)).to_be_visible()
+
+    page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('planning','personal')}""")
+    expect(page.get_by_role("heading", name="Ma semaine type", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Nouveau créneau", exact=True).click()
+    page.get_by_role("dialog").get_by_label("Nom", exact=True).fill("Course du matin")
+    page.get_by_role("dialog").get_by_role("button", name="Enregistrer", exact=True).click()
+    expect(page.get_by_text("Course du matin", exact=True)).to_be_visible()
+    assert any(method == "PUT" and path == "/v1/me/personal-planning" and body.get("week", {}).get("slots", [{}])[0].get("title") == "Course du matin" for method, path, body in requests if body)
+
+    page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('mailbox','templates')}""")
+    page.get_by_role("button", name="E-mails système", exact=True).click()
+    expect(page.get_by_role("heading", name="Notifications", exact=True)).to_be_visible()
+    page.get_by_label("Objet", exact=True).fill("Une nouveauté Workspace")
+    page.get_by_role("button", name="Aperçu", exact=True).click()
+    expect(page.get_by_title("Aperçu : Une nouveauté Workspace")).to_be_visible()
+    page.get_by_role("button", name="Enregistrer", exact=True).click()
+    expect(page.get_by_text("Personnalisé", exact=False)).to_be_visible()
+    assert any(method == "PUT" and path == "/v1/mailbox/system-templates/notification" and body.get("subject") == "Une nouveauté Workspace" for method, path, body in requests if body)
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('mailbox','mailbox')}""")
     expect(page.get_by_role("heading", name="E-mails", exact=True)).to_be_visible()
