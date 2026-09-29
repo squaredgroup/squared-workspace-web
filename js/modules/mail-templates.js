@@ -45,9 +45,13 @@ export async function renderMailTemplates() {
           toast("Modèle enregistré"); await drawEditorial();
         } catch (error) { toast(errorMessage(error), "error", 6000); }
       } }));
-      content.replaceChildren(card(template ? "Modifier le modèle" : "Nouveau modèle", "Votre modèle est enregistré dans le Workspace partagé par l’app native.", h("div", { class: "form" }, form, actions)));
+      content.replaceChildren(card(template?.id ? "Modifier le modèle" : "Nouveau modèle", "Ce modèle est enregistré dans votre Workspace.", h("div", { class: "form" }, form, actions)));
     };
-    content.replaceChildren(card("Bibliothèque", `${templates.length} modèle(s) disponible(s).`, h("div", { class: "list" }, ...(templates.length ? templates.map(template => row({ title: template.name, subtitle: `${template.category || "Général"} · ${template.description || template.subject || ""}`, status: template.isShared ? "Équipe" : "Personnel", actions: [can("sendMail") ? button("Modifier", { small: true, onClick: () => edit(template) }) : null, can("sendMail") && !template.isSystem ? button("Supprimer", { small: true, kind: "ghost", onClick: () => confirmAction({ title: "Supprimer ce modèle ?", message: template.name, confirmLabel: "Supprimer", danger: true, onConfirm: async () => { await deleteMailboxTemplate(template.id); toast("Modèle supprimé"); await drawEditorial(); } }) }) : null].filter(Boolean) })) : [emptyState("Aucun modèle", "Créez un modèle de rédaction pour votre boîte e-mail.", "document")]))), ...(can("sendMail") ? [button("Nouveau modèle", { kind: "primary", iconName: "add", onClick: () => edit(null) })] : []));
+    content.replaceChildren(card("Bibliothèque", `${templates.length} modèle(s) disponible(s).`, h("div", { class: "list" }, ...(templates.length ? templates.map(template => {
+      const editable = !template.isSystem && (template.createdBy === state.user?.id || can("organizeMail"));
+      const duplicate = () => edit({ ...template, id: null, name: `${template.name} — copie`, isSystem: false, isShared: false });
+      return row({ title: template.name, subtitle: `${template.category || "Général"} · ${template.description || template.subject || ""}`, status: template.isSystem ? "Modèle Squared" : template.isShared ? "Équipe" : "Personnel", actions: [can("sendMail") ? button(editable ? "Modifier" : "Dupliquer", { small: true, onClick: () => editable ? edit(template) : duplicate() }) : null, can("sendMail") && editable ? button("Supprimer", { small: true, kind: "ghost", onClick: () => confirmAction({ title: "Supprimer ce modèle ?", message: template.name, confirmLabel: "Supprimer", danger: true, onConfirm: async () => { await deleteMailboxTemplate(template.id); toast("Modèle supprimé"); await drawEditorial(); } }) }) : null].filter(Boolean) });
+    }) : [emptyState("Aucun modèle", "Créez un modèle de rédaction pour votre boîte e-mail.", "document")]))), ...(can("sendMail") ? [button("Nouveau modèle", { kind: "primary", iconName: "add", onClick: () => edit(null) })] : []));
   }
   async function drawSystem() {
     const data = await systemMailTemplates(), templates = data.templates || [];

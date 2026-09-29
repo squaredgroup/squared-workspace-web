@@ -82,7 +82,7 @@ def fixture(route):
     request = route.request
     path = urlsplit(request.url).path
     method = request.method
-    body = request.post_data_json if request.post_data else None
+    body = request.post_data_json if request.post_data and "application/json" in request.headers.get("content-type", "") else None
     requests.append((method, path, body))
     if path in ("/v1/auth/password", "/v1/auth/refresh"):
         return respond(route, SESSION)
