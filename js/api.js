@@ -169,6 +169,16 @@ export async function updateConversationPreferences(conversationId, preferences)
 export async function updateConversationDetails(conversationId, details) { return (await request(`/v1/conversations/${conversationId}`, { method: "PATCH", body: details })).data; }
 export async function updateConversationParticipants(conversationId, participantIDs) { return (await request(`/v1/conversations/${conversationId}/participants`, { method: "PUT", body: { participantIDs } })).data; }
 export async function deleteConversation(conversationId) { await request(`/v1/conversations/${conversationId}`, { method: "DELETE" }); }
+export async function sendMessageProposal(conversationId, messageID, entityKind, entityID, recipientID) {
+  return (await request(`/v1/conversations/${conversationId}/proposals`, {
+    method: "POST", body: { messageID, entityKind, entityID, recipientID }
+  })).data;
+}
+export async function decideMessageProposal(conversationId, messageID, decision) {
+  return (await request(`/v1/conversations/${conversationId}/proposals/${messageID}/decision`, {
+    method: "POST", body: { decision }
+  })).data;
+}
 
 export async function adminSecurityOverview() { return (await request("/v1/admin/security-overview")).data; }
 

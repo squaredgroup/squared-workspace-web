@@ -2,6 +2,7 @@ import { getDraft, saveDraft } from "../focus-state.js";
 import { state, subscribe, setRoute } from "../store.js";
 import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile } from "../api.js";
 import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
+import { openProposalPicker, proposalCard } from "../message-proposals.js";
 
 const conversationMessages = conversation => Array.isArray(conversation?.messages) ? conversation.messages : [];
 const memberId = member => member.id || member.memberId || member.member_id;
@@ -201,13 +202,17 @@ export async function renderMessages() {
         const date = new Date(messageDate(message)), valid = Number.isFinite(date.getTime());
         const day = valid ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(date) : "Date indisponible";
         if (day !== previousDay) { nodes.push(h("div", { class: "sq-message-date", text: day })); previousDay = day; }
+        if (message.proposalEvent) {
+          nodes.push(h("div", { class: "sq-proposal-event", text: `${messageBody(message)} · ${valid ? formatDate(date) : "Date indisponible"}` }));
+          continue;
+        }
         const authorId = messageAuthorId(message), mine = authorId === state.user?.id;
         const author = mine ? state.user : (teamMember(authorId) || { name: message.authorName || message.author || "Membre", avatarData: message.authorAvatarData || message.author_avatar_data });
         const profile = profiles.get(message.id), removed = Boolean(message.deletedAt || message.deleted_at);
         const myName = memberName(state.user);
         const reactions = Object.entries(profile?.reactions || {}).filter(([, members]) => Array.isArray(members) && members.length);
         const mutate = async action => { try { await action(); await reload(); } catch (error) { toast(errorMessage(error), "error", 6000); } };
-        const actions = removed ? null : h("div", { class: "message-actions" },
+        const actions = removed || message.proposal ? null : h("div", { class: "message-actions" },
           button("Répondre", { small: true, onClick: () => { replyingTo = message; box.focus(); replyHint.replaceChildren(h("span", { text: `En réponse à ${mine ? "votre message" : message.authorName || message.author || "un membre"} : ${messageBody(message).slice(0, 80)}` }), button("Annuler", { small: true, kind: "ghost", onClick: () => { replyingTo = null; replyHint.replaceChildren(); } })); } }),
           ...["👍", "❤️", "🎉"].map(emoji => {
             const active = (profile?.reactions?.[emoji] || []).includes(myName);
@@ -236,7 +241,7 @@ export async function renderMessages() {
           profile?.forwardedFromMessageID ? h("small", { class: "muted", text: "Message transféré" }) : null,
           reply ? h("blockquote", { class: "sq-message-reference", text: `En réponse à : ${messageBody(reply).slice(0, 140)}` }) : null,
           profile?.isPinned ? h("small", { class: "muted", text: "📌 Message épinglé" }) : null,
-          h("p", { text: messageBody(message) }),
+          message.proposal ? proposalCard(conversation, message, reload) : h("p", { text: messageBody(message) }),
           message.linkedContext ? h("div", { class: "sq-message-reference", text: `${message.linkedContext.entityKind || "Élément"} · ${message.linkedContext.title || "Workspace"}` }) : null,
           attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => button(`Télécharger · ${file.fileName || "Fichier"}`, { small: true, onClick: async () => { try { await downloadFile(file.id || file.storageKey, file.fileName); } catch (error) { toast(errorMessage(error), "error"); } } }))) : null,
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
@@ -310,7 +315,11 @@ export async function renderMessages() {
     });
     box.addEventListener("input", updateDraft);
     box.addEventListener("keydown", event => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) { event.preventDefault(); void send(); } });
-    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", {}, h("strong", { text: conversation.name || "Conversation" }), h("small", { text: participantNames(conversation) })), searchToggle, button("Options", { small: true, onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, box, sendButton), h("div", { class: "composer-meta" }, attachmentButton, contextButton, attachmentInput, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
+    const proposalButtons = state.user?.permissions?.includes("sendMessages") ? [
+      state.user.permissions.includes("manageMissions") ? button("Envoyer une mission", { small: true, onClick: () => openProposalPicker(conversation, "mission", reload) }) : null,
+      state.user.permissions.includes("manageContracts") ? button("Envoyer un contrat", { small: true, onClick: () => openProposalPicker(conversation, "contract", reload) }) : null
+    ].filter(Boolean) : [];
+    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", {}, h("strong", { text: conversation.name || "Conversation" }), h("small", { text: participantNames(conversation) })), searchToggle, button("Options", { small: true, onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, box, sendButton), h("div", { class: "composer-meta" }, attachmentButton, contextButton, ...proposalButtons, attachmentInput, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
     drawBubbles(); updateDraft();
     requestAnimationFrame(() => {
       if (!root.isConnected || !alive()) return;

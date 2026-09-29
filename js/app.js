@@ -172,12 +172,17 @@ async function ensureLatestRelease(){
 }
 let realtimeReconnectTimer=null;let reconnectDelay=1000;
 function stopRealtime(){clearTimeout(realtimeReconnectTimer);clearTimeout(realtimeRefreshTimer);const old=state.realtime;state.realtime=null;try{old?.close()}catch{}}
+async function refreshRealtimeView(type){
+  if(type!=="personal_planning.changed"&&type!=="mail.changed")await loadWorkspace();
+  if(state.route.section==="messages")window.dispatchEvent(new Event("sq:messages-refresh"));
+  else await renderCurrent({focus:false});
+}
 function connectRealtime(){
   if(!uiReady||!state.accessToken||!state.online)return;stopRealtime();const wsURL=realtimeURL();wsURL.searchParams.set("accessToken",state.accessToken);
   try{
     const socket=new WebSocket(wsURL);state.realtime=socket;
     socket.addEventListener("open",()=>{reconnectDelay=1000;refreshChrome()});
-    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}if(message.type==="connected")return;if(message.type==="personal_planning.changed"&&state.route.section==="planning"&&state.route.subpage==="personal"){renderCurrent({focus:false});return}if(message.type?.startsWith("mail.")&&state.route.section==="mailbox"){renderCurrent({focus:false});return}clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{try{await loadWorkspace();if(state.route.section==="messages")window.dispatchEvent(new Event("sq:messages-refresh"));else if(["dashboard","today","notifications","activity"].includes(state.route.section))renderCurrent({focus:false})}catch{}},500)});
+    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}const type=message.type;if(type==="communication.changed"&&!(["messages","dashboard","today","notifications","activity"].includes(state.route.section)))return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{if(socket!==state.realtime)return;try{await refreshRealtimeView(type)}catch{}},type==="connected"?0:180)});
     socket.addEventListener("close",()=>{if(socket!==state.realtime)return;state.realtime=null;if(uiReady&&state.accessToken&&state.online){realtimeReconnectTimer=setTimeout(connectRealtime,reconnectDelay);reconnectDelay=Math.min(30000,reconnectDelay*2)}});
   }catch{}
 }
@@ -197,7 +202,7 @@ window.addEventListener("keydown",event=>{
   if(event.key==="Escape"&&!document.querySelector(".overlay")&&state.sidebarOpen)setState({sidebarOpen:false});
 });
 window.addEventListener("pageshow",()=>{ensureLatestRelease()});
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){swRegistration?.update().catch(()=>{});ensureLatestRelease()}});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){swRegistration?.update().catch(()=>{});ensureLatestRelease();if(uiReady&&state.online)refreshRealtimeView("connected").catch(()=>{})}});
 setInterval(()=>{if(uiReady&&state.user)refreshChrome()},60*1000);
 function signature(){return JSON.stringify({route:state.route,closedGroups:state.closedGroups,sidebarOpen:state.sidebarOpen,appearance:state.appearance,online:state.online,lastSyncAt:state.lastSyncAt?.toISOString?.(),user:[state.user?.firstName,state.user?.first_name,state.user?.lastName,state.user?.last_name,state.user?.email,state.user?.role]})}
 subscribe(()=>{if(!uiReady||!state.user)return;const before=uiSignature?JSON.parse(uiSignature):{};const next=signature();if(next===uiSignature)return;const after=JSON.parse(next);uiSignature=next;if(!refs.shell){buildShell();return}const routeChanged=JSON.stringify(before.route)!==JSON.stringify(after.route);refreshChrome();if(routeChanged)renderCurrent({focus:true})});
