@@ -195,7 +195,7 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(400)
         page.screenshot(path=str(visual_dir / "dashboard-desktop.png"), full_page=True)
 
-    sections = page.evaluate("""async()=>{const c=await import('/js/config.js');return Object.entries(c.SECTIONS).filter(([,s])=>!s.adminOnly||true).map(([key,s])=>({key,title:s.title,heading:key==='siteHelp'?((s.subpages||[])[0]?.title||s.title):s.title,subpage:(s.subpages||[])[0]?.id||''}))}""")
+    sections = page.evaluate("""async()=>{const c=await import('/js/config.js');return Object.entries(c.SECTIONS).map(([key,s])=>({key,title:s.title,heading:key==='planning'?'Ma semaine type':key==='siteHelp'?((s.subpages||[])[0]?.title||s.title):s.title,subpage:(s.subpages||[])[0]?.id||''}))}""")
     for section in sections:
         page.evaluate("""async value=>{const s=await import('/js/store.js');s.setRoute(value.key,value.subpage)}""", section)
         expect(page.locator("#workspace-main")).to_have_attribute("aria-busy", "false")
