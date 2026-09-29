@@ -1,5 +1,6 @@
 import { state, setState } from "./store.js";
-import { request, setSession } from "./session.js";
+import { request, setSession, refreshSession, APIError } from "./session.js";
+import { apiURL } from "./config.js";
 export { APIError, request, setSession, clearSession, refreshSession, logout, hasStoredSession, probeConnection } from "./session.js";
 const DEVICE = () => ({ name: "Navigateur Web", platform: "Web" });
 
@@ -84,15 +85,30 @@ export async function saveSpecialized(kind, entity) {
 }
 export async function archiveSpecialized(kind, id, version) { await request(`/v1/domain-data/${kind}/${id}?version=${version}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } }); }
 
-export async function uploadFile(file, entityKind, entityId) {
+export async function uploadFile(file, entityType, entityId) {
+  if (file.size > 25 * 1024 * 1024) throw new Error("Le fichier dépasse la limite de 25 Mo.");
   const bytes = await file.arrayBuffer();
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const checksum = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const { data: upload } = await request("/v1/files/upload-url", { method: "POST", body: { fileName: file.name, contentType: file.type || "application/octet-stream", byteCount: file.size, checksum, entityKind, entityId } });
+  const { data: upload } = await request("/v1/files/upload-url", { method: "POST", body: { fileName: file.name, contentType: file.type || "application/octet-stream", byteCount: file.size, entityType, entityId } });
   await request(`/v1/files/${upload.fileId}/content`, { method: "PUT", rawBody: bytes, contentType: file.type || "application/octet-stream", timeoutMs: 120000 });
-  return (await request(`/v1/files/${upload.fileId}/complete`, { method: "POST", body: { checksum, byteCount: file.size } })).data;
+  await request(`/v1/files/${upload.fileId}/complete`, { method: "POST", body: { checksum, byteCount: file.size }, timeoutMs: 120000 });
+  return { id: upload.fileId, fileName: file.name, storageKey: upload.fileId, mediaType: file.type || "application/octet-stream", byteCount: file.size };
 }
-export async function downloadFile(id) { const { data } = await request(`/v1/files/${id}/download-url`); location.href = data.url; }
+export async function downloadFile(id, fileName = "fichier") {
+  const path = `/v1/files/${encodeURIComponent(id)}/content`;
+  const fetchContent = () => fetch(apiURL(path), { headers: { Authorization: `Bearer ${state.accessToken}`, "X-Workspace-Client": "web" }, credentials: "omit", cache: "no-store", mode: "cors" });
+  let response = await fetchContent();
+  if (response.status === 401) { await refreshSession(); response = await fetchContent(); }
+  if (!response.ok) {
+    const payload = response.headers.get("content-type")?.includes("application/json") ? await response.json().catch(() => ({})) : {};
+    throw new APIError(response.status, payload);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a"); link.href = url; link.download = String(fileName || "fichier").replace(/[\\/\r\n]/g, "_");
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 
 export async function getProjectPublication(projectId) { return (await request(`/v1/projects/${projectId}/publication`)).data; }
 export async function saveProjectPublication(projectId, value) { return (await request(`/v1/projects/${projectId}/publication`, { method: "PUT", body: value })).data; }
@@ -116,6 +132,9 @@ export async function mailboxThread(id) { return (await request(`/v1/mailbox/${i
 export async function mailboxMessage(id) { return (await request(`/v1/mailbox/${id}`)).data; }
 export async function updateMailboxMessage(id, value) { return (await request(`/v1/mailbox/${id}`, { method: "PATCH", body: value })).data; }
 export async function sendMail(value) { return (await request("/v1/mailbox/send", { method: "POST", body: value })).data; }
+export async function saveMailDraft(id, value) { return (await request(`/v1/mailbox/drafts/${id}`, { method: "PUT", body: value })).data; }
+export async function previewMail(value) { return (await request("/v1/mailbox/style/preview", { method: "POST", body: value })).data; }
+export async function cancelScheduledMail(id) { return (await request(`/v1/mailbox/${id}/cancel-schedule`, { method: "POST" })).data; }
 export async function mailboxTemplates() { return (await request("/v1/mailbox/templates")).data; }
 export async function saveMailboxTemplate(value) { return (await request("/v1/mailbox/templates", { method: "POST", body: value })).data; }
 export async function deleteMailboxTemplate(id) { await request(`/v1/mailbox/templates/${encodeURIComponent(id)}`, { method: "DELETE" }); }
@@ -137,13 +156,19 @@ export async function syncGoogleMail() { return (await request("/v1/mailbox/goog
 export async function disconnectGoogleMail() { return (await request("/v1/mailbox/google/connection", { method: "DELETE" })).data; }
 
 export async function createConversation(value) { return (await request("/v1/conversations", { method: "POST", body: value })).data; }
-export async function sendConversationMessage(conversationId, body, replyToMessageID = null) {
-  return (await request(`/v1/conversations/${conversationId}/messages`, { method: "POST", body: { message: { id: crypto.randomUUID(), body, time: "À l’instant", createdAt: new Date().toISOString() }, replyToMessageID, forwardedFromMessageID: null } })).data;
+export async function sendConversationMessage(conversationId, body, replyToMessageID = null, details = {}) {
+  const { forwardedFromMessageID = null, ...messageDetails } = details;
+  return (await request(`/v1/conversations/${conversationId}/messages`, { method: "POST", body: { message: { id: crypto.randomUUID(), body, time: "À l’instant", createdAt: new Date().toISOString(), ...messageDetails }, replyToMessageID, forwardedFromMessageID } })).data;
 }
 export async function markConversationRead(conversationId, lastReadMessageID = null) { return (await request(`/v1/conversations/${conversationId}/read`, { method: "PUT", body: { isRead: true, lastReadMessageID } })).data; }
 export async function editConversationMessage(conversationId, messageId, body) { return (await request(`/v1/conversations/${conversationId}/messages/${messageId}`, { method: "PATCH", body: { body } })).data; }
 export async function deleteConversationMessage(conversationId, messageId) { await request(`/v1/conversations/${conversationId}/messages/${messageId}`, { method: "DELETE" }); }
 export async function reactToConversationMessage(conversationId, messageId, emoji, active) { await request(`/v1/conversations/${conversationId}/messages/${messageId}/reaction`, { method: "PUT", body: { emoji, active } }); }
+export async function flagConversationMessage(conversationId, messageId, flags) { await request(`/v1/conversations/${conversationId}/messages/${messageId}/flags`, { method: "PUT", body: flags }); }
+export async function updateConversationPreferences(conversationId, preferences) { await request(`/v1/conversations/${conversationId}/preferences`, { method: "PUT", body: preferences }); }
+export async function updateConversationDetails(conversationId, details) { return (await request(`/v1/conversations/${conversationId}`, { method: "PATCH", body: details })).data; }
+export async function updateConversationParticipants(conversationId, participantIDs) { return (await request(`/v1/conversations/${conversationId}/participants`, { method: "PUT", body: { participantIDs } })).data; }
+export async function deleteConversation(conversationId) { await request(`/v1/conversations/${conversationId}`, { method: "DELETE" }); }
 
 export async function adminSecurityOverview() { return (await request("/v1/admin/security-overview")).data; }
 

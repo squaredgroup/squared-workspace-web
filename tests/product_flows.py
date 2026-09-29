@@ -62,6 +62,7 @@ MAIL = {
 SETTINGS = {"appearanceMode": "dark", "dashboardDensity": "balanced", "contentWidth": "balanced", "language": "fr-FR", "timezone": "Europe/Paris", "compactSidebar": False, "reducedMotion": False}
 PLANNING = {"week": None, "version": 0}
 SYSTEM_TEMPLATE = {"key": "notification", "name": "Notifications", "description": "Notification du compte", "tone": "neutral", "subject": "Notification Workspace", "body": "{{event.detail}}", "contentBlocks": [{"id": "00000000-0000-4000-8000-000000000001", "kind": "PARAGRAPH", "text": "{{event.detail}}", "url": "", "alternativeText": ""}], "visualStyle": None, "isCustomized": False, "revision": 0, "variables": ["event.detail"]}
+DRAFTS = {}
 requests = []
 visual_dir = Path(os.environ["WORKSPACE_VISUAL_DIR"]) if os.environ.get("WORKSPACE_VISUAL_DIR") else None
 if visual_dir:
@@ -129,6 +130,11 @@ def fixture(route):
         return respond(route, MAIL)
     if path == "/v1/mailbox/send" and method == "POST":
         return respond(route, {"id": "sent-mail"}, 201)
+    if path == "/v1/mailbox/style/preview" and method == "POST":
+        return respond(route, {"subject": body["subject"], "html": "<html><body><h1>Aperçu du message</h1></body></html>"})
+    if path.startswith("/v1/mailbox/drafts/") and method == "PUT":
+        DRAFTS[path.rsplit("/", 1)[1]] = body
+        return respond(route, {"id": body["id"], "status": "DRAFT"})
     if path == "/v1/mailbox/templates":
         return respond(route, {"templates": []})
     if path == "/v1/mailbox/system-templates":
@@ -154,6 +160,14 @@ def fixture(route):
         message["authorId"] = USER["id"]
         WORKSPACE["conversations"][0]["messages"].append(message)
         return respond(route, message, 201)
+    if path.startswith("/v1/conversations/conversation-1/messages/") and path.endswith("/flags") and method == "PUT":
+        return respond(route, {"ok": True})
+    if path == "/v1/conversations/conversation-1/preferences" and method == "PUT":
+        return respond(route, {"ok": True})
+    if path == "/v1/files/upload-url" and method == "POST":
+        return respond(route, {"fileId": "00000000-0000-4000-8000-000000000321", "url": "https://storage.example.invalid/upload"}, 201)
+    if path.startswith("/v1/files/") and method in ("PUT", "POST"):
+        return respond(route, {"ok": True})
     if path == "/health":
         return respond(route, {"status": "ok"})
     if method == "GET" and path.startswith("/v1/domain-data/"):
@@ -227,6 +241,16 @@ with sync_playwright() as playwright:
     composer.fill("Validation fonctionnelle terminée.")
     page.get_by_role("button", name="Envoyer", exact=True).click()
     expect(page.get_by_role("log", name="Messages de Direction produit").get_by_text("Validation fonctionnelle terminée.", exact=True)).to_be_visible()
+    message = page.get_by_role("article").filter(has_text="Validation fonctionnelle terminée.")
+    message.get_by_role("button", name="Sauvegarder", exact=True).click()
+    assert any(method == "PUT" and path.endswith("/flags") and body.get("isSaved") is True for method, path, body in requests if isinstance(body, dict))
+    page.get_by_role("button", name="Options", exact=True).click()
+    page.get_by_role("dialog").get_by_label("Notifications", exact=True).select_option("muted")
+    page.get_by_role("dialog").get_by_role("button", name="Enregistrer", exact=True).click()
+    assert any(method == "PUT" and path.endswith("/preferences") and body.get("notificationMode") == "muted" for method, path, body in requests if isinstance(body, dict))
+    page.get_by_label("Choisir une pièce jointe").set_input_files({"name": "test.txt", "mimeType": "text/plain", "buffer": b"Exemple Workspace"})
+    expect(page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : test.txt", exact=True)).to_be_visible()
+    assert any(method == "POST" and path == "/v1/files/upload-url" and body.get("entityType") == "messageAttachment" for method, path, body in requests if isinstance(body, dict))
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('planning','personal')}""")
     expect(page.get_by_role("heading", name="Ma semaine type", exact=True)).to_be_visible()
@@ -267,6 +291,16 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Afficher les images", exact=True).click()
     assert "tracking.example.invalid" in preview.get_attribute("srcdoc")
     page.get_by_role("button", name="Masquer les images", exact=True).click()
+    page.get_by_role("button", name="Nouveau message", exact=True).click()
+    dialog = page.get_by_role("dialog")
+    dialog.get_by_label("À", exact=True).fill("test@example.invalid")
+    dialog.get_by_label("Objet", exact=True).fill("Nouvelle mise à jour")
+    dialog.get_by_role("button", name="Ajouter un bloc", exact=True).click()
+    dialog.get_by_label("Texte du bloc", exact=True).fill("Un bloc de contenu")
+    dialog.get_by_role("button", name="Aperçu", exact=True).click()
+    expect(dialog.get_by_title("Aperçu du message en cours")).to_be_visible()
+    dialog.get_by_role("button", name="Enregistrer le brouillon", exact=True).click()
+    assert any(method == "PUT" and path.startswith("/v1/mailbox/drafts/") and body.get("blocks", [{}])[0].get("text") == "Un bloc de contenu" for method, path, body in requests if isinstance(body, dict))
     if visual_dir:
         page.wait_for_timeout(400)
         page.screenshot(path=str(visual_dir / "mailbox-desktop.png"), full_page=True)

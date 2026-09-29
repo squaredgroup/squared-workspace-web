@@ -14,10 +14,14 @@ Source examinée : archive « Squared Workspace.zip » du 29 septembre 2026 (Swi
 | Messages | Le web ne proposait que l'envoi de texte. | Réponse liée, modification et suppression de ses messages, réactions, affichage des réactions du snapshot, mutations ciblées sur l'API. |
 | Aperçu e-mail | `frame-src 'none'` empêchait l'affichage des iframes `srcdoc` déjà utilisées dans la boîte. | Iframes limitées à l'origine du site et conservées en mode `sandbox`; scripts interdits dans l'aperçu des messages. |
 
+## Deuxième passage : messagerie, fichiers et e-mails
+
+- Le deuxième passage ajoute au web le transfert de messages, les pièces jointes, les liens vers les éléments Workspace, les reçus visibles, les épingles et sauvegardes, les préférences de conversation, les participants, ainsi que la modification et la suppression des groupes selon les droits serveur. Le téléversement utilise désormais `entityType` et le téléchargement passe par le point d'entrée binaire authentifié de l'API.
+- Le deuxième passage ajoute les blocs de contenu natifs à l'éditeur des modèles et au compositeur, le choix d'un modèle, l'aperçu HTML rendu par l'API, les pièces jointes, les brouillons et les envois programmés.
+
 ## Écarts encore présents
 
-- La messagerie native inclut notamment transfert, pièces jointes, messages vocaux, épingles, sauvegardes, reçus et gestion avancée des conversations. Ce changement couvre les actions citées plus haut, pas l'intégralité de cet atelier.
-- Le compositeur mail natif possède des blocs, une personnalisation et des campagnes plus complets. L'éditeur des modèles de rédaction web reste limité au texte, à l'objet et au partage ; il préserve les blocs existants sans proposer leur édition complète.
+- Les messages vocaux déjà enregistrés sont traités comme pièces jointes audio ; l'enregistrement direct du microphone dans le navigateur n'est pas encore disponible. Les campagnes et les outils de personnalisation groupée ne sont pas portés en totalité.
 - Plusieurs modules d'entreprise déjà visibles sur le web utilisent des formulaires de domaine génériques. Ils n'ont pas été remplacés par tous les écrans SwiftUI spécialisés.
 - Les données privées ne sont pas vérifiables sans session de test autorisée. Les routes du planning et des e-mails système répondent `401` sans session sur l'API publique, ce qui confirme leur présence mais pas l'état du schéma en production.
 

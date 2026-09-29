@@ -1,7 +1,8 @@
 import { viewContext } from "../focus-state.js";
-import { mailbox,mailboxThread,updateMailboxMessage,sendMail,mailboxStyle,saveMailboxStyle,googleMailStatus,connectGoogleMail,syncGoogleMail,disconnectGoogleMail } from "../api.js";
+import { mailbox,mailboxThread,updateMailboxMessage,mailboxStyle,saveMailboxStyle,googleMailStatus,connectGoogleMail,syncGoogleMail,disconnectGoogleMail,cancelScheduledMail,downloadFile } from "../api.js";
 import { state } from "../store.js";
 import { h,pageHeader,card,button,toolbar,modal,field,input,textarea,select,validateControls,toast,errorMessage,emptyState,formatDate,relativeDate,row,profileAvatar,confirmAction } from "../ui.js";
+import { openMailComposer } from "./mail-composer.js";
 
 const folders=[
   {id:"INBOX",label:"Réception"},
@@ -59,7 +60,7 @@ function safeEmailDocument(mail,showRemote=false,plain=false){
 
 function attachmentView(attachment,index){
   const name=attachment.fileName||attachment.file_name||attachment.name||`Pièce jointe ${index+1}`;
-  return h("div",{class:"mail-attachment"},h("span",{class:"mail-attachment-mark","aria-hidden":"true",text:"↗"}),h("div",{},h("strong",{text:name}),h("span",{text:[attachment.contentType||attachment.content_type,formatBytes(attachment.byteCount||attachment.byte_count||attachment.size)].filter(Boolean).join(" · ")||"Pièce jointe"})));
+  return h("div",{class:"mail-attachment"},h("span",{class:"mail-attachment-mark","aria-hidden":"true",text:"↗"}),h("div",{},h("strong",{text:name}),h("span",{text:[attachment.contentType||attachment.content_type,formatBytes(attachment.byteCount||attachment.byte_count||attachment.size)].filter(Boolean).join(" · ")||"Pièce jointe"})),attachment.id?button("Télécharger",{small:true,onClick:async()=>{try{await downloadFile(attachment.id,name)}catch(error){toast(errorMessage(error),"error")}}}):null);
 }
 
 function bodyPreview(mail){
@@ -83,22 +84,7 @@ function conversationMessage(mail,index,total){
   details.append(h("div",{class:"mail-conversation-content"},(to.length||cc.length)?h("div",{class:"mail-recipient-line"},to.length?h("span",{text:`À ${to.join(", ")}`}):null,cc.length?h("span",{text:`Cc ${cc.join(", ")}`}):null):null,bodyPreview(mail),attachments.length?h("section",{class:"mail-attachments","aria-label":`${attachments.length} pièce${attachments.length>1?"s":""} jointe${attachments.length>1?"s":""}`},h("h4",{text:`${attachments.length} pièce${attachments.length>1?"s":""} jointe${attachments.length>1?"s":""}`}),h("div",{class:"mail-attachment-grid"},...attachments.map(attachmentView))):null,h("div",{class:"mail-message-footer"},h("span",{text:statusLabel(mail)||"Synchronisé"}),h("span",{text:formatDate(mailDate(mail))}))));
   return details;
 }
-function compose(reload,replyTo=null){
-  const to=input(replyTo?.fromEmail||replyTo?.from_email||"",{placeholder:"nom@entreprise.com",required:true,autocomplete:"email"});
-  const subject=input(replyTo?`Re: ${String(replyTo.subject||"").replace(/^Re:\s*/i,"")}`:"",{placeholder:"Objet",required:true});
-  const body=textarea("",{placeholder:"Votre message…",required:true});
-  const cc=input("",{placeholder:"cc@entreprise.com"});
-  const bcc=input("",{placeholder:"cci@entreprise.com"});
-  const advanced=h("details",{class:"advanced-panel"},h("summary",{text:"Copie & copie cachée"}),h("div",{class:"advanced-panel-body form"},field("Cc",cc),field("Cci",bcc)));
-  modal({title:replyTo?"Répondre":"Nouveau message",content:h("div",{class:"form"},field("À",to),field("Objet",subject),field("Message",body),advanced),wide:true,actions:[{label:"Envoyer",kind:"primary",icon:"send",onClick:async close=>{
-    try{
-      if(!validateControls(to,subject,body))return;
-      const text=body.value.trim();if(!addresses(to.value).length){toast("Ajoutez au moins un destinataire.","error");return}if(!text){toast("Le message est vide.","error");return}
-      await sendMail({to:addresses(to.value),cc:addresses(cc.value),bcc:addresses(bcc.value),subject:subject.value.trim(),body:text,blocks:[{id:crypto.randomUUID(),kind:"PARAGRAPH",text,url:"",alternativeText:""}],...(replyTo?.providerThreadID?{providerThreadID:replyTo.providerThreadID}:{})});
-      toast("E-mail envoyé");close();await reload();
-    }catch(error){toast(errorMessage(error),"error",6000)}
-  }}]});
-}
+const compose = (reload, replyTo = null, draft = null) => openMailComposer(reload, replyTo, draft);
 async function mailboxMain(){
   const context=viewContext("mailbox",{folder:"INBOX",query:"",filter:"ALL",selectedId:""});
   let {folder,query,filter}=context,selected=null,searchTimer=null,generation=0,reading=0,listY=0;
@@ -125,7 +111,8 @@ async function mailboxMain(){
       const messages=data.messages?.length?data.messages:[mail],latest=messages.at(-1)||mail;
       const secondary=h("details",{class:"focus-filters"},h("summary",{text:"Plus d’actions"}));
       if(can("organizeMail"))secondary.append(button(mail.isStarred?"Retirer le favori":"Favori",{iconName:"star",onClick:async()=>{await updateMailboxMessage(mail.id,{isStarred:!mail.isStarred});mail.isStarred=!mail.isStarred;await open(mail);}}),button("Archiver",{iconName:"archive",onClick:async()=>{await updateMailboxMessage(mail.id,{folder:"ARCHIVED"});back();await load();}}));
-      detailHost.replaceChildren(h("div",{class:"mail-reader"},backButton(),h("header",{class:"mail-reader-head"},h("div",{class:"mail-reader-copy"},h("h2",{text:mailTitle(latest)}),h("p",{text:`${sender(latest)} · ${mailDate(latest)?formatDate(mailDate(latest)):""}`})),h("div",{class:"mail-reader-actions"},can("sendMail")?button("Répondre",{kind:"primary",iconName:"send",onClick:()=>compose(load,latest)}):null,can("organizeMail")?secondary:null)),h("div",{class:"mail-thread"},...messages.map((message,index)=>conversationMessage(message,index,messages.length)))));
+      const editable=["DRAFT","SCHEDULED","FAILED"].includes(latest.status);
+      detailHost.replaceChildren(h("div",{class:"mail-reader"},backButton(),h("header",{class:"mail-reader-head"},h("div",{class:"mail-reader-copy"},h("h2",{text:mailTitle(latest)}),h("p",{text:`${sender(latest)} · ${mailDate(latest)?formatDate(mailDate(latest)):""}`})),h("div",{class:"mail-reader-actions"},can("sendMail")?(editable?button("Modifier le brouillon",{kind:"primary",onClick:()=>compose(load,null,latest)}):button("Répondre",{kind:"primary",iconName:"send",onClick:()=>compose(load,latest)})):null,can("sendMail")&&latest.status==="SCHEDULED"?button("Annuler la programmation",{onClick:()=>confirmAction({title:"Annuler cet envoi programmé ?",message:"L’e-mail redeviendra un brouillon modifiable.",confirmLabel:"Annuler la programmation",onConfirm:async()=>{await cancelScheduledMail(latest.id);toast("Programmation annulée");back();await load();}})}):null,can("organizeMail")?secondary:null)),h("div",{class:"mail-thread"},...messages.map((message,index)=>conversationMessage(message,index,messages.length)))));
       if(matchMedia("(max-width:880px)").matches){window.scrollTo({top:0,behavior:"instant"});detailHost.querySelector(".sq-mail-back")?.focus({preventScroll:true});}
       if(!mail.isRead){await updateMailboxMessage(mail.id,{isRead:true}).then(()=>{mail.isRead=true;drawSelection();}).catch(()=>{});}
     }catch(e){if(version===reading)detailHost.replaceChildren(backButton(),emptyState("Lecture impossible",errorMessage(e),"warning"));}
