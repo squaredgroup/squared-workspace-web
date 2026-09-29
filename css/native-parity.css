@@ -1,0 +1,21 @@
+.personal-planning,.mail-templates{display:grid;gap:20px;min-width:0}
+.planning-poster{background:#0d110d!important;color:#f7faf5!important;border-color:#394d35!important;background-image:radial-gradient(#7be84e16 1px,transparent 1px)!important;background-size:22px 22px!important}
+.planning-poster .card-title{color:#7be84e!important;letter-spacing:.08em}
+.planning-poster .card-subtitle{color:#a8b7a3!important}
+.planning-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;overflow:auto;padding:8px 0 4px}
+.planning-day{min-width:134px;padding:12px;background:#141a14;border:1px solid #293d29;border-radius:12px}
+.planning-day h3{font-size:13px;margin:0 0 14px;color:#dfe8dc}
+.planning-day-slots{display:grid;gap:8px}
+.planning-slot{border:1px solid #45683e;border-left:3px solid #7be84e;border-radius:9px;padding:9px;display:grid;gap:4px;background:#1b2c1c;color:#fff;overflow-wrap:anywhere}
+.planning-slot.category-work{border-left-color:#a4b7cc}.planning-slot.category-strength{border-left-color:#ee9e62}.planning-slot.category-running{border-left-color:#78c8ee}.planning-slot.category-meals{border-left-color:#ead176}.planning-slot.category-personal{border-left-color:#bbacd8}
+.planning-slot-time{color:#a8d998;font-size:11px;font-weight:700}.planning-slot strong{font-size:12px}.planning-slot small,.planning-slot p{font-size:11px;color:#c5cec2;margin:0}
+.planning-slot-actions{display:flex;flex-wrap:wrap;gap:4px}.planning-slot-actions .button{padding:5px 7px;min-width:0}
+.planning-day>.muted{color:#a8b7a3;font-size:12px}
+.planning-days{display:flex;flex-wrap:wrap;gap:8px}.planning-days label,.planning-options label{display:flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid var(--sq-border);border-radius:8px}.planning-options{display:flex;flex-wrap:wrap;gap:8px}
+.system-mail-layout{display:grid;grid-template-columns:minmax(200px,270px) minmax(0,1fr);align-items:start;gap:14px}.system-mail-list{display:grid;gap:7px}.system-mail-list .button{justify-content:flex-start;width:100%}
+.system-mail-blocks{display:grid;gap:10px}.system-mail-block{border:1px solid var(--sq-border);padding:12px;border-radius:12px;display:grid;gap:10px}.system-mail-block-head{display:flex;justify-content:space-between;align-items:end;gap:10px}
+.system-mail-preview-host{min-width:0}.system-mail-preview{width:100%;min-height:480px;background:#fff;border:1px solid var(--sq-border);border-radius:12px}
+.system-mail-style[hidden]{display:none!important}
+.message-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;opacity:.86}.message-actions .button{padding:4px 7px;min-width:0;font-size:11px}.message-reactions{display:flex;gap:5px;font-size:12px}.message-reply-hint:not(:empty){display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-left:2px solid var(--sq-accent);background:var(--sq-control);font-size:12px;border-radius:7px}
+@media(max-width:1000px){.planning-grid{grid-template-columns:repeat(4,minmax(140px,1fr))}.system-mail-layout{grid-template-columns:1fr}.system-mail-list{display:flex;flex-wrap:wrap}}
+@media(max-width:640px){.planning-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.planning-day{min-width:0}.personal-planning .page-actions{flex-wrap:wrap}.system-mail-block-head{align-items:stretch;flex-direction:column}}

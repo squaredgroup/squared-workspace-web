@@ -1,7 +1,7 @@
 import { getDraft, saveDraft } from "../focus-state.js";
 import { state, subscribe, setRoute } from "../store.js";
-import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead } from "../api.js";
-import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce } from "../ui.js";
+import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage } from "../api.js";
+import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
 
 const conversationMessages = conversation => Array.isArray(conversation?.messages) ? conversation.messages : [];
 const memberId = member => member.id || member.memberId || member.member_id;
@@ -72,7 +72,7 @@ export async function renderMessages() {
   const leftCard = card("Conversations", "Canaux auxquels vous avez accès.", left, { iconName: "messages", className: "sq-conversation-list" });
   const rightCard = card("Discussion", "Sélectionnez une conversation.", right, { iconName: "mail", className: "sq-message-panel" });
   rightCard.querySelector(":scope > .card-head")?.remove();
-  let messageBox = null, sendButton = null, draftNote = null, threadQuery = "", threadSearchOpen = false;
+  let messageBox = null, sendButton = null, draftNote = null, threadQuery = "", threadSearchOpen = false, replyingTo = null;
   let listScroll = 0, shownConversation = null;
   const alive = () => version === generation && owner === currentOwner && state.user?.id === currentOwner;
   const conversations = () => Array.isArray(state.workspace?.conversations) ? state.workspace.conversations : [];
@@ -128,6 +128,7 @@ export async function renderMessages() {
   }
   function drawThread(userInitiated = false) {
     const conversation = selected();
+    replyingTo = null;
     root.classList.toggle("sq-conversation-open", Boolean(conversation));
     if (!conversation) { if(state.route.item){root.classList.add("sq-conversation-open");right.replaceChildren(button("Retour aux conversations",{onClick:()=>{selectedId=null;setRoute("messages");}}),emptyState("Conversation indisponible","Elle n’existe plus ou ne fait pas partie de votre périmètre.","lock"));return;} selectedId = null; right.replaceChildren(emptyState("Sélectionnez une conversation", "Les messages et le champ de réponse apparaîtront ici.", "mail")); return; }
     const key = draftKey(conversation.id), messages = conversationMessages(conversation);
@@ -144,6 +145,7 @@ export async function renderMessages() {
     latest.hidden = true;
     const drawBubbles = () => {
       const term = normalize(threadQuery.trim()), filtered = term ? messages.filter(message => normalize(`${messageBody(message)} ${message.authorName || message.author || ""}`).includes(term)) : messages;
+      const profiles = new Map((state.workspace?.enterprise?.messageProfiles || []).map(profile => [profile.messageID, profile]));
       const nodes = []; let previousDay = "";
       for (const message of filtered) {
         const date = new Date(messageDate(message)), valid = Number.isFinite(date.getTime());
@@ -151,7 +153,18 @@ export async function renderMessages() {
         if (day !== previousDay) { nodes.push(h("div", { class: "sq-message-date", text: day })); previousDay = day; }
         const authorId = messageAuthorId(message), mine = authorId === state.user?.id;
         const author = mine ? state.user : (teamMember(authorId) || { name: message.authorName || message.author || "Membre", avatarData: message.authorAvatarData || message.author_avatar_data });
-        nodes.push(h("article", { class: `message-bubble ${mine ? "mine" : ""}` }, h("div", { class: "message-bubble-head" }, profileAvatar(author, { className: "message-avatar", size: 28, ariaHidden: true }), h("div", {}, h("strong", { text: mine ? "Vous" : message.authorName || message.author || memberName(author) }), h("span", { text: valid ? new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date) : "" }))), h("p", { text: messageBody(message) })));
+        const profile = profiles.get(message.id), removed = Boolean(message.deletedAt || message.deleted_at);
+        const reactions = Object.entries(profile?.reactions || {}).filter(([, members]) => Array.isArray(members) && members.length);
+        const mutate = async action => { try { await action(); await reload(); } catch (error) { toast(errorMessage(error), "error", 6000); } };
+        const actions = removed ? null : h("div", { class: "message-actions" },
+          button("Répondre", { small: true, onClick: () => { replyingTo = message; box.focus(); replyHint.replaceChildren(h("span", { text: `En réponse à ${mine ? "votre message" : message.authorName || message.author || "un membre"} : ${messageBody(message).slice(0, 80)}` }), button("Annuler", { small: true, kind: "ghost", onClick: () => { replyingTo = null; replyHint.replaceChildren(); } })); } }),
+          ...["👍", "❤️", "🎉"].map(emoji => button(emoji, { small: true, pressed: (profile?.reactions?.[emoji] || []).includes(state.user?.id), onClick: () => mutate(() => reactToConversationMessage(conversation.id, message.id, emoji, !(profile?.reactions?.[emoji] || []).includes(state.user?.id))) })),
+          mine ? button("Modifier", { small: true, onClick: () => {
+            const text = textarea(messageBody(message), { maxLength: 4000, rows: 4 });
+            modal({ title: "Modifier le message", content: field("Message", text), actions: [{ label: "Enregistrer", kind: "primary", onClick: async close => { if (!text.value.trim()) return; await mutate(() => editConversationMessage(conversation.id, message.id, text.value.trim())); close(); } }] });
+          } }) : null,
+          mine ? button("Supprimer", { small: true, kind: "ghost", onClick: () => confirmAction({ title: "Supprimer ce message ?", message: "Le message restera marqué comme supprimé dans la conversation.", confirmLabel: "Supprimer", danger: true, onConfirm: () => mutate(() => deleteConversationMessage(conversation.id, message.id)) }) }) : null);
+        nodes.push(h("article", { class: `message-bubble ${mine ? "mine" : ""}` }, h("div", { class: "message-bubble-head" }, profileAvatar(author, { className: "message-avatar", size: 28, ariaHidden: true }), h("div", {}, h("strong", { text: mine ? "Vous" : message.authorName || message.author || memberName(author) }), h("span", { text: valid ? new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date) : "" }))), h("p", { text: messageBody(message) }), reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null, actions));
       }
       thread.replaceChildren(...(nodes.length ? nodes : [emptyState(term ? "Aucun message correspondant" : "Aucun message", term ? "Essayez un autre mot dans cette discussion." : "Commencez la conversation.", "messages")]));
     };
@@ -160,6 +173,7 @@ export async function renderMessages() {
     messageBox = textarea(getDraft(conversation.id) || "", { placeholder: "Écrire un message…", maxLength: 4000, rows: 2 });
     messageBox.setAttribute("aria-label", "Écrire un message");
     const box = messageBox, count = h("span", { class: "composer-count" });
+    const replyHint = h("div", { class: "message-reply-hint" });
     draftNote = h("p", { class: "sq-message-draft" });
     const updateDraft = () => {
       const stored=saveDraft(conversation.id,box.value);
@@ -174,9 +188,9 @@ export async function renderMessages() {
       if (!state.online) { toast("Reconnectez-vous pour envoyer ce message. Le brouillon est conservé.", "error"); return; }
       sending.add(key); updateSendState(); let sent = false;
       try {
-        await sendConversationMessage(conversation.id, text); sent = true;
+        await sendConversationMessage(conversation.id, text, replyingTo?.id || null); sent = true;
         if (owner !== currentOwner || state.user?.id !== currentOwner) return;
-        volatileDrafts.delete(key); saveDraft(conversation.id,""); box.value = ""; announce("Message envoyé");
+        volatileDrafts.delete(key); saveDraft(conversation.id,""); box.value = ""; replyingTo = null; replyHint.replaceChildren(); announce("Message envoyé");
         try { await loadWorkspace(); }
         catch { toast("Message envoyé, mais actualisation impossible. Ne le renvoyez pas : actualisez la discussion après reconnexion.", "error", 7000); }
       } catch (error) { if (owner === currentOwner && state.user?.id === currentOwner) toast(errorMessage(error), "error"); }
@@ -189,7 +203,7 @@ export async function renderMessages() {
     sendButton.addEventListener("click", () => { void send(); });
     box.addEventListener("input", updateDraft);
     box.addEventListener("keydown", event => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) { event.preventDefault(); void send(); } });
-    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", {}, h("strong", { text: conversation.name || "Conversation" }), h("small", { text: participantNames(conversation) })), searchToggle), searchArea, thread, latest, h("div", { class: "composer" }, box, sendButton), h("div", { class: "composer-meta" }, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
+    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", {}, h("strong", { text: conversation.name || "Conversation" }), h("small", { text: participantNames(conversation) })), searchToggle), searchArea, thread, latest, replyHint, h("div", { class: "composer" }, box, sendButton), h("div", { class: "composer-meta" }, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
     drawBubbles(); updateDraft();
     requestAnimationFrame(() => {
       if (!root.isConnected || !alive()) return;

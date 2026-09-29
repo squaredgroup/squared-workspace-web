@@ -99,6 +99,9 @@ function refreshChrome(){
 }
 async function sectionPage(section,subpage){
   if(section==="spaces")return renderSpaces();
+  if(section==="planning"&&subpage==="personal"){
+    const {renderPersonalPlanning}=await import("./modules/personal-planning.js");return renderPersonalPlanning();
+  }
   const domain=CORE_DOMAIN_BY_SECTION[section];
   if(state.route.item&&supportsRecord(domain))return renderRecord(domain,state.route.item);
   if(section==="dashboard"||section==="today"){const {renderDashboard}=await import("./modules/dashboard.js");return renderDashboard(section==="today")}
@@ -174,7 +177,7 @@ function connectRealtime(){
   try{
     const socket=new WebSocket(wsURL);state.realtime=socket;
     socket.addEventListener("open",()=>{reconnectDelay=1000;refreshChrome()});
-    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}if(message.type==="connected")return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{try{await loadWorkspace();if(state.route.section==="messages")window.dispatchEvent(new Event("sq:messages-refresh"));else if(["dashboard","today","notifications","activity"].includes(state.route.section))renderCurrent({focus:false})}catch{}},500)});
+    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}if(message.type==="connected")return;if(message.type==="personal_planning.changed"&&state.route.section==="planning"&&state.route.subpage==="personal"){renderCurrent({focus:false});return}if(message.type?.startsWith("mail.")&&state.route.section==="mailbox"){renderCurrent({focus:false});return}clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{try{await loadWorkspace();if(state.route.section==="messages")window.dispatchEvent(new Event("sq:messages-refresh"));else if(["dashboard","today","notifications","activity"].includes(state.route.section))renderCurrent({focus:false})}catch{}},500)});
     socket.addEventListener("close",()=>{if(socket!==state.realtime)return;state.realtime=null;if(uiReady&&state.accessToken&&state.online){realtimeReconnectTimer=setTimeout(connectRealtime,reconnectDelay);reconnectDelay=Math.min(30000,reconnectDelay*2)}});
   }catch{}
 }

@@ -8,6 +8,7 @@
 @import "../css/mobile.css";
 @import "../css/focus.css";
 @import "../css/v8.css";
+@import "../css/native-parity.css";
 
 @source "../index.html";
 @source "../js/**/*.js";

@@ -1,7 +1,7 @@
 import { viewContext } from "../focus-state.js";
-import { mailbox,mailboxThread,updateMailboxMessage,sendMail,mailboxTemplates,mailboxStyle,saveMailboxStyle } from "../api.js";
+import { mailbox,mailboxThread,updateMailboxMessage,sendMail,mailboxStyle,saveMailboxStyle,googleMailStatus,connectGoogleMail,syncGoogleMail,disconnectGoogleMail } from "../api.js";
 import { state } from "../store.js";
-import { h,pageHeader,card,button,toolbar,modal,field,input,textarea,select,validateControls,toast,errorMessage,emptyState,formatDate,relativeDate,row,profileAvatar } from "../ui.js";
+import { h,pageHeader,card,button,toolbar,modal,field,input,textarea,select,validateControls,toast,errorMessage,emptyState,formatDate,relativeDate,row,profileAvatar,confirmAction } from "../ui.js";
 
 const folders=[
   {id:"INBOX",label:"Réception"},
@@ -143,27 +143,54 @@ async function mailboxMain(){
   drawFolders();await load();return root;
 }
 async function templatesView(){
-  const root=h("div");root.append(pageHeader({eyebrow:"E-mails",title:"Modèles",subtitle:"Réponses et messages réutilisables disponibles dans Workspace."}));
-  try{
-    const data=await mailboxTemplates(),values=Array.isArray(data)?data:(data.templates||[]);
-    root.append(card("Modèles",`${values.length} modèle${values.length>1?"s":""} disponible${values.length>1?"s":""}.`,values.length?h("div",{class:"list"},...values.map((value,index)=>row({title:value.name||value.title||value.subject||`Modèle ${index+1}`,subtitle:value.description||value.preview||"",status:value.status||"active",meta:value.updatedAt?formatDate(value.updatedAt):""}))):emptyState("Aucun modèle","Créez vos modèles depuis l’app native ou l’administration mail.","document"),{iconName:"document"}));
-  }catch(error){root.append(emptyState("Modèles indisponibles",errorMessage(error),"warning"))}
-  return root;
+  const {renderMailTemplates}=await import("./mail-templates.js");return renderMailTemplates();
 }
 async function styleView(){
   const root=h("div");root.append(pageHeader({eyebrow:"E-mails",title:"Identité & style",subtitle:"Paramètres de marque utilisés par les e-mails Squared Workspace."}));
   try{
-    const data=await mailboxStyle(),form=h("div",{class:"form"}),controls={};
-    for(const [key,value] of Object.entries(data||{})){controls[key]=typeof value==="boolean"?h("input",{type:"checkbox",checked:value}):input(value??"");form.append(field(key,controls[key]))}
-    root.append(card("Identité e-mail","Valeurs actuellement actives côté serveur.",form,{iconName:"image"}),button("Enregistrer",{kind:"primary",iconName:"check",onClick:async()=>{const next={};for(const [key,control] of Object.entries(controls))next[key]=control.type==="checkbox"?control.checked:control.value;try{await saveMailboxStyle(next);toast("Style e-mail enregistré")}catch(error){toast(errorMessage(error),"error")}}}));
+    const {style}=await mailboxStyle(),form=h("div",{class:"form"}),controls={};
+    if(!style)throw new Error("Le serveur n’a pas transmis le style des e-mails.");
+    const definitions=[
+      ["brandName","Marque",{required:true,maxLength:80}], ["senderName","Nom d’expéditeur",{required:true,maxLength:120}],
+      ["replyToEmail","Adresse de réponse",{type:"email"}], ["logoURL","URL HTTPS du logo",{type:"url"}],
+      ["accentHex","Accent",{required:true,pattern:"#[0-9a-fA-F]{6}"}], ["accentSoftHex","Accent doux",{required:true,pattern:"#[0-9a-fA-F]{6}"}],
+      ["stageHex","Fond",{required:true,pattern:"#[0-9a-fA-F]{6}"}], ["surfaceHex","Surface",{required:true,pattern:"#[0-9a-fA-F]{6}"}],
+      ["borderHex","Bordure",{required:true,pattern:"#[0-9a-fA-F]{6}"}], ["footerText","Pied de page",{required:true,maxLength:500}], ["signatureText","Signature",{required:true,maxLength:500}]
+    ];
+    for(const [key,label,options] of definitions){controls[key]=input(style[key]??"",options);form.append(field(label,controls[key]))}
+    controls.showsDotGrid=h("input",{type:"checkbox",checked:!!style.showsDotGrid});form.append(h("label",{},controls.showsDotGrid," Grille de points"));
+    if(!can("manageMailSettings"))form.querySelectorAll("input").forEach(control=>control.disabled=true);
+    root.append(card("Identité e-mail","Style commun utilisé par les e-mails du Workspace.",form,{iconName:"image"}));
+    if(can("manageMailSettings"))root.append(button("Enregistrer",{kind:"primary",iconName:"check",onClick:async()=>{
+      if(!validateControls(...Object.values(controls)))return;
+      const next={};for(const [key,control] of Object.entries(controls))next[key]=control.type==="checkbox"?control.checked:control.value.trim();
+      if(next.logoURL&&!next.logoURL.startsWith("https://")){toast("Le logo doit utiliser HTTPS.","error");return}
+      try{await saveMailboxStyle(next);toast("Style e-mail enregistré")}
+      catch(error){toast(errorMessage(error),"error")}
+    }}));
   }catch(error){root.append(emptyState("Style indisponible",errorMessage(error),"warning"))}
   return root;
 }
 export async function renderMailbox(subpage="mailbox"){
   if(subpage==="templates")return templatesView();
   if(subpage==="appearance")return styleView();
-  if(subpage==="connections"){
-    const root=h("div");root.append(pageHeader({eyebrow:"E-mails",title:"Connexion",subtitle:"La connexion Google Workspace est administrée par le backend Squared."}),emptyState("Connexion gérée côté serveur","Les connexions OAuth et leurs secrets restent volontairement hors du navigateur.","shield"));return root;
-  }
+  if(subpage==="connections")return connectionView();
   return mailboxMain();
+}
+async function connectionView(){
+  const root=h("div"),details=h("div");
+  root.append(pageHeader({eyebrow:"E-mails",title:"Connexion Google Workspace",subtitle:"Le serveur conserve les autorisations. Le navigateur ne reçoit aucun mot de passe Google."}),details);
+  const load=async()=>{
+    try{
+      const {connection}=await googleMailStatus();
+      const connected=["CONNECTED","SYNCING"].includes(connection?.status);
+      const lines=h("div",{class:"list"},row({title:"État",status:connection?.status||"NOT_CONFIGURED",subtitle:connection?.emailAddress||"Aucune boîte connectée"}),row({title:"Réception",subtitle:connection?.inboundMode||"Non configurée",meta:connection?.lastSyncAt?formatDate(connection.lastSyncAt):"Jamais synchronisée"}),connection?.lastError?row({title:"Dernière erreur",subtitle:connection.lastError,status:"ERROR"}):null);
+      const actions=h("div",{class:"page-actions"},connected?button("Synchroniser",{iconName:"sync",onClick:async()=>{try{const data=await syncGoogleMail();toast(`${data.result?.imported||0} e-mail(s) importé(s)`);await load()}catch(error){toast(errorMessage(error),"error")}}}):null,can("manageMailSettings")?button("Connecter Google",{kind:"primary",iconName:"mail",onClick:async()=>{
+        const popup=window.open("about:blank","_blank");if(popup)popup.opener=null;
+        try{const data=await connectGoogleMail(),url=new URL(data.authorizationURL);if(url.protocol!=="https:"||url.hostname!=="accounts.google.com")throw new Error("URL d’autorisation Google invalide.");if(popup)popup.location.replace(url.href);else location.assign(url.href)}catch(error){popup?.close();toast(errorMessage(error),"error",6000)}
+      }}):null,can("manageMailSettings")&&connected?button("Déconnecter",{kind:"ghost",onClick:()=>confirmAction({title:"Déconnecter la boîte Google ?",message:"Les nouvelles synchronisations seront arrêtées. Les messages déjà enregistrés resteront dans Workspace.",confirmLabel:"Déconnecter",danger:true,onConfirm:async()=>{await disconnectGoogleMail();toast("Boîte déconnectée");await load()}})}):null);
+      details.replaceChildren(card("Boîte Google",connection?.providerConfigured?"Connecteur prêt côté serveur.":"La connexion Google nécessite la configuration du serveur.",h("div",{class:"stack"},lines,actions),{iconName:"mail"}));
+    }catch(error){details.replaceChildren(emptyState("Connexion indisponible",errorMessage(error),"warning"))}
+  };
+  await load();return root;
 }

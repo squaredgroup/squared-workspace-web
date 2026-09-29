@@ -27,6 +27,10 @@ export async function listSessions() { return (await request("/v1/sessions")).da
 export async function revokeSession(id) { await request(`/v1/sessions/${id}`, { method: "DELETE" }); }
 export async function loadSettings() { return (await request("/v1/settings")).data; }
 export async function saveSettings(value) { return (await request("/v1/settings", { method: "PUT", body: value })).data; }
+export async function loadPersonalPlanning() { return (await request("/v1/me/personal-planning")).data; }
+export async function savePersonalPlanning(week, expectedVersion) {
+  return (await request("/v1/me/personal-planning", { method: "PUT", body: { week, expectedVersion } })).data;
+}
 
 export async function loadWorkspace() {
   const { data, response } = await request("/v1/workspace", { headers: state.workspaceEtag ? { "If-None-Match": state.workspaceEtag } : {} });
@@ -113,14 +117,33 @@ export async function mailboxMessage(id) { return (await request(`/v1/mailbox/${
 export async function updateMailboxMessage(id, value) { return (await request(`/v1/mailbox/${id}`, { method: "PATCH", body: value })).data; }
 export async function sendMail(value) { return (await request("/v1/mailbox/send", { method: "POST", body: value })).data; }
 export async function mailboxTemplates() { return (await request("/v1/mailbox/templates")).data; }
+export async function saveMailboxTemplate(value) { return (await request("/v1/mailbox/templates", { method: "POST", body: value })).data; }
+export async function deleteMailboxTemplate(id) { await request(`/v1/mailbox/templates/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+export async function systemMailTemplates() { return (await request("/v1/mailbox/system-templates")).data; }
+export async function previewSystemMailTemplate(key, draft, original = false) {
+  return (await request(`/v1/mailbox/system-templates/${encodeURIComponent(key)}/preview`, { method: "POST", body: { ...draft, original } })).data;
+}
+export async function saveSystemMailTemplate(key, draft, expectedRevision) {
+  return (await request(`/v1/mailbox/system-templates/${encodeURIComponent(key)}`, { method: "PUT", body: { ...draft, expectedRevision } })).data;
+}
+export async function restoreSystemMailTemplate(key, expectedRevision) {
+  return (await request(`/v1/mailbox/system-templates/${encodeURIComponent(key)}`, { method: "DELETE", body: { expectedRevision } })).data;
+}
 export async function mailboxStyle() { return (await request("/v1/mailbox/style")).data; }
 export async function saveMailboxStyle(value) { return (await request("/v1/mailbox/style", { method: "PUT", body: value })).data; }
+export async function googleMailStatus() { return (await request("/v1/mailbox/google/status")).data; }
+export async function connectGoogleMail() { return (await request("/v1/mailbox/google/connect", { method: "POST" })).data; }
+export async function syncGoogleMail() { return (await request("/v1/mailbox/google/sync", { method: "POST" })).data; }
+export async function disconnectGoogleMail() { return (await request("/v1/mailbox/google/connection", { method: "DELETE" })).data; }
 
 export async function createConversation(value) { return (await request("/v1/conversations", { method: "POST", body: value })).data; }
 export async function sendConversationMessage(conversationId, body, replyToMessageID = null) {
   return (await request(`/v1/conversations/${conversationId}/messages`, { method: "POST", body: { message: { id: crypto.randomUUID(), body, time: "À l’instant", createdAt: new Date().toISOString() }, replyToMessageID, forwardedFromMessageID: null } })).data;
 }
 export async function markConversationRead(conversationId, lastReadMessageID = null) { return (await request(`/v1/conversations/${conversationId}/read`, { method: "PUT", body: { isRead: true, lastReadMessageID } })).data; }
+export async function editConversationMessage(conversationId, messageId, body) { return (await request(`/v1/conversations/${conversationId}/messages/${messageId}`, { method: "PATCH", body: { body } })).data; }
+export async function deleteConversationMessage(conversationId, messageId) { await request(`/v1/conversations/${conversationId}/messages/${messageId}`, { method: "DELETE" }); }
+export async function reactToConversationMessage(conversationId, messageId, emoji, active) { await request(`/v1/conversations/${conversationId}/messages/${messageId}/reaction`, { method: "PUT", body: { emoji, active } }); }
 
 export async function adminSecurityOverview() { return (await request("/v1/admin/security-overview")).data; }
 
