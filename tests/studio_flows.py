@@ -23,6 +23,7 @@ UNITS=[dict(id=UNIT,title='Studio créatif',status='active',version=3,data=dict(
 fail_ticket=False
 fail_response=False
 files={}
+sessions=[dict(id='fixture-session',device_name='Ce navigateur',platform='Web',last_seen_at='2026-09-30T09:00:00Z'),dict(id='other-session',device_name='Autre navigateur',platform='Web',last_seen_at='2026-09-29T09:00:00Z')]
 
 def fixture(route):
     global fail_ticket,fail_response
@@ -42,6 +43,10 @@ def fixture(route):
     if path=='/v1/me' and method=='PATCH':
         assert 'avatarData' in body, 'A profile update must explicitly retain or remove the native photo'
         f.requests.append((method,path,body));f.USER.update(body);f.WORKSPACE['team'][0].update(body);return send(f.USER)
+    if path=='/v1/projects/project-1' and method=='GET':return send(f.WORKSPACE['projects'][0])
+    if path=='/v1/sessions':return send(sessions)
+    if path=='/v1/sessions/other-session' and method=='DELETE':
+        sessions[:]=[value for value in sessions if value['id']!='other-session'];f.requests.append((method,path,body));return send({'ok':True})
     if path=='/v1/domain-data/catalog':return send({'kinds':[{'kind':'business-units','writable':True,'required':['name','code','kind'],'statuses':['active','draft']}]})
     if path.startswith('/v1/domain-data/'):
         f.requests.append((method,path,body))
@@ -52,7 +57,7 @@ def fixture(route):
             return send({'items':items,'nextCursor':None})
         if method in ('POST','PATCH'):
             assert parts[3]=='tickets'
-            if fail_ticket:fail_ticket=False;return send({'message':'Conflit simulé : actualisez avant de réessayer.'},409)
+            if fail_ticket:return send({'message':'Conflit simulé : actualisez avant de réessayer.'},409)
             for key in ['reference','title','state','severity','impact','urgency']:assert body['data'][key]
             assert body['data']['state']==body['status'] and body['title']==body['data']['title']
             if method=='POST':
@@ -95,7 +100,7 @@ def run():
         dialog.get_by_label('Objet de la demande',exact=True).fill('Mon nouvel accès')
         dialog.get_by_label('Description',exact=True).fill('Le compte doit accéder au dossier partagé pour la revue de demain.')
         fail_ticket=True;dialog.get_by_role('button',name='Créer le ticket',exact=True).click();expect(dialog.get_by_role('alert')).to_contain_text('Conflit simulé');expect(dialog.get_by_label('Objet de la demande',exact=True)).to_have_value('Mon nouvel accès')
-        dialog.get_by_role('button',name='Créer le ticket',exact=True).click();expect(dialog).not_to_be_visible();f.settled(page);expect(page.locator('.sq-ticket-detail')).to_contain_text('Mon nouvel accès')
+        fail_ticket=False;dialog.get_by_role('button',name='Créer le ticket',exact=True).click();expect(dialog).not_to_be_visible();f.settled(page);expect(page.locator('.sq-ticket-detail')).to_contain_text('Mon nouvel accès')
         page.get_by_role('button',name='Gérer le ticket',exact=True).click();dialog=page.get_by_role('dialog',name='Gérer le ticket');dialog.get_by_label('Statut',exact=True).select_option('resolved');dialog.get_by_role('button',name='Enregistrer les modifications').click();expect(dialog).not_to_be_visible();expect(page.locator('.sq-ticket-detail .sq-ticket-state')).to_have_text('Résolu')
         page.get_by_role('button',name='Fermer le ticket').click();f.settled(page);page.get_by_role('button',name='Ouvrir le ticket Accès au dossier de lancement',exact=True).click();f.settled(page)
         page.get_by_role('button',name='Gérer le ticket',exact=True).click();dialog=page.get_by_role('dialog',name='Gérer le ticket');dialog.get_by_label('Responsable',exact=True).select_option(AGENT);dialog.get_by_role('button',name='Enregistrer les modifications').click();expect(dialog).not_to_be_visible();assert TICKETS[0]['data']['slaID']==UNIT and 'Important' in TICKETS[0]['data']['metadata']['tags']
@@ -124,6 +129,8 @@ def run():
         expect(page.locator('.focus-detail')).to_contain_text(f.WORKSPACE['projects'][0]['title'])
         f.go(page,'settings');page.get_by_label('Thème',exact=True).select_option('light');expect(page.locator('html')).to_have_attribute('data-theme','light')
         page.get_by_label('Thème',exact=True).select_option('dark');expect(page.locator('html')).to_have_attribute('data-theme','dark')
+        page.get_by_role('button',name='Révoquer',exact=True).click();page.get_by_role('alertdialog',name='Révoquer cette session ?').get_by_role('button',name='Révoquer',exact=True).click()
+        expect(page.get_by_text('Autre navigateur',exact=True)).to_have_count(0);assert len(sessions)==1
         f.go(page,'profile');old_avatar=f.USER['avatarData'];page.get_by_role('button',name='Enregistrer le profil').click();expect(page.get_by_text('Profil mis à jour',exact=True)).to_be_visible();assert f.USER['avatarData']==old_avatar
         page.get_by_label('Choisir une photo de profil').set_input_files(str(f.ROOT/'assets/appicon-256.png'));photo=page.get_by_role('dialog',name='Votre photo de profil');expect(photo.get_by_role('img',name='Aperçu du recadrage de la photo')).to_be_visible();capture(page,'photo-crop-390')
         photo.get_by_role('slider',name='Zoom de la photo').press('End');photo.get_by_role('button',name='Enregistrer la photo').click();expect(photo).not_to_be_visible();assert f.USER['avatarData'].startswith('/9j/');assert len(base64.b64decode(f.USER['avatarData']))<10*1024*1024

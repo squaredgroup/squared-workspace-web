@@ -13,7 +13,7 @@ if(!sw.includes("SKIP_WAITING"))throw new Error("Le service worker doit prendre 
 const installBlock=(sw.split('self.addEventListener("install"')[1]||"").split('self.addEventListener("activate"')[0]||"";if(!installBlock.includes("skipWaiting"))throw new Error("Le service worker de purge doit s’activer immédiatement.");
 if(sw.includes('self.addEventListener("fetch"'))throw new Error("Le service worker ne doit plus intercepter ni mettre en cache les requêtes.");
 const cssFiles=["src/styles.css",...[...(await fs.readFile("src/styles.css","utf8")).matchAll(/@import\s+"\.\.\/(css\/[^\"]+)"/g)].map(match=>match[1])];
-const criticalJs=["js/boot.js","js/app.js","js/api.js","js/session.js","js/storage.js","js/auth-flow.js","js/config.js","js/store.js","js/ui.js","js/webauthn.js","js/modules/auth.js","js/mobile.js","js/focus-model.js","js/data-insights.js","js/focus-state.js","js/focus-records.js","js/focus-navigation.js","js/focus-search.js"];
+const criticalJs=["js/boot.js","js/app.js","js/api.js","js/session.js","js/storage.js","js/auth-flow.js","js/config.js","js/store.js","js/ui.js","js/webauthn.js","js/modules/auth.js","js/mobile.js","js/focus-model.js","js/data-insights.js","js/focus-state.js","js/focus-records.js","js/focus-navigation.js","js/navigation-preferences.js","js/focus-home.js","js/focus-search.js"];
 const gzipSize=async files=>{let total=0;for(const file of files)total+=zlib.gzipSync(await fs.readFile(file)).byteLength;return total};
 const jsGzip=await gzipSize(criticalJs),cssGzip=await gzipSize(cssFiles);
 if(jsGzip>75000)throw new Error("Budget JS initial dépassé: "+jsGzip+" octets gzip > 75000");

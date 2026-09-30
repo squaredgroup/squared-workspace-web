@@ -43,7 +43,7 @@ export function renderSpaces(){
     const matches=key=>key!=="spaces"&&allowed(key)&&normalize(SECTIONS[key].title).includes(term);
     const favourites=[...new Set(pins)].filter(matches);
     if(favourites.length)groups.push(h("section",{},h("h2",{text:"Mes favoris"}),h("div",{class:"focus-space-grid"},...favourites.map(renderItem))));
-    for(const group of NAV_GROUPS){const keys=group.sections.filter(matches);if(keys.length)groups.push(h("section",{},h("h2",{text:group.name}),h("div",{class:"focus-space-grid"},...keys.map(renderItem))));}
+    for(const group of NAV_GROUPS){const keys=group.sections.filter(key=>matches(key)&&!favourites.includes(key));if(keys.length)groups.push(h("section",{},h("h2",{text:group.name}),h("div",{class:"focus-space-grid"},...keys.map(renderItem))));}
     results.replaceChildren(...(groups.length?groups:[emptyState("Aucun espace correspondant","Essayez un autre nom.","search")]));
   }
   search.addEventListener("input",()=>{context.query=search.value;draw();});draw();return root;

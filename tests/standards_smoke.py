@@ -126,21 +126,22 @@ with sync_playwright() as p:
     page.goto(origin+"/#/dashboard")
     expect(page.get_by_role("heading",name="Tableau de bord",exact=True)).to_be_visible()
     assert page.evaluate("""()=>[...document.querySelectorAll(".icon,.nav-icon,.group-chevron")].filter(img=>img.getClientRects().length&&(!img.complete||img.naturalWidth===0)).map(img=>img.getAttribute("src"))""")==[]
-    assert page.locator(".stat-icon img").evaluate_all("els=>els.every(img=>img.complete&&img.naturalWidth>0)")
+    expect(page.locator(".work-summary-item").first).to_be_visible()
+    assert page.locator(".work-summary-item img").evaluate_all("els=>els.length>0&&els.every(img=>img.complete&&img.naturalWidth>0)")
     assert page.locator('meta[name="theme-color"]').get_attribute("content")=="#0D0D0E"
-    dark_filter=page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")
+    dark_filter=page.locator(".work-summary-item img").first.evaluate("el=>getComputedStyle(el).filter")
     assert dark_filter!="none"
     active_nav_filter=page.locator(".nav-item.active .nav-icon").first.evaluate("el=>getComputedStyle(el).filter")
     assert "invert(1)" in active_nav_filter,active_nav_filter
     page.get_by_role("button",name="Changer de thème",exact=True).click()
     assert page.locator("html").get_attribute("data-theme")=="light"
     assert page.locator('meta[name="theme-color"]').get_attribute("content")=="#F4F5F1"
-    assert page.locator(".stat-icon img").first.evaluate("el=>getComputedStyle(el).filter")=="none"
+    assert page.locator(".work-summary-item img").first.evaluate("el=>getComputedStyle(el).filter")=="none"
     light_active_nav_filter=page.locator(".nav-item.active .nav-icon").first.evaluate("el=>getComputedStyle(el).filter")
     assert "invert(1)" not in light_active_nav_filter,light_active_nav_filter
     topbar_rgb=page.locator(".topbar").evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
     assert sum(topbar_rgb)/3>180,topbar_rgb
-    pulse_rgb=page.locator(".pulse-item").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
+    pulse_rgb=page.locator(".work-summary-item").first.evaluate("""el=>getComputedStyle(el).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)""")
     assert sum(pulse_rgb)/3>180,pulse_rgb
     c.close()
 

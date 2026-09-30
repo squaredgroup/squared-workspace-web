@@ -13,6 +13,8 @@ html[data-content-width="wide"] .workspace .content{max-width:1600px}
 html[data-content-width="focused"] .workspace .content{max-width:1100px}
 html[data-compact-sidebar="true"]{--sq-sidebar:220px}
 .workspace .sidebar{padding:20px 14px 12px;gap:0;background:var(--sq-shell);border-right:1px solid var(--sq-border);backdrop-filter:none}
+.workspace .sidebar>nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.workspace .sidebar>.brand,.workspace .sidebar>.sidebar-search,.workspace .sidebar>.sidebar-context,.workspace .sidebar>.sidebar-footer{flex-shrink:0}
 .workspace .brand{gap:10px;padding:0 7px 22px}
 .workspace .brand-logo{width:36px;height:36px;border-radius:10px;box-shadow:none}
 .workspace .brand-copy strong{font-size:12px;font-weight:600;line-height:1.4}
@@ -75,7 +77,7 @@ html[data-compact-sidebar="true"]{--sq-sidebar:220px}
 .form-row{gap:16px}
 .workspace .card{padding:24px;border:1px solid var(--sq-border);border-radius:var(--sq-radius-card);background:var(--sq-card);box-shadow:none;overflow:visible}
 .workspace .card::before,.workspace .card::after{display:none}
-.workspace .card-head{padding:0 0 20px;gap:16px;align-items:start}
+.workspace .card-head{padding:0 0 20px;gap:16px;align-items:start;flex-wrap:nowrap}.workspace .card-head>div{min-width:0;flex:1}.workspace .card-head>.icon{flex:none;margin-top:3px}
 .workspace .card-title{font-size:17px;line-height:1.4;font-weight:500;letter-spacing:-.02em}
 .workspace .card-subtitle{font-size:12px;line-height:1.6;margin-top:6px;color:var(--sq-muted)}
 .workspace .grid{gap:20px}
@@ -287,7 +289,7 @@ html[data-density="airy"] .workspace .focus-record{min-height:92px;padding:20px}
   .workspace .focus-home-toolbar>select{flex:1;min-height:44px;font-size:12px}
   .workspace .focus-home-toolbar>.button{min-height:44px;font-size:11px;padding-inline:12px}
   .work-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:22px}
-  .work-summary-item{padding:14px 16px;min-height:77px;gap:10px}.work-summary-item>span:first-child{display:grid;width:29px;height:29px;flex-basis:29px}.work-summary-item strong{font-size:22px}.work-summary-item small{font-size:9px}
+  .work-summary-item{padding:14px 16px;min-height:77px;gap:10px}.work-summary-item>span:first-child{display:grid;width:29px;height:29px;flex-basis:29px}.work-summary-item strong{font-size:22px}.work-summary-item small{font-size:11px;line-height:1.5}
   .work-body-grid,.work-secondary{grid-template-columns:minmax(0,1fr);gap:20px}.work-primary{gap:20px}
   .focus-home-group,.work-clear,.focus-attention{padding:18px;border-radius:13px}.focus-group-heading h2{font-size:14px}
   .workspace .focus-record{padding:13px 0;min-height:78px}.focus-record-list>.focus-record{padding:14px!important}
@@ -301,7 +303,7 @@ html[data-density="airy"] .workspace .focus-record{min-height:92px;padding:20px}
   .workspace .mobile-tabs button.active{background:rgba(var(--sq-accent-rgb),.07);border-color:rgba(var(--sq-accent-rgb),.16);box-shadow:none}.workspace .mobile-tabs button.active::after{display:none}
   .sq-support-metrics{gap:8px;margin-bottom:20px}.sq-support-metric{padding:14px 12px;border-radius:12px}.sq-support-metric strong{font-size:24px}.sq-support-metric span{font-size:9px}
   .workspace .sq-support-page>.page-head{padding-bottom:18px;margin-bottom:20px}.workspace .sq-support-page>.page-head .page-title{font-size:28px}.workspace .sq-support-page>.page-head .page-actions{width:auto}
-  .sq-ticket-row{padding:16px 14px;gap:12px}.sq-ticket-reference{font-size:9px}.sq-ticket-text strong{font-size:12px}.sq-ticket-excerpt{font-size:10px}.sq-ticket-meta small{font-size:9px}
+  .sq-ticket-row{padding:16px 14px;gap:12px}.sq-ticket-reference{font-size:10px}.sq-ticket-text strong{font-size:13px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.sq-ticket-excerpt{font-size:11px}.sq-ticket-meta small{font-size:10px}
   .sq-ticket-detail{border-radius:14px}.sq-ticket-detail-body{padding:20px}.sq-ticket-detail-body h2{font-size:24px}.studio-ticket-thread{padding:20px}.studio-ticket-thread .button{min-height:44px}
   .sq-unit-card{padding:18px}.sq-unit-card>strong{font-size:18px}.sq-unit-card-top .sq-unit-visual{width:76px!important;height:76px!important}
   .studio-profile-overview{padding:18px;gap:14px;margin-bottom:20px}.studio-profile-overview strong{font-size:18px}.studio-profile-overview p{font-size:11px}
@@ -316,3 +318,4 @@ html[data-density="airy"] .workspace .focus-record{min-height:92px;padding:20px}
 }
 @media(prefers-reduced-motion:reduce){.workspace *,.modal *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 html[data-reduced-motion="true"] .workspace *,html[data-reduced-motion="true"] .modal *{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+.workspace .sq-board-search>input,.workspace .sq-messages .sq-inbox-search>input{border:0!important;background:transparent!important;padding:0!important;box-shadow:none!important;min-height:44px}

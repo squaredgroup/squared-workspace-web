@@ -83,13 +83,13 @@ async function sessionsCard(){
   const host=h("div");
   try{
     const sessions=await listSessions();
-    host.append(...(sessions.length?sessions.map(session=>row({
+    host.append(...(sessions.length?sessions.map(session=>{let entry;entry=row({
       title:session.device_name||"Appareil",
       subtitle:session.platform||"",
       status:session.id===state.sessionId?"active":"session",
       meta:new Date(session.last_seen_at||session.created_at).toLocaleString("fr-FR"),
-      actions:[session.id!==state.sessionId?button("Révoquer",{small:true,kind:"ghost",onClick:()=>confirmAction({title:"Révoquer cette session ?",message:"Cet appareil devra se reconnecter à Squared Workspace.",confirmLabel:"Révoquer",danger:true,onConfirm:async()=>{await revokeSession(session.id);toast("Session révoquée")}})}):null].filter(Boolean)
-    })):[emptyState("Aucune session","Aucune session active supplémentaire.")]));
+      actions:[session.id!==state.sessionId?button("Révoquer",{small:true,kind:"ghost",onClick:()=>confirmAction({title:"Révoquer cette session ?",message:"Cet appareil devra se reconnecter à Squared Workspace.",confirmLabel:"Révoquer",danger:true,onConfirm:async()=>{await revokeSession(session.id);entry.remove();if(!host.children.length)host.append(emptyState("Aucune session","Aucune session active supplémentaire."));toast("Session révoquée")}})}):null].filter(Boolean)
+    });return entry;}):[emptyState("Aucune session","Aucune session active supplémentaire.")]));
   }catch(error){host.append(emptyState("Sessions indisponibles",errorMessage(error),"warning"))}
   return card("Sessions actives","Contrôlez les navigateurs et appareils actuellement autorisés.",host,{iconName:"lock"});
 }
