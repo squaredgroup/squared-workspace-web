@@ -13,7 +13,7 @@ export function realtimeURL(path = "/v1/realtime") {
 
 
 export const ICONS = {
-  More:"Sliders", Expand:"External", Paperclip:"Add", DoubleCheck:"Check",
+  More:"MoreSquare", Expand:"Show", Paperclip:"Add", DoubleCheck:"Check",
   dashboard:"SidebarDashboard", today:"SidebarToday", projects:"SidebarProjects", missions:"SidebarMissions", tasks:"SidebarTasks", planning:"SidebarPlanning", map:"SidebarMap",
   businessUnits:"SidebarBusinessUnits", objectives:"SidebarObjectives", reports:"SidebarReports", finance:"SidebarFinance", timeExpenses:"SidebarTimeExpenses",
   validations:"SidebarValidations", deliverables:"SidebarDeliverables", contracts:"SidebarContracts", documents:"SidebarDocuments", resources:"SidebarResources",

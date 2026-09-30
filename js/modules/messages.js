@@ -127,7 +127,7 @@ function attachmentPreview(file, observer, signal, resourceURLs = mediaURLs) {
   let cachedBlob = null;
   const preview = h("div", { class: `sq-attachment-preview sq-attachment-${kind}`, "aria-label": `Aperçu de ${name}` });
   const fallback = () => preview.replaceChildren(h("span", { class: "sq-file-symbol", "aria-hidden": "true", text: kind === "pdf" ? "PDF" : kind === "text" ? "TXT" : "▤" }), h("span", { text: kind === "document" ? "Aperçu non disponible pour ce format" : "Aperçu indisponible — télécharger le fichier" }));
-  if (kind === "audio" && id) preview.replaceChildren(h("span", { class: "sq-audio-preview" },icon("phone",18),h("span",{text:"Écouter le message vocal"})));
+  if (kind === "audio" && id) preview.replaceChildren(h("span", { class: "sq-audio-preview" },icon("Play",18),h("span",{text:"Écouter le message vocal"})));
   else if (kind === "document" || !id) fallback();
   else {
     preview.replaceChildren(h("span", { class: "sq-media-loading", text: "Chargement de l’aperçu…" }));
