@@ -219,7 +219,9 @@ html[data-theme="light"] .sq-messages{--chat-surface:#fff;--chat-canvas:#f3f5f6;
 .workspace .sq-messages .sq-inbox-section-label{flex:0 0 auto;margin:0 18px 10px;color:var(--sq-muted);text-transform:uppercase;letter-spacing:.1em;font-size:9px;font-weight:600}
 .workspace .sq-messages .sq-conversation-bottomline>.icon{flex:none;opacity:.6}
 .workspace .sq-messages .mine>.sq-bubble-surface{border:0;color:#13200d}
-.workspace .sq-messages .mine>.sq-bubble-surface p{color:#13200d}
+.workspace .sq-messages .mine>.sq-bubble-surface>p{color:#13200d}
+.workspace .sq-messages .sq-bubble-surface:has(>.sq-proposal-card){padding:0;border:0;background:transparent;box-shadow:none}
+.workspace .sq-messages .sq-bubble-surface>.sq-proposal-card{margin:0}
 .workspace .sq-messages .sq-message-text-only .sq-message-footer{justify-content:flex-end;gap:6px;min-height:20px;margin:3px -3px -4px 16px;float:right}
 .workspace .sq-messages .sq-message-text-only .sq-message-footer :is(.sq-message-clock,.sq-message-receipt,.sq-message-action-menu){color:var(--sq-muted)}
 .workspace .sq-messages .mine.sq-message-text-only .sq-message-footer :is(.sq-message-clock,.sq-message-receipt,.sq-message-action-menu){color:#3d582d}
