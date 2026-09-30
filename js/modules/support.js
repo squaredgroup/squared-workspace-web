@@ -33,6 +33,7 @@ export async function renderSupport(subpage="tickets-clients"){
     const visible=tickets.filter(ticket=>subpage!=="demandes-internes"||ticket.data?.metadata?.tags?.includes("Interne"));
     metrics.replaceChildren(...[["Demandes ouvertes",visible.filter(ticket=>!done(ticket)).length,"support"],["En cours",visible.filter(ticket=>["assigned","inProgress"].includes(ticket.status)).length,"clock"],["Résolues",visible.filter(ticket=>["resolved","closed"].includes(ticket.status)).length,"check"]].map(([title,count,glyph])=>h("div",{class:"sq-support-metric"},h("span",{class:"sq-metric-glyph"},icon(glyph,19)),h("div",{},h("span",{text:title}),h("strong",{text:String(count)})))));
     const search=input(context.query,{type:"search",placeholder:"Rechercher un ticket…","aria-label":"Rechercher un ticket"});
+    search.setAttribute("aria-label","Rechercher un ticket");
     const sort=select(context.sort,[{value:"recent",label:"Dernière activité"},{value:"priority",label:"Priorité"}]);sort.setAttribute("aria-label","Trier les tickets");
     const results=h("div",{class:"sq-ticket-list"}),summary=h("p",{class:"sq-results-summary",role:"status","aria-live":"polite"});
     const filters=[["open","Ouverts"],["mine","Mes demandes"],["all","Tous"],["resolved","Résolus"]].map(([value,title])=>button(title,{kind:"ghost",pressed:context.filter===value,onClick:()=>{context.filter=value;filters.forEach((control,index)=>control.setAttribute("aria-pressed",String(["open","mine","all","resolved"][index]===value)));draw();}}));

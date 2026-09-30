@@ -45,7 +45,7 @@ async function photoEditor(file,owner,refresh){
   canvas.addEventListener("pointermove",event=>{if(!drag||drag.pointer!==event.pointerId)return;const ratio=size/canvas.getBoundingClientRect().width;x=drag.offsetX+(event.clientX-drag.x)*ratio;y=drag.offsetY+(event.clientY-drag.y)*ratio;draw();});
   for(const type of ["pointerup","pointercancel"])canvas.addEventListener(type,()=>{drag=null;});
   const shift=h("div",{class:"sq-photo-position","aria-label":"Déplacer la photo"},...[["←",-14,0,"Déplacer vers la gauche"],["↑",0,-14,"Déplacer vers le haut"],["↓",0,14,"Déplacer vers le bas"],["→",14,0,"Déplacer vers la droite"]].map(([label,dx,dy,name])=>button(label,{ariaLabel:name,onClick:()=>{x+=dx;y+=dy;draw();}})));
-  dialog=modal({title:"Votre photo de profil",className:"sq-photo-editor",content:h("div",{class:"sq-photo-editor-content"},h("p",{text:"Déplacez la photo pour choisir le cadrage."}),h("div",{class:"sq-photo-crop"},canvas),field("Zoom",zoom),shift,error),beforeClose:()=>!busy,onClose:()=>URL.revokeObjectURL(url),actions:[{label:"Enregistrer la photo",kind:"primary",icon:"check",onClick:async close=>{
+  dialog=modal({title:"Votre photo de profil",className:"sq-photo-editor",content:h("div",{class:"sq-photo-editor-content"},h("p",{text:"Déplacez la photo pour choisir le cadrage."}),h("div",{class:"sq-photo-crop"},canvas),field("Zoom de la photo",zoom),shift,error),beforeClose:()=>!busy,onClose:()=>URL.revokeObjectURL(url),actions:[{label:"Enregistrer la photo",kind:"primary",icon:"check",onClick:async close=>{
     if(busy||state.user?.id!==owner)return;
     busy=true;error.hidden=true;dialog.panel.setAttribute("aria-busy","true");dialog.panel.querySelectorAll("button,input").forEach(control=>control.disabled=true);
     try{

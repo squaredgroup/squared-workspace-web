@@ -9,6 +9,7 @@ const memberName=value=>`${value?.firstName||""} ${value?.lastName||""}`.trim()|
 export function businessUnitList({items,writable,reload,onEdit}){
   const context=viewContext("business-unit-directory",{query:"",status:"all"});
   const search=input(context.query,{type:"search",placeholder:"Rechercher un pôle ou une entité…","aria-label":"Rechercher un pôle"});
+  search.setAttribute("aria-label","Rechercher un pôle");
   const filter=select(context.status,[{value:"all",label:"Tous les statuts"},...[...new Set(items.map(item=>item.status).filter(Boolean))].map(value=>({value,label:pretty(value)}))]);filter.setAttribute("aria-label","Filtrer les pôles");
   const grid=h("div",{class:"sq-unit-grid"}),summary=h("p",{class:"sq-results-summary",role:"status"});
   const root=h("div",{class:"sq-unit-directory"},h("div",{class:"sq-directory-controls"},h("div",{class:"sq-board-search"},icon("search",17),search),filter,writable?button("Créer un pôle",{kind:"primary",iconName:"add",onClick:()=>onEdit(null)}):null),summary,grid);

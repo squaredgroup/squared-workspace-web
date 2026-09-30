@@ -95,7 +95,7 @@ def run():
         photo.get_by_role('slider',name='Zoom de la photo').press('End');photo.get_by_role('button',name='Enregistrer la photo').click();expect(photo).not_to_be_visible();assert f.USER['avatarData'].startswith('/9j/');assert len(base64.b64decode(f.USER['avatarData']))<10*1024*1024
         f.go(page,'dashboard');f.go(page,'profile');expect(page.locator('.sq-photo-avatar img')).to_have_attribute('src','data:image/jpeg;base64,'+f.USER['avatarData'])
         page.get_by_label('Choisir une photo de profil').set_input_files({'name':'invalide.png','mimeType':'image/png','buffer':b'not-an-image'});expect(page.get_by_role('status').filter(has_text='Cette image ne peut pas être ouverte')).to_be_visible();assert f.USER['avatarData'].startswith('/9j/')
-        page.get_by_role('button',name='Retirer',exact=True).click();page.get_by_role('dialog').get_by_role('button',name='Retirer la photo',exact=True).click();expect(page.locator('.sq-photo-avatar img')).to_have_count(0);assert f.USER['avatarData'] is None
+        page.get_by_role('button',name='Retirer',exact=True).click();page.get_by_role('alertdialog',name='Retirer votre photo ?').get_by_role('button',name='Retirer la photo',exact=True).click();expect(page.locator('.sq-photo-avatar img')).to_have_count(0);assert f.USER['avatarData'] is None
         # Requester creation must be available without support-management permission.
         f.USER['permissions']=['readWorkspace','createSupportRequests','editOwnProfile','sendMessages'];f.USER['role']='CLIENT'
         page.evaluate('async u=>{const s=await import("/js/store.js");s.setState({user:u});s.setRoute("support","tickets-clients")}',f.USER);f.settled(page)
