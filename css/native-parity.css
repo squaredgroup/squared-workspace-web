@@ -24,4 +24,5 @@
 @media(max-width:640px){.planning-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.planning-day{min-width:0}.personal-planning .page-actions{flex-wrap:wrap}.system-mail-block-head{align-items:stretch;flex-direction:column}}
 .toast-stack{width:max-content;max-width:calc(100vw - 36px);justify-items:end}
 .toast{box-sizing:border-box;width:fit-content;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.toast-message{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:880px){.toast-stack{width:auto;max-width:none}}
