@@ -2,6 +2,7 @@ import { focusTabs, focusHeader, renderSpaces } from "./focus-navigation.js";
 import { configureMobile, openTools } from "./mobile.js";
 import { openFocusSearch } from "./focus-search.js";
 import { viewContext } from "./focus-state.js";
+import { pinnedSections, toggleSectionPin } from "./navigation-preferences.js";
 import { supportsRecord, renderRecord } from "./focus-records.js";
 import { CORE_DOMAIN_BY_SECTION } from "./config.js";
 import { authContext } from "./auth-flow.js";
@@ -9,7 +10,7 @@ import { state,setState,setRoute,setGroupOpen,subscribe,setAppearance } from "./
 import { SECTIONS,NAV_GROUPS,SECTION_DESCRIPTIONS,canAccessSection,canAccessSubpage,iconPath,realtimeURL } from "./config.js";
 import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredSession } from "./api.js";
 import { renderAuth } from "./modules/auth.js";
-import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar } from "./ui.js";
+import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar,roleLabel } from "./ui.js";
 
 let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let navigationPrefix=false;let activeViewTransition=null;
 const app=document.querySelector("#app");
@@ -28,23 +29,29 @@ function activeSubpage(){
   return section?.subpages?.find(p=>p.id===state.route.subpage);
 }
 function groupId(group){return "nav-group-"+group.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}
+const primarySections=()=>["dashboard","today",state.user?.role==="CLIENT"?"projects":"tasks","notifications","messages","spaces"].filter(key=>canAccessSection(key,state.user));
+function navigationItem(key){const section=SECTIONS[key];return h("button",{class:`nav-item ${state.route.section===key?"active":""}`,type:"button","aria-current":state.route.section===key?"page":null,onClick:()=>setRoute(key,section.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("img",{class:"nav-icon",src:iconPath(key),alt:"",width:18,height:18,decoding:"async"}),h("span",{class:"nav-label",text:key==="spaces"?"Tous les espaces":section.title}));}
 function navGroup(group){
-  const visible=group.sections.filter(key=>canAccessSection(key,state.user));if(!visible.length)return null;
+  const primary=primarySections(),pins=pinnedSections();
+  const visible=group.sections.filter(key=>canAccessSection(key,state.user)&&!primary.includes(key)&&!pins.includes(key));if(!visible.length)return null;
   const open=!state.closedGroups?.[group.name],id=groupId(group),container=h("div",{class:`nav-group ${open?"open":""}`});
   container.append(h("button",{class:"nav-group-head",type:"button","aria-expanded":String(open),"aria-controls":id,onClick:()=>setGroupOpen(group.name,!open)},h("span",{text:group.name}),h("img",{class:"group-chevron",src:iconPath("ChevronDown"),alt:"",width:14,height:14})));
   const items=h("div",{id,class:"nav-items",hidden:!open});
-  if(open)for(const key of visible){const section=SECTIONS[key];items.append(h("button",{class:`nav-item ${state.route.section===key?"active":""}`,type:"button","aria-current":state.route.section===key?"page":null,onClick:()=>setRoute(key,section.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("img",{class:"nav-icon",src:iconPath(key),alt:"",width:18,height:18,decoding:"async"}),h("span",{class:"nav-label",text:section.title})))}
+  if(open)for(const key of visible)items.append(navigationItem(key));
   container.append(items);return container;
 }
 function sidebar(){
   const u=state.user;const nav=h("nav",{"aria-label":"Navigation principale"});
+  const pins=pinnedSections();
+  nav.append(h("div",{class:"studio-nav-section"},h("span",{class:"studio-nav-heading",text:"Mon Workspace"}),...primarySections().filter(key=>!pins.includes(key)).map(navigationItem)));
+  if(pins.length)nav.append(h("div",{class:"studio-nav-section"},h("span",{class:"studio-nav-heading",text:"Mes favoris"}),...pins.map(navigationItem)));
   for(const group of NAV_GROUPS){const node=navGroup(group);if(node)nav.append(node)}
   return h("aside",{class:"sidebar"},
-    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:42,height:42,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{},h("i",{class:"brand-dot"}),"Operating system")),h("span",{class:"version-pill",text:"V8"})),
+    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:42,height:42,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{},h("i",{class:"brand-dot"}),"Votre espace de travail"))),
     h("button",{class:"sidebar-search",type:"button",onClick:openCommand},icon("search",16),h("span",{text:"Rechercher"}),h("span",{class:"shortcut",text:"⌘ K"})),
     h("div",{class:"sidebar-context"},h("span",{text:"Espace actif"}),h("strong",{text:state.workspace?.workspace?.name||"Squared Group"}),h("small",{text:`${accessibleSections().length} espaces autorisés`})),
     nav,
-    h("div",{class:"sidebar-footer"},h("button",{class:"account-card",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:36,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:u?.role||"Workspace"}))))
+    h("div",{class:"sidebar-footer"},h("button",{class:"account-card",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:36,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:roleLabel(u?.role)}))))
   );
 }
 function mobileTabs(){return focusTabs()}
@@ -69,10 +76,13 @@ function topbar(){
   const section=SECTIONS[state.route.section]||{};const sub=activeSubpage();
   const refresh=iconButton("sync","Actualiser les données",event=>refreshWorkspace(event.currentTarget));refresh.classList.add("desktop-only");
   const effectiveTheme=document.documentElement.dataset.theme||"dark";
+  const pinned=pinnedSections().includes(state.route.section);
+  const pin=iconButton("star",pinned?"Retirer cette rubrique des favoris":"Épingler cette rubrique",()=>{const result=toggleSectionPin(state.route.section);if(result.full)toast("Six favoris maximum. Retirez une rubrique pour en épingler une autre.","error");});
+  pin.setAttribute("aria-pressed",String(pinned));pin.classList.add("studio-pin-trigger");
   return h("header",{class:"topbar"},
     h("div",{class:"menu-toggle"},iconButton("grid","Ouvrir le menu",()=>setState({sidebarOpen:!state.sidebarOpen}))),
     h("div",{class:"breadcrumbs"},h("div",{class:"breadcrumb-line"},h("span",{text:section.group||"Workspace"}),sub?h("span",{class:"separator",text:"/"}):null,sub?h("span",{text:sub.title}):null),h("div",{class:"top-title",text:section.title||"Squared Workspace"})),
-    h("div",{class:"top-actions"},systemState(),refresh,notificationButton(),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),iconButton("search","Recherche",openCommand),iconButton("logout","Déconnexion",async()=>{await logout()}))
+    h("div",{class:"top-actions"},systemState(),refresh,pin,notificationButton(),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),iconButton("search","Recherche",openCommand),iconButton("logout","Déconnexion",async()=>{await logout()}))
   );
 }
 function subnav(){
@@ -97,6 +107,7 @@ function refreshChrome(){
   if(!state.online&&!banner)refs.main.querySelector(".topbar")?.after(h("div",{class:"network-banner"},icon("warning",15),h("span",{text:"Connexion interrompue. Les données affichées restent visibles ; aucune action n’est envoyée automatiquement."})));
   if(state.online)banner?.remove();
 }
+window.addEventListener("sq:navigation-preferences",()=>{document.querySelectorAll(".sq-mobile-pins").forEach(node=>node.remove());refreshChrome();});
 async function sectionPage(section,subpage){
   if(section==="spaces")return renderSpaces();
   if(section==="planning"&&subpage==="personal"){
@@ -183,7 +194,7 @@ function connectRealtime(){
   try{
     const socket=new WebSocket(wsURL);state.realtime=socket;
     socket.addEventListener("open",()=>{reconnectDelay=1000;refreshChrome()});
-    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}const type=message.type;if(type==="communication.changed"&&!(["messages","dashboard","today","notifications","activity"].includes(state.route.section)))return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{if(socket!==state.realtime)return;try{await refreshRealtimeView(type)}catch{}},type==="connected"?0:180)});
+    socket.addEventListener("message",event=>{if(socket!==state.realtime)return;let message;try{message=JSON.parse(event.data)}catch{return}const type=message.type;if(type==="communication.changed"&&!(["messages","dashboard","today","notifications","activity","support"].includes(state.route.section)))return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{if(socket!==state.realtime)return;try{await refreshRealtimeView(type)}catch{}},type==="connected"?0:180)});
     socket.addEventListener("close",()=>{if(socket!==state.realtime)return;state.realtime=null;if(uiReady&&state.accessToken&&state.online){realtimeReconnectTimer=setTimeout(connectRealtime,reconnectDelay);reconnectDelay=Math.min(30000,reconnectDelay*2)}});
   }catch{}
 }

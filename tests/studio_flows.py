@@ -21,12 +21,24 @@ metadata=dict(version=1,tags=['Technique','Important'],createdBy=AGENT,updatedBy
 TICKETS=[dict(id=TICKET,title='Accès au dossier de lancement',status='inProgress',version=4,createdAt=metadata['createdAt'],updatedAt=metadata['updatedAt'],data=dict(id=TICKET,title='Accès au dossier de lancement',reference='SUP-2026-014',description='L’accès au dossier est bloqué depuis ce matin. Le reste de Workspace fonctionne.',requesterID=AGENT,assigneeID=f.USER['id'],state='inProgress',severity='high',impact='team',urgency='high',slaID=UNIT,firstRespondedAt='2026-09-30T08:30:00Z',escalationLevel=1,metadata=metadata)),dict(id='00000000-0000-4000-a000-000000000021',title='Mise à jour du compte',status='resolved',version=2,data=dict(reference='SUP-2026-013',title='Mise à jour du compte',description='Les informations du compte ont été corrigées.',requesterID=f.USER['id'],state='resolved',severity='low',impact='individual',urgency='low',escalationLevel=0,metadata=metadata))]
 UNITS=[dict(id=UNIT,title='Studio créatif',status='active',version=3,data=dict(name='Studio créatif',code='STU',kind='businessUnit',summary='Identité, design produit et expériences numériques.',visualImageData=ART,visualColorHex='#7BE84E',leadUserID=AGENT,memberIDs=[f.USER['id'],AGENT],projectIDs=['project-1'],objectiveIDs=[])),dict(id='00000000-0000-4000-a000-000000000011',title='Production',status='active',version=1,data=dict(name='Production',code='PRD',kind='department',summary='La réalisation des projets du groupe.',visualIconName='Bag',memberIDs=[],projectIDs=[]))]
 fail_ticket=False
+fail_response=False
+files={}
 
 def fixture(route):
-    global fail_ticket
-    req=route.request;path=urlsplit(req.url).path;method=req.method;body=req.post_data_json if req.post_data else None
+    global fail_ticket,fail_response
+    req=route.request;path=urlsplit(req.url).path;method=req.method;body=req.post_data_json if req.post_data and 'application/json' in req.headers.get('content-type','') else None
     def send(payload,status=200):
         route.fulfill(status=status,content_type='application/json',headers={'Access-Control-Allow-Origin':f.origin,'etag':'"12"'},body=json.dumps(payload))
+    if path=='/v1/files/upload-url':
+        assert body['entityType']=='messageAttachment';assert any(v['id']==body['entityId'] for v in f.WORKSPACE['conversations'])
+        f.requests.append((method,path,body));return send({'fileId':'studio-file-1'})
+    if path=='/v1/files/studio-file-1/content':
+        if method=='PUT':files['studio-file-1']=req.post_data_buffer;return send({'ok':True})
+        return route.fulfill(status=200,content_type='text/plain',headers={'Access-Control-Allow-Origin':f.origin},body=files['studio-file-1'])
+    if path=='/v1/files/studio-file-1/complete':
+        assert body['byteCount']==len(files['studio-file-1']);return send({'ok':True})
+    if path.endswith('/messages') and method=='POST' and fail_response:
+        fail_response=False;f.requests.append((method,path,body));return send({'message':'Échec de réponse simulé. Réessayez.'},500)
     if path=='/v1/me' and method=='PATCH':
         assert 'avatarData' in body, 'A profile update must explicitly retain or remove the native photo'
         f.requests.append((method,path,body));f.USER.update(body);f.WORKSPACE['team'][0].update(body);return send(f.USER)
@@ -56,7 +68,7 @@ def capture(page,name):
     page.screenshot(path=str(OUT/f'{name}.png'))
 
 def run():
-    global fail_ticket
+    global fail_ticket,fail_response
     errors=[]
     with sync_playwright() as p:
         executable=os.environ.get('CHROMIUM_PATH')
@@ -90,6 +102,28 @@ def run():
         page.get_by_role('button',name='Échanger',exact=True).click();f.settled(page);expect(page.get_by_placeholder('Écrire un message…')).to_be_visible()
         expect(page.get_by_placeholder('Écrire un message…')).to_have_value('À propos du ticket SUP-2026-014 : Accès au dossier de lancement.')
         assert not any(method=='POST' and path.endswith('/messages') for method,path,body in f.requests), 'Opening a ticket discussion must leave a draft'
+        # A failed first reply preserves the draft and reuses the acknowledged conversation.
+        f.WORKSPACE['conversations'].clear()
+        page.evaluate('async()=>{const a=await import("/js/api.js");await a.loadWorkspace()}')
+        page.evaluate('async id=>{const s=await import("/js/store.js");s.setRoute("support","tickets-clients",id)}',TICKET);f.settled(page)
+        reply=page.get_by_label('Message concernant ce ticket',exact=True);reply.fill('Voici la réponse du support avec le contexte demandé.')
+        page.reload();f.settled(page);expect(reply).to_have_value('Voici la réponse du support avec le contexte demandé.')
+        fail_response=True;page.get_by_role('button',name='Envoyer la réponse',exact=True).click();expect(page.locator('.studio-ticket-thread [role=alert]')).to_contain_text('Échec de réponse simulé')
+        assert len(f.WORKSPACE['conversations'])==1;expect(reply).to_have_value('Voici la réponse du support avec le contexte demandé.')
+        page.get_by_role('button',name='Envoyer la réponse',exact=True).click();expect(reply).to_have_value('');expect(page.get_by_role('button',name='Envoyer la réponse',exact=True)).to_be_disabled()
+        assert len(f.WORKSPACE['conversations'])==1
+        assert f.WORKSPACE['conversations'][0]['messages'][0]['body']=='[Ticket SUP-2026-014]\nVoici la réponse du support avec le contexte demandé.'
+        expect(page.locator('.studio-ticket-messages')).to_contain_text('Voici la réponse du support')
+        page.get_by_label('Fichier pour ce ticket',exact=True).set_input_files({'name':'contexte.txt','mimeType':'text/plain','buffer':b'Ticket attachment evidence'})
+        expect(page.locator('.studio-ticket-messages').get_by_role('button',name='contexte.txt',exact=True)).to_be_visible()
+        with page.expect_download() as event:page.locator('.studio-ticket-messages').get_by_role('button',name='contexte.txt',exact=True).click()
+        download=event.value;assert download.suggested_filename=='contexte.txt';assert Path(download.path()).read_bytes()==b'Ticket attachment evidence'
+        capture(page,'ticket-exchanges-390')
+        f.go(page,'businessUnits');page.get_by_role('button',name='Ouvrir le pôle Studio créatif',exact=True).click()
+        page.get_by_role('dialog',name='Studio créatif').get_by_role('button',name=f.WORKSPACE['projects'][0]['title'],exact=True).click();f.settled(page)
+        expect(page.locator('.focus-detail')).to_contain_text(f.WORKSPACE['projects'][0]['title'])
+        f.go(page,'settings');page.get_by_label('Thème',exact=True).select_option('light');expect(page.locator('html')).to_have_attribute('data-theme','light')
+        page.get_by_label('Thème',exact=True).select_option('dark');expect(page.locator('html')).to_have_attribute('data-theme','dark')
         f.go(page,'profile');old_avatar=f.USER['avatarData'];page.get_by_role('button',name='Enregistrer le profil').click();expect(page.get_by_text('Profil mis à jour',exact=True)).to_be_visible();assert f.USER['avatarData']==old_avatar
         page.get_by_label('Choisir une photo de profil').set_input_files(str(f.ROOT/'assets/appicon-256.png'));photo=page.get_by_role('dialog',name='Votre photo de profil');expect(photo.get_by_role('img',name='Aperçu du recadrage de la photo')).to_be_visible();capture(page,'photo-crop-390')
         photo.get_by_role('slider',name='Zoom de la photo').press('End');photo.get_by_role('button',name='Enregistrer la photo').click();expect(photo).not_to_be_visible();assert f.USER['avatarData'].startswith('/9j/');assert len(base64.b64decode(f.USER['avatarData']))<10*1024*1024
@@ -102,6 +136,6 @@ def run():
         expect(page.get_by_role('button',name='Créer un ticket',exact=True).first).to_be_visible();page.get_by_role('button',name='Tous',exact=True).click();page.get_by_role('button',name='Ouvrir le ticket Mon nouvel accès',exact=True).click();f.settled(page);expect(page.get_by_role('button',name='Gérer le ticket',exact=True)).to_have_count(0)
         assert not errors,errors
         context.close();browser.close()
-    print('Support create/update/conflict/permissions/discussion, native unit artwork and profile crop/preservation/removal passed; 4 widths in both themes.')
+    print('Support CRUD/conflicts/permissions, reload-safe inline replies, retry without duplicate conversation, uploaded/downloaded attachments, linked unit projects, live appearance and profile photo passed; 4 widths in both themes.')
 
 if __name__=='__main__':run()

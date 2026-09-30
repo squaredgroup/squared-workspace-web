@@ -1,11 +1,11 @@
 import { state } from "./store.js";
 import { updateMe } from "./api.js";
-import { h, button, iconButton, modal, field, toast, errorMessage, profileAvatar, confirmAction } from "./ui.js";
+import { h, button, iconButton, modal, field, toast, errorMessage, profileAvatar, confirmAction, roleLabel } from "./ui.js";
 
 function profileBody(user,avatarData){
   return {email:user.email,firstName:user.firstName||user.first_name||"",lastName:user.lastName||user.last_name||"",title:user.title||"",company:user.company||"",phone:user.phone||"",phoneCountryCode:user.phoneCountryCode||user.phone_country_code||"FR",avatarData};
 }
-export function profilePhotoControl(user){
+export function profilePhotoControl(user,{onChange=()=>{}}={}){
   const avatar=h("div",{class:"sq-photo-avatar"},profileAvatar(user,{className:"profile-avatar-large",size:88}));
   const status=h("p",{class:"sq-photo-status",role:"status","aria-live":"polite",text:"Votre photo est partagée avec l’app et les autres membres."});
   const picker=h("input",{type:"file",accept:"image/jpeg,image/png,image/webp",hidden:true,"aria-label":"Choisir une photo de profil"});
@@ -14,7 +14,7 @@ export function profilePhotoControl(user){
   const remove=button("Retirer",{kind:"ghost",onClick:()=>confirmAction({title:"Retirer votre photo ?",message:"Vos initiales remplaceront votre photo sur le web et dans l’app.",confirmLabel:"Retirer la photo",onConfirm:async()=>{
     try{if(state.user?.id!==user.id)return;await updateMe(profileBody(state.user,null));refresh();toast("Photo retirée");}catch(error){status.textContent=errorMessage(error);}
   }})});
-  function refresh(){avatar.replaceChildren(profileAvatar(state.user,{className:"profile-avatar-large",size:88}));remove.hidden=!Boolean(state.user?.avatarData||state.user?.avatar_data);status.textContent="Photo synchronisée avec votre compte.";}
+  function refresh(){avatar.replaceChildren(profileAvatar(state.user,{className:"profile-avatar-large",size:88}));remove.hidden=!Boolean(state.user?.avatarData||state.user?.avatar_data);status.textContent="Photo synchronisée avec votre compte.";onChange();}
   remove.hidden=!writable||!Boolean(user.avatarData||user.avatar_data);
   picker.addEventListener("change",async()=>{
     const file=picker.files?.[0];picker.value="";if(!file)return;
@@ -22,7 +22,7 @@ export function profilePhotoControl(user){
     change.disabled=true;
     try{await photoEditor(file,user.id,refresh);}catch(error){status.textContent=errorMessage(error);}finally{change.disabled=!writable;}
   });
-  return h("div",{class:"sq-profile-photo profile-identity"},avatar,h("div",{class:"sq-photo-info"},h("strong",{text:`${user.firstName||user.first_name||""} ${user.lastName||user.last_name||""}`.trim()||user.email}),h("span",{text:[user.title,user.company].filter(Boolean).join(" · ")||user.role||"Membre"}),h("div",{class:"button-row"},change,remove),status,h("small",{text:"JPG, PNG ou WebP · 10 Mo maximum"})),picker);
+  return h("div",{class:"sq-profile-photo profile-identity"},avatar,h("div",{class:"sq-photo-info"},h("strong",{text:`${user.firstName||user.first_name||""} ${user.lastName||user.last_name||""}`.trim()||user.email}),h("span",{text:[user.title,user.company].filter(Boolean).join(" · ")||roleLabel(user.role)}),h("div",{class:"button-row"},change,remove),status,h("small",{text:"JPG, PNG ou WebP · 10 Mo maximum"})),picker);
 }
 async function photoEditor(file,owner,refresh){
   const url=URL.createObjectURL(file),image=new Image();image.src=url;

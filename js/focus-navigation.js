@@ -1,9 +1,10 @@
 import { state, setRoute, setState, setAppearance } from "./store.js";
-import { SECTIONS, ICONS, NAV_GROUPS, canAccessSection, canAccessSubpage } from "./config.js";
+import { SECTIONS, ICONS, NAV_GROUPS, SECTION_DESCRIPTIONS, canAccessSection, canAccessSubpage } from "./config.js";
 import { h, icon, button, iconButton, pageHeader, emptyState, profileAvatar } from "./ui.js";
 import { normalize } from "./focus-model.js";
 import { viewContext } from "./focus-state.js";
-import { storage } from "./storage.js";
+import { pinnedSections, toggleSectionPin } from "./navigation-preferences.js";
+import { toast } from "./ui.js";
 // Add an explicit catalogue destination without renaming or breaking legacy URLs.
 SECTIONS.spaces={title:"Espaces",group:"Général"};
 ICONS.spaces="Grid";
@@ -31,9 +32,11 @@ export function focusHeader({search,tools,refresh}){
 export function renderSpaces(){
   const root=h("div",{class:"focus-spaces"}),results=h("div",{class:"focus-space-groups"}),context=viewContext("spaces",{query:""});
   const search=h("input",{type:"search",class:"search-input",placeholder:"Trouver un espace…","aria-label":"Trouver un espace",value:context.query});
-  const preferences=storage("local");let pins=[];try{pins=JSON.parse(preferences.get(`sq-mobile-pins:${state.user?.id||"member"}`)||"[]");}catch{}
-  if(!Array.isArray(pins))pins=[];
-  const renderItem=key=>button(SECTIONS[key].title,{kind:"ghost",iconName:key,onClick:()=>go(key),className:"focus-space-link"});
+  let pins=pinnedSections();
+  const renderItem=key=>{
+    const pin=iconButton("star",pins.includes(key)?`Retirer ${SECTIONS[key].title} des favoris`:`Épingler ${SECTIONS[key].title}`,()=>{const result=toggleSectionPin(key);if(result.full)toast("Six favoris maximum. Retirez d’abord une rubrique.","error");pins=pinnedSections();draw();});pin.setAttribute("aria-pressed",String(pins.includes(key)));pin.classList.add("studio-space-pin");
+    return h("article",{class:"studio-space-item"},h("button",{class:"button ghost focus-space-link",type:"button",onClick:()=>go(key)},h("span",{class:"studio-space-icon"},icon(key,22)),h("span",{},h("strong",{text:SECTIONS[key].title}),h("small",{text:SECTION_DESCRIPTIONS[key]||"Ouvrir cette rubrique"}))),pin);
+  };
   root.append(pageHeader({eyebrow:"Votre périmètre",title:"Espaces",subtitle:"Tous vos modules autorisés, sans perdre le fil."}),search,results);
   function draw(){
     const term=normalize(context.query),groups=[];

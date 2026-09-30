@@ -57,7 +57,7 @@ def run():
             page.get_by_label('Mot de passe',exact=True).fill('fixture-pass123')
             page.get_by_role('button',name='Se connecter',exact=True).click();f.settled(page)
             expect(page.locator('.focus-home')).to_be_visible()
-            first=page.locator('.focus-attention')
+            first=page.locator('.focus-home-group').filter(has=page.get_by_role('heading',name='Décisions attendues',exact=True))
             expect(first).to_be_visible()
             assert first.bounding_box()['y']<650
             page.get_by_label('Périmètre de la journée').select_option('mine')
@@ -80,6 +80,13 @@ def run():
             expect(page.locator('.focus-detail')).to_be_visible();assert 'item=task-44' in page.url
             page.get_by_role('button',name='Retour à la liste',exact=True).click();f.settled(page)
             expect(search).to_have_value('Audit tâche numéro 44')
+            page.reload();f.settled(page);expect(search).to_have_value('Audit tâche numéro 44')
+            page.get_by_role('button',name='Terminés',exact=True).click();expect(page.locator('.focus-record')).to_have_count(0)
+            page.reload();f.settled(page);expect(page.get_by_role('button',name='Terminés',exact=True)).to_have_attribute('aria-pressed','true')
+            page.get_by_role('button',name='Réinitialiser',exact=True).click();expect(search).to_have_value('');expect(page.locator('.focus-record').first).to_be_visible()
+            go(page,'spaces');page.get_by_role('button',name='Épingler Support',exact=True).click()
+            page.reload();f.settled(page);expect(page.get_by_role('button',name='Retirer Support des favoris',exact=True)).to_have_attribute('aria-pressed','true')
+            page.get_by_role('button',name='Retirer Support des favoris',exact=True).click()
             page.get_by_role('button',name='Recherche',exact=True).click()
             page.get_by_role('combobox',name='Rechercher dans Workspace').fill('Audit tâche numéro 47')
             page.get_by_role('option').filter(has_text='Audit tâche numéro 47').click();f.settled(page)
@@ -122,6 +129,7 @@ def run():
             page.evaluate('async()=>{const a=await import("/js/api.js");await a.logout()}')
             expect(page.get_by_label('Adresse e-mail',exact=True)).to_be_visible()
             assert not page.evaluate('Object.keys(sessionStorage).some(k=>k.startsWith("sq-focus-draft:"))')
+            assert not page.evaluate('Object.keys(sessionStorage).some(k=>k.startsWith("sq-view:"))')
             unexpected=[e for e in errors if "context is sandboxed and lacks the 'allow-same-origin' flag" not in e]
             assert not unexpected,unexpected
             print(f'PASS Focus: {len(checks)} layout checks + task creation/update/completion, exact deep links, stable search, reloads and private-draft lifecycle.')

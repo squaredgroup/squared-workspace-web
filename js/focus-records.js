@@ -120,10 +120,11 @@ export function recordRow(domain,record,{onRefresh,compact=false}={}) {
   return row;
 }
 export function recordList(domain,items,reload,{writable=canEditRecord(domain)}={}) {
-  const context=viewContext(`records:${state.route.section}:${state.route.subpage}:${domain}`,{query:"",status:"all",scope:"all",sort:"due",limit:30});
+  const context=viewContext(`records:${state.route.section}:${state.route.subpage}:${domain}`,{query:"",status:"all",scope:"all",sort:"due",view:"all",limit:30});
   const root=h("div",{class:"focus-collection"}),results=h("div",{class:"focus-record-list"}),summary=h("p",{class:"focus-summary",role:"status","aria-live":"polite"}),more=button("Afficher la suite",{kind:"ghost",onClick:()=>{context.limit+=30;draw();}});
   const search=h("input",{type:"search",class:"search-input",placeholder:`Rechercher dans ${domainLabels[domain]?.toLowerCase()||"la liste"}…`,value:context.query,"aria-label":"Rechercher dans la liste"});
   const states=[...new Set(items.map(item=>valueOf(item,"status")).filter(Boolean))];
+  if(context.status!=="all"&&!states.includes(context.status))context.status="all";
   const status=select(context.status,[{value:"all",label:"Tous les statuts"},...states.map(value=>({value,label:statusLabel(value)}))]);status.setAttribute("aria-label","Filtrer par statut");
   const scope=select(context.scope,[{value:"all",label:"Périmètre visible"},{value:"mine",label:"Affecté à moi"},{value:"unassigned",label:"Non affecté"}]);scope.setAttribute("aria-label","Périmètre des éléments");
   const sort=select(context.sort,[{value:"due",label:"Échéances"},{value:"recent",label:"Plus récents"},{value:"title",label:"Titre A–Z"}]);sort.setAttribute("aria-label","Trier les éléments");
@@ -132,12 +133,16 @@ export function recordList(domain,items,reload,{writable=canEditRecord(domain)}=
   search.addEventListener("input",()=>{context.query=search.value;context.limit=30;draw();});
   const heading=h("div",{class:"focus-list-controls"},search,filters);
   if(writable)heading.append(button(domain==="tasks"?"Nouvelle tâche":"Nouveau",{kind:"primary",iconName:"add",onClick:()=>editRecord(domain,null,reload)}));
-  root.append(heading,summary,results,more);
+  const views=h("div",{class:"studio-list-views",role:"group","aria-label":"Vue de la liste"});
+  for(const [value,label] of [["all","Tout"],["active","À traiter"],["overdue","En retard"],["completed","Terminés"]])views.append(button(label,{kind:"ghost",small:true,pressed:context.view===value,onClick:()=>{context.view=value;context.limit=30;draw();},className:`studio-view-${value}`}));
+  const reset=button("Réinitialiser",{small:true,kind:"ghost",className:"studio-list-reset",onClick:()=>{Object.assign(context,{query:"",status:"all",scope:"all",view:"all",sort:"due",limit:30});search.value="";status.value="all";scope.value="all";sort.value="due";draw();}});
+  root.append(heading,views,summary,results,more);
   function draw(){
     const term=normalize(context.query.trim());
-    const visible=items.filter(item=>(context.status==="all"||valueOf(item,"status")===context.status)&&(context.scope==="all"||(context.scope==="mine"?isMine(item,state.user?.id):!assigneeOf(item)))&&normalize(`${titleOf(item)} ${valueOf(item,"description","detail")} ${statusLabel(valueOf(item,"status"))}`).includes(term));
+    const visible=items.filter(item=>(context.status==="all"||valueOf(item,"status")===context.status)&&(context.view==="all"||(context.view==="completed"?isFinished(item):!isFinished(item)&&(context.view!=="overdue"||dueBucket(item)==="overdue")))&&(context.scope==="all"||(context.scope==="mine"?isMine(item,state.user?.id):!assigneeOf(item)))&&normalize(`${titleOf(item)} ${valueOf(item,"description","detail")} ${statusLabel(valueOf(item,"status"))}`).includes(term));
     visible.sort((a,b)=>context.sort==="title"?titleOf(a).localeCompare(titleOf(b),"fr"):context.sort==="recent"?new Date(valueOf(b,"updatedAt","updated_at","createdAt")||0)-new Date(valueOf(a,"updatedAt","updated_at","createdAt")||0):String(dueOf(a)||"9999").localeCompare(String(dueOf(b)||"9999")));
-    summary.textContent=`${visible.length} résultat${visible.length>1?"s":""} · ${context.scope==="mine"?"affectés à vous":context.scope==="unassigned"?"non affectés":"votre périmètre autorisé"}`;
+    summary.replaceChildren(h("span",{text:`${visible.length} résultat${visible.length>1?"s":""} · ${context.scope==="mine"?"affectés à vous":context.scope==="unassigned"?"non affectés":"votre périmètre autorisé"}`}),term||context.status!=="all"||context.scope!=="all"||context.view!=="all"?reset:null);
+    for(const [index,value] of ["all","active","overdue","completed"].entries())views.children[index].setAttribute("aria-pressed",String(context.view===value));
     results.replaceChildren(...(visible.length?visible.slice(0,context.limit).map(item=>recordRow(domain,item,{onRefresh:reload})): [emptyState("Aucun élément à afficher",term||context.status!=="all"?"Modifiez vos filtres ou votre recherche.":"Les éléments accessibles apparaîtront ici.",sectionForDomain(domain))]));
     more.hidden=visible.length<=context.limit;
   }
@@ -153,16 +158,18 @@ export async function renderRecord(domain,id) {
   const redraw=async()=>{const next=await renderRecord(domain,id);if(root.isConnected)root.replaceWith(next);};
   const actions=[button("Retour à la liste",{iconName:"ArrowLeft",onClick:back})];
   if(canEditRecord(domain))actions.push(button("Modifier",{iconName:"edit",onClick:()=>editRecord(domain,record,redraw)}));
+  if(["missions","contracts"].includes(domain)&&canEditRecord(domain)&&state.user?.permissions?.includes("sendMessages"))actions.push(button("Proposer dans une conversation",{iconName:"messages",kind:"primary",onClick:async()=>{const {openRecordProposal}=await import("./message-proposals.js");openRecordProposal(domain,record,redraw);}}));
   root.append(pageHeader({eyebrow:domainLabels[domain],title:titleOf(record),subtitle:statusLabel(valueOf(record,"status")),actions}));
   const metadata=h("dl",{class:"focus-properties"});
-  const property=(label,value)=>{if(value!==""&&value!==null&&value!==undefined)metadata.append(h("div",{},h("dt",{text:label}),h("dd",{text:value})));};
+  const property=(label,value)=>{if(value!==""&&value!==null&&value!==undefined)metadata.append(h("div",{},h("dt",{text:label}),value instanceof Node?h("dd",{},value):h("dd",{text:value})));};
   property("Échéance",dueOf(record)?dateLabel(dueOf(record)):"Sans échéance");
   if(domain==="missions")property("Rémunération",formatMoney(valueOf(record,"remuneration"),valueOf(record,"currency")||"","Non renseignée"));
   if(domain==="contracts"){property("Partie contractante",valueOf(record,"client"));property("Montant",formatMoney(valueOf(record,"amount")||valueOf(record,"amountValue"),valueOf(record,"currency")||"EUR"));property("Devise",valueOf(record,"currency"));}
   property("Responsable",memberName(list("team").find(m=>(m.id||m.memberId)===assigneeOf(record)))==="Membre"?"Non renseigné":memberName(list("team").find(m=>(m.id||m.memberId)===assigneeOf(record))));
-  const project=list("projects").find(p=>p.id===parentOf(record));if(project)property("Projet",titleOf(project));
+  const project=list("projects").find(p=>p.id===parentOf(record));if(project&&canAccessSection("projects",state.user))property("Projet",button(titleOf(project),{small:true,kind:"ghost",iconName:"folder",onClick:()=>openRecord("projects",project.id)}));
   const release=valueOf(record,"revision","revisionNumber","versionName","fileVersion");property(domain==="deliverables"?"Version du livrable":"Version de l’enregistrement",release||record.version||"Non renseignée");
-  root.append(metadata,h("section",{class:"focus-brief"},h("h2",{text:domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description"}),h("p",{text:valueOf(record,...(domain==="missions"?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"Aucune description renseignée."})));
+  property("Dernière mise à jour",valueOf(record,"updatedAt","updated_at")?dateLabel(valueOf(record,"updatedAt","updated_at")):null);
+  root.append(h("div",{class:"studio-record-layout"},h("div",{class:"studio-record-main"},h("section",{class:"focus-brief"},h("h2",{text:domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description"}),h("p",{text:valueOf(record,...(domain==="missions"?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"Aucune description renseignée."}))),metadata));
   if(domain==="tasks"&&!isFinished(record)&&canEditRecord(domain))root.append(button("Terminer la tâche",{kind:"primary",iconName:"check",onClick:()=>finishTask(record,redraw)}));
   if(domain==="projects"){
     for(const child of ["tasks","deliverables","documents"]){

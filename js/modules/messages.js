@@ -1,4 +1,6 @@
-import { getDraft, saveDraft } from "../focus-state.js";
+import { getDraft, saveDraft, viewContext } from "../focus-state.js";
+import { canAccessSection } from "../config.js";
+import { openRecord } from "../focus-records.js";
 import { state, subscribe, setRoute, setAppearance } from "../store.js";
 import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile, fetchFileBlob } from "../api.js";
 import { h, card, button, icon, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
@@ -21,6 +23,13 @@ function conversationTime(value) {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(date);
 }
 const teamMember = id => (state.workspace?.team || []).find(member => memberId(member) === id);
+function messageReference(context){
+  const definition={project:["projects","Projet"],mission:["missions","Mission"],task:["tasks","Tâche"],validation:["validations","Validation"],deliverable:["deliverables","Livrable"],contract:["contracts","Contrat"],document:["documents","Document"],resource:["resources","Ressource"],client:["clients","Client"],event:["events","Rendez-vous"]}[context.entityKind];
+  const label=`${definition?.[1]||"Élément"} · ${context.title||"Workspace"}`;
+  const id=context.entityID||context.entityId;
+  if(definition&&id&&canAccessSection(definition[0]==="events"?"planning":definition[0],state.user))return h("button",{type:"button",class:"sq-message-reference studio-message-reference",onClick:()=>openRecord(definition[0],id),text:label});
+  return h("div",{class:"sq-message-reference",text:label});
+}
 const volatileDrafts = new Set();
 // Draft content is held exclusively by the bounded, per-session draft store.
 const sending = new Set(), reading = new Set();
@@ -223,6 +232,8 @@ function newConversation(reload) {
 export async function renderMessages() {
   const currentOwner = state.user?.id || "member";
   if (owner !== currentOwner) { resetMessages(); owner = currentOwner; }
+  const context=viewContext("messages",{query:"",filter:"all"});
+  listQuery=context.query;listMode=["all","unread","pinned","archived"].includes(context.filter)?context.filter:"all";
   unsubscribeView?.(); const version = ++generation;
   selectedId=state.route.item||null;
   const root = h("div", { class: "sq-messages" }), left = h("div", { class: "sq-inbox-body" }), right = h("div", { class: "sq-thread-content" });
@@ -250,9 +261,9 @@ export async function renderMessages() {
     ["all", "Toutes"], ["unread", "Non lues"], ["pinned", "Épinglées"], ["archived", "Archivées"]
   ].map(([mode, label]) => button(label, { small: true, pressed: listMode === mode, onClick: () => setFilter(mode) }));
   left.append(h("div", { class: "sq-conversation-search" }, h("div", { class: "sq-inbox-search" }, icon("search", 17), search), h("div", { class: "sq-conversation-filters" }, ...filters)), pinnedRail, resultsLabel, resultCount, results);
-  search.addEventListener("input", () => { listQuery = search.value; drawList(); });
+  search.addEventListener("input", () => { context.query=listQuery=search.value; drawList(); });
   function setFilter(value) {
-    listMode = value; filters.forEach((control, index) => control.setAttribute("aria-pressed", String(["all", "unread", "pinned", "archived"][index] === value))); drawList();
+    context.filter=listMode = value; filters.forEach((control, index) => control.setAttribute("aria-pressed", String(["all", "unread", "pinned", "archived"][index] === value))); drawList();
   }
   function drawList() {
     if (!alive()) return;
@@ -455,9 +466,9 @@ export async function renderMessages() {
           h("div", { class: "sq-bubble-surface" },
           profile?.forwardedFromMessageID ? h("small", { class: "muted", text: "Message transféré" }) : null,
           reply ? h("blockquote", { class: "sq-message-reference", text: `En réponse à : ${messageBody(reply).slice(0, 140)}` }) : null,
-          profile?.isPinned ? h("small", { class: "muted", text: "📌 Message épinglé" }) : null,
+          profile?.isPinned ? h("small", { class: "muted" },icon("pin",12),h("span",{text:" Message épinglé"})) : null,
           message.proposal ? proposalCard(conversation, message, reload) : body && !generatedCaption ? h("p", { text: body }) : null,
-          message.linkedContext ? h("div", { class: "sq-message-reference", text: `${message.linkedContext.entityKind || "Élément"} · ${message.linkedContext.title || "Workspace"}` }) : null,
+          message.linkedContext ? messageReference(message.linkedContext) : null,
           attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, message === filtered.at(-1) ? null : mediaObserver, signal))) : null),
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
           actions,

@@ -12,6 +12,7 @@
 @import "../css/messaging.css";
 @import "../css/studio.css";
 @import "../css/brand.css";
+@import "../css/workspace.css";
 
 @source "../index.html";
 @source "../js/**/*.js";

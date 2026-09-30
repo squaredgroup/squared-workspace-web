@@ -1,5 +1,7 @@
 import { state, setRoute } from "../store.js";
-import { listSpecialized, getSpecialized, saveSpecialized, loadWorkspace, createConversation } from "../api.js";
+import { listSpecialized, getSpecialized, saveSpecialized, loadWorkspace, createConversation, sendConversationMessage, uploadFile, downloadFile } from "../api.js";
+import { openRecord } from "../focus-records.js";
+import { canAccessSection } from "../config.js";
 import { viewContext, getDraft, saveDraft } from "../focus-state.js";
 import { h, pageHeader, button, icon, iconButton, modal, field, input, textarea, select, validateControls, emptyState, toast, errorMessage, profileAvatar, formatDate, confirmAction } from "../ui.js";
 
@@ -66,19 +68,93 @@ function ticketDetail(ticket,subpage,refresh){
   const timeline=h("section",{class:"sq-ticket-timeline"},h("h3",{text:"Suivi du ticket"}),...events);
   const deadlines=[["Réponse attendue",data.responseDueAt],["Résolution attendue",data.resolutionDueAt]].filter(([,date])=>date).map(([title,date])=>h("p",{class:"sq-ticket-deadline",text:`${title} · ${formatDate(date)}`}));
   const body=h("div",{class:"sq-ticket-detail-body"},statusBadge(ticket),h("h2",{text:ticket.title||data.title}),identity,description,properties,timeline,...deadlines);
+  const project=(state.workspace?.projects||[]).find(item=>item.id===data.projectID);
+  if(project&&canAccessSection("projects",state.user))body.append(h("div",{class:"studio-ticket-links"},button(project.title||"Projet lié",{small:true,kind:"ghost",iconName:"folder",onClick:()=>openRecord("projects",project.id)})));
   const discussion=ticketDiscussion(ticket);
   const edit=manager()?button("Gérer le ticket",{kind:"primary",iconName:"edit",onClick:async()=>{try{const fresh=await getSpecialized("tickets",encodeURIComponent(ticket.id));ticketForm(fresh,refresh);}catch(error){toast(errorMessage(error),"error");}}}):null;
-  return h("aside",{class:"sq-ticket-detail","aria-label":"Détail du ticket"},head,body,edit||discussion?h("div",{class:"sq-ticket-detail-actions"},edit,discussion):null);
+  return h("aside",{class:"sq-ticket-detail","aria-label":"Détail du ticket"},head,body,ticketThread(ticket),edit||discussion?h("div",{class:"sq-ticket-detail-actions"},edit,discussion):null);
+}
+function ticketCounterpart(ticket){
+  const data=ticket.data||{},owner=state.user?.id,requester=person(data.requesterID),assignee=person(data.assigneeID);
+  if(manager()&&requester&&(requester.id||requester.memberId)!==owner)return requester;
+  if(assignee&&(assignee.id||assignee.memberId)!==owner)return assignee;
+  return(state.workspace?.team||[]).find(member=>(member.id||member.memberId)!==owner&&(member.permissions?.includes("manageSupport")||["OWNER","ADMIN"].includes(member.role)));
+}
+function ticketConversation(targetID){
+  return(state.workspace?.conversations||[]).find(item=>{const ids=item.participantIDs||item.participantIds||[];return ids.length===2&&ids.includes(state.user?.id)&&ids.includes(targetID);});
+}
+function ticketThread(ticket){
+  if(!state.user?.permissions?.includes("sendMessages"))return null;
+  const target=ticketCounterpart(ticket),targetID=target?.id||target?.memberId,owner=state.user?.id;
+  if(!targetID||targetID===owner)return null;
+  const reference=ticket.data?.reference||ticket.id,prefix=`[Ticket ${reference}]\n`,draftKey=`support:${ticket.id}`;
+  const messages=h("div",{class:"studio-ticket-messages"}),error=h("p",{class:"sq-inline-error",role:"alert",hidden:true});
+  const box=textarea(getDraft(draftKey).slice(0,4000-prefix.length),{rows:3,maxLength:4000-prefix.length,placeholder:manager()?"Écrire une réponse au demandeur…":"Écrire au support…"});
+  box.setAttribute("aria-label","Message concernant ce ticket");let busy=false;
+  const ensureConversation=async()=>{
+    let conversation=ticketConversation(targetID);
+    if(!conversation){
+      conversation=await createConversation({id:crypto.randomUUID(),name:name(target),kind:"direct",participantIDs:[owner,targetID],participants:[],messages:[],unread:0,createdAt:new Date().toISOString()});
+      if(state.user?.id===owner&&state.workspace&&!ticketConversation(targetID))state.workspace.conversations=[...(state.workspace.conversations||[]),conversation];
+    }
+    return conversation;
+  };
+  const send=h("button",{class:"button primary",type:"button",disabled:!box.value.trim()||!state.online,onClick:async()=>{
+    if(busy||state.user?.id!==owner||!box.value.trim())return;
+    if(!state.online){error.hidden=false;error.textContent="Reconnectez-vous pour envoyer. Votre brouillon est conservé.";return;}
+    busy=true;error.hidden=true;send.disabled=true;box.readOnly=true;attachment.disabled=true;
+    try{
+      const conversation=await ensureConversation();
+      if(state.user?.id!==owner)return;
+      await sendConversationMessage(conversation.id,prefix+box.value.trim());
+      if(state.user?.id!==owner)return;
+      saveDraft(draftKey,"");box.value="";toast("Réponse envoyée");
+      try{await loadWorkspace();draw();}catch{error.hidden=false;error.textContent="Réponse envoyée. Actualisez le ticket pour retrouver l’échange.";}
+    }catch(cause){if(state.user?.id===owner){error.hidden=false;error.textContent=errorMessage(cause);}}
+    finally{busy=false;box.readOnly=false;attachment.disabled=false;send.disabled=!box.value.trim()||!state.online;}
+  }},icon("send",14),h("span",{text:manager()?"Envoyer la réponse":"Envoyer au support"}));
+  const update=()=>{saveDraft(draftKey,box.value);send.disabled=busy||!box.value.trim()||!state.online;};
+  box.addEventListener("input",update);
+  const picker=h("input",{type:"file",class:"sr-only","aria-label":"Fichier pour ce ticket"});
+  const attachment=button("Joindre un fichier",{kind:"ghost",small:true,iconName:"upload",onClick:()=>picker.click()});
+  let prepared=null;
+  const retry=button("Réessayer l’envoi du fichier",{kind:"ghost",small:true,onClick:()=>sendFile()});retry.hidden=true;
+  const sendFile=async(file=null)=>{
+    if(busy||state.user?.id!==owner||!state.online)return;
+    if(file&&file.size>25*1024*1024){error.hidden=false;error.textContent="Choisissez un fichier de 25 Mo maximum.";return;}
+    busy=true;send.disabled=true;attachment.disabled=true;retry.disabled=true;error.hidden=true;
+    try{
+      const conversation=await ensureConversation();if(state.user?.id!==owner)return;
+      if(file)prepared=await uploadFile(file,"messageAttachment",conversation.id);
+      if(state.user?.id!==owner||!prepared)return;
+      await sendConversationMessage(conversation.id,prefix+`Fichier : ${prepared.fileName||file?.name||"Pièce jointe"}`,null,{attachmentName:prepared.fileName||file?.name,attachmentStorageKey:prepared.storageKey||prepared.id,attachments:[prepared]});
+      if(state.user?.id!==owner)return;
+      prepared=null;retry.hidden=true;toast("Fichier envoyé");
+      try{await loadWorkspace();draw();}catch{error.hidden=false;error.textContent="Fichier envoyé. Actualisez le ticket pour retrouver l’échange.";}
+    }catch(cause){if(state.user?.id===owner){error.hidden=false;error.textContent=errorMessage(cause);retry.hidden=!prepared;}}
+    finally{busy=false;send.disabled=!box.value.trim()||!state.online;attachment.disabled=false;retry.disabled=false;}
+  };
+  picker.addEventListener("change",()=>{const file=picker.files?.[0];picker.value="";if(file)void sendFile(file);});
+  const form=h("form",{},box,error,h("div",{class:"studio-ticket-compose-actions"},attachment,send),retry,picker);form.addEventListener("submit",event=>{event.preventDefault();send.click();});
+  const root=h("section",{class:"studio-ticket-thread","aria-label":"Échanges du ticket"},h("h3",{text:"Échanges"}),h("p",{text:`Avec ${name(target)} · les réponses sont également disponibles dans Messages.`}),messages,form);
+  function draw(){
+    const related=(state.workspace?.conversations||[]).filter(item=>(item.participantIDs||item.participantIds||[]).includes(owner)).flatMap(item=>item.messages||[]).filter(item=>!item.deletedAt&&(String(item.body||item.text||"").startsWith(prefix)||String(item.body||item.text||"").startsWith(`À propos du ticket ${reference} :`))).sort((a,b)=>new Date(a.createdAtISO||a.createdAt||a.created_at||0)-new Date(b.createdAtISO||b.createdAt||b.created_at||0));
+    messages.replaceChildren(...related.slice(-30).map(item=>{
+      const author=person(item.authorID||item.authorId||item.senderID||item.senderId),text=String(item.body||item.text||"");
+      return h("article",{class:"studio-ticket-message"},h("header",{},profileAvatar(author||{name:item.author||"Membre"},{size:24,ariaHidden:true}),h("strong",{text:author?name(author):item.author||"Membre"}),h("time",{text:formatDate(item.createdAtISO||item.createdAt||item.created_at)})),h("p",{text:text.startsWith(prefix)?text.slice(prefix.length):text}),...(item.attachments||[]).map(file=>button(file.fileName||"Pièce jointe",{small:true,kind:"ghost",iconName:"download",onClick:()=>downloadFile(file.storageKey||file.id,file.fileName)})));
+    }));
+  }
+  draw();return root;
 }
 function ticketDiscussion(ticket){
   if(!state.user?.permissions?.includes("sendMessages"))return null;
-  const target=manager()?person(ticket.data?.requesterID):(person(ticket.data?.assigneeID)||(state.workspace?.team||[]).find(member=>member.id!==state.user?.id&&(member.permissions?.includes("manageSupport")||["OWNER","ADMIN"].includes(member.role))));
+  const target=ticketCounterpart(ticket);
   const targetId=target?.id||target?.memberId;
   if(!targetId||targetId===state.user?.id)return null;
   return button(manager()?"Échanger":"Contacter le support",{iconName:"messages",onClick:async()=>{
     try{
       const owner=state.user?.id;
-      let conversation=(state.workspace?.conversations||[]).find(value=>(value.kind==="direct"||(value.participantIDs||[]).length===2)&&(value.participantIDs||[]).includes(owner)&&(value.participantIDs||[]).includes(targetId));
+      let conversation=ticketConversation(targetId);
       if(!conversation){conversation=await createConversation({id:crypto.randomUUID(),name:name(target),kind:"direct",participantIDs:[owner,targetId],participants:[],messages:[],unread:0,createdAt:new Date().toISOString()});await loadWorkspace();}
       if(state.user?.id!==owner)return;
       const key=conversation.id;
@@ -99,8 +175,12 @@ function ticketForm(ticket,refresh){
   const status=select(ticket?.status||"new",Object.entries(states).map(([value,label])=>({value,label})));
   const assignee=select(old.assigneeID||"",[{value:"",label:"Non attribué"},...(state.workspace?.team||[]).map(member=>({value:member.id||member.memberId,label:name(member)}))]);
   if(old.assigneeID&&!person(old.assigneeID))assignee.append(h("option",{value:old.assigneeID,selected:true,text:"Responsable actuel — conservé"}));
+  const projects=canAccessSection("projects",state.user)?state.workspace?.projects||[]:[];
+  const project=select(old.projectID||"",[{value:"",label:"Aucun projet"},...projects.map(item=>({value:item.id,label:item.title||item.data?.name||"Projet"}))]);
+  if(old.projectID&&!projects.some(item=>item.id===old.projectID))project.append(h("option",{value:old.projectID,selected:true,text:"Projet actuel — conservé"}));
   const error=h("p",{class:"sq-inline-error",role:"alert",hidden:true});
   const content=h("form",{class:"form sq-ticket-form"},h("p",{class:"sq-form-intro",text:editing?"Mettez à jour la prise en charge et le suivi de cette demande.":"Décrivez votre besoin. Le support pourra ensuite qualifier et attribuer votre ticket."}),field("Objet de la demande",title),h("div",{class:"form-row"},field("Catégorie",category),field("Priorité",severity)),field("Description",description,"Ajoutez le contexte et les étapes qui permettent de comprendre la demande."),h("div",{class:"form-row"},field("Qui est concerné ?",impact),field("Urgence",urgency)),editing?h("div",{class:"form-row"},field("Statut",status),field("Responsable",assignee)):null,error);
+  if(projects.length||old.projectID)content.insertBefore(field("Projet concerné",project,"Facultatif · pour retrouver le contexte de la demande."),error);
   let busy=false,dirty=false,dialog;content.addEventListener("input",()=>dirty=true);content.addEventListener("change",()=>dirty=true);
   const save=async close=>{
     if(busy||state.user?.id!==owner||!validateControls(title,description))return;
@@ -110,6 +190,7 @@ function ticketForm(ticket,refresh){
       const now=new Date().toISOString(),id=ticket?.id||crypto.randomUUID(),nextState=editing?status.value:"new";
       const metadata={...old.metadata,version:old.metadata?.version||1,createdBy:old.metadata?.createdBy||owner,createdAt:old.metadata?.createdAt||now,updatedBy:owner,updatedAt:now,tags:[...(old.metadata?.tags||[]).filter(tag=>!categories.includes(tag)),category.value,...(!editing&&state.route.subpage==="demandes-internes"?["Interne"]:[])]};
       const data={...old,id,title:title.value.trim(),description:description.value.trim(),reference:old.reference||`SUP-${id.slice(0,8).toUpperCase()}`,state:nextState,severity:severity.value,impact:impact.value,urgency:urgency.value,requesterID:old.requesterID||owner,assigneeID:editing?assignee.value||null:null,escalationLevel:old.escalationLevel||0,metadata};
+      if(projects.length||old.projectID)data.projectID=project.value||null;
       if(editing&&["resolved","closed"].includes(nextState)&&!old.resolvedAt)data.resolvedAt=now;
       if(editing&&!["resolved","closed"].includes(nextState))data.resolvedAt=null;
       const saved=await saveSpecialized("tickets",{id,...(editing?{version:ticket.version}:{}),title:data.title,status:nextState,data});

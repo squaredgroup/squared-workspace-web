@@ -2,16 +2,19 @@ import { state,setAppearance } from "../store.js";
 import { updateMe,loadSecurity,updateSecurity,changePassword,listSessions,revokeSession,loadSettings,saveSettings,recoveryCodes,createPasskeyOptions,registerPasskey } from "../api.js";
 import { createPasskey } from "../webauthn.js";
 import { profilePhotoControl } from "../profile-photo.js";
-import { h,pageHeader,card,button,field,input,select,validateControls,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor,profileAvatar } from "../ui.js";
+import { h,pageHeader,card,button,field,input,select,validateControls,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor,profileAvatar,roleLabel } from "../ui.js";
 
-function settingRow(title,copy,control){return h("div",{class:"setting-row"},h("div",{},h("strong",{text:title}),h("span",{text:copy})),control)}
+function settingRow(title,copy,control){control.setAttribute("aria-label",title);return h("label",{class:"setting-row"},h("div",{},h("strong",{text:title}),h("span",{text:copy})),control)}
 export async function renderProfile(){
   const u=state.user||{},root=h("div",{class:"sq-profile-page"});
   root.append(pageHeader({eyebrow:"Compte",title:"Profil",subtitle:"Identité, coordonnées et sécurité de votre compte Squared Workspace."}));
+  const overview=h("div",{class:"studio-profile-overview"});
+  const refreshIdentity=()=>overview.replaceChildren(profileAvatar(state.user,{size:64,ariaHidden:true}),h("div",{},h("strong",{text:`${state.user?.firstName||state.user?.first_name||""} ${state.user?.lastName||state.user?.last_name||""}`.trim()||"Mon compte"}),h("p",{text:[state.user?.email,state.user?.company].filter(Boolean).join(" · ")}),badge(roleLabel(state.user?.role))));
+  refreshIdentity();root.append(overview);
   const email=input(u.email||"",{type:"email",required:true,autocomplete:"email"}),first=input(u.firstName||u.first_name||"",{required:true,autocomplete:"given-name"}),last=input(u.lastName||u.last_name||"",{required:true,autocomplete:"family-name"}),title=input(u.title||"",{autocomplete:"organization-title"}),company=input(u.company||"",{autocomplete:"organization"}),phone=input(u.phone||"",{type:"tel",autocomplete:"tel"});
-  const identity=h("div",{class:"form"},profilePhotoControl(u),h("div",{class:"form-row"},field("Prénom",first),field("Nom",last)),field("Adresse e-mail",email),h("div",{class:"form-row"},field("Fonction",title),field("Entreprise",company)),field("Téléphone",phone),button("Enregistrer le profil",{kind:"primary",iconName:"check",onClick:async()=>{try{if(!validateControls(email,first,last))return;await updateMe({email:email.value.trim(),firstName:first.value.trim(),lastName:last.value.trim(),title:title.value.trim(),company:company.value.trim(),phone:phone.value.trim(),phoneCountryCode:u.phoneCountryCode||u.phone_country_code||"FR"});toast("Profil mis à jour")}catch(error){toast(errorMessage(error),"error")}}}));
+  const identity=h("div",{class:"form"},profilePhotoControl(u,{onChange:refreshIdentity}),h("div",{class:"form-row"},field("Prénom",first),field("Nom",last)),field("Adresse e-mail",email),h("div",{class:"form-row"},field("Fonction",title),field("Entreprise",company)),field("Téléphone",phone),button("Enregistrer le profil",{kind:"primary",iconName:"check",onClick:async()=>{try{if(!validateControls(email,first,last))return;await updateMe({email:email.value.trim(),firstName:first.value.trim(),lastName:last.value.trim(),title:title.value.trim(),company:company.value.trim(),phone:phone.value.trim(),phoneCountryCode:u.phoneCountryCode||u.phone_country_code||"FR"});refreshIdentity();toast("Profil mis à jour")}catch(error){toast(errorMessage(error),"error")}}}));
   root.append(h("div",{class:"grid two"},
-    card("Identité",`${u.role||"Membre"} · informations visibles selon votre périmètre.`,identity,{iconName:"user"}),
+    card("Identité",`${roleLabel(u.role)} · informations visibles selon votre périmètre.`,identity,{iconName:"user"}),
     await securityCard()
   ));
   return root;
@@ -56,6 +59,8 @@ export async function renderSettings(){
     const width=select(settings.contentWidth||"balanced",[{value:"focused",label:"Concentrée"},{value:"balanced",label:"Équilibrée"},{value:"wide",label:"Large"}]);
     const language=input(settings.language||"fr-FR"),timezone=input(settings.timezone||"Europe/Paris");
     const compact=h("input",{type:"checkbox",checked:Boolean(settings.compactSidebar)}),motion=h("input",{type:"checkbox",checked:Boolean(settings.reducedMotion)});
+    const preview=()=>setAppearance({mode:theme.value,density:density.value,contentWidth:width.value,compactSidebar:compact.checked,reducedMotion:motion.checked});
+    [theme,density,width,compact,motion].forEach(control=>control.addEventListener("change",preview));
     const experience=h("div",{class:"form"},
       h("div",{class:"form-row"},field("Thème",theme),field("Densité",density)),
       h("div",{class:"form-row"},field("Largeur du contenu",width),field("Langue",language)),
@@ -65,7 +70,7 @@ export async function renderSettings(){
         try{
           settings={...settings,appearanceMode:theme.value,dashboardDensity:density.value,contentWidth:width.value,language:language.value,timezone:timezone.value,compactSidebar:compact.checked,reducedMotion:motion.checked};
           await saveSettings(settings);
-          setAppearance({mode:theme.value,density:density.value,contentWidth:width.value,compactSidebar:compact.checked,reducedMotion:motion.checked});
+          preview();
           toast("Paramètres enregistrés");
         }catch(error){toast(errorMessage(error),"error",6000)}
       }})

@@ -3,6 +3,8 @@ import { state } from "./store.js";
 const contexts = new Map();
 const draftMemory = new Map();
 const PREFIX = "sq-focus-draft:";
+const VIEW_PREFIX = "sq-view:";
+const validPreference=value=>typeof value==="string"||typeof value==="boolean"||typeof value==="number"&&Number.isFinite(value)&&value>=0&&value<=100000;
 const MAX_AGE = 24 * 60 * 60 * 1000;
 const MAX_DRAFTS = 50;
 let identity = "";
@@ -16,8 +18,18 @@ function ensureScope() {
   identity=next;return next;
 }
 export function viewContext(key,initial={}) {
-  const scoped=ensureScope()+":"+key;
-  if(!contexts.has(scoped))contexts.set(scoped,{...initial});
+  const scoped=ensureScope()+":"+(state.sessionId||"")+":"+key;
+  if(!contexts.has(scoped)){
+    const storageKey=VIEW_PREFIX+encodeURIComponent(scoped);let saved={};
+    try{const value=JSON.parse(sessionStorage.getItem(storageKey)||"null");if(value&&Date.now()-value.time<MAX_AGE&&value.time<=Date.now()&&value.values&&typeof value.values==="object")saved=value.values;}catch{}
+    const values={...initial};
+    for(const field of Object.keys(initial))if(Object.hasOwn(saved,field)&&typeof saved[field]===typeof initial[field]&&validPreference(saved[field]))values[field]=typeof saved[field]==="string"?saved[field].slice(0,1000):saved[field];
+    const persist=target=>{
+      const safe=Object.fromEntries(Object.entries(target).filter(([,value])=>validPreference(value)).map(([field,value])=>[field,typeof value==="string"?value.slice(0,1000):value]));
+      try{sessionStorage.setItem(storageKey,JSON.stringify({time:Date.now(),values:safe}));const keys=Object.keys(sessionStorage).filter(value=>value.startsWith(VIEW_PREFIX));if(keys.length>60)keys.filter(value=>value!==storageKey).slice(0,keys.length-60).forEach(value=>sessionStorage.removeItem(value));}catch{}
+    };
+    contexts.set(scoped,new Proxy(values,{set(target,field,value){target[field]=value;persist(target);return true;}}));
+  }
   return contexts.get(scoped);
 }
 const draftKey=id=>PREFIX+encodeURIComponent(JSON.stringify([scopeKey(),state.sessionId||"",id]));
@@ -58,5 +70,5 @@ export function clearDrafts() {
   draftMemory.clear();
   try{Object.keys(sessionStorage).filter(k=>k.startsWith(PREFIX)).forEach(k=>sessionStorage.removeItem(k));}catch{}
 }
-window.addEventListener("sq:session-ended",()=>{contexts.clear();clearDrafts();identity="";});
+window.addEventListener("sq:session-ended",()=>{contexts.clear();clearDrafts();identity="";try{Object.keys(sessionStorage).filter(key=>key.startsWith(VIEW_PREFIX)).forEach(key=>sessionStorage.removeItem(key));}catch{}});
 setInterval(prune,60000);

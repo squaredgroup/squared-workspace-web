@@ -28,7 +28,7 @@ function termsSummary(kind, terms) {
   return [terms.scope, terms.client ? `Parties : ${terms.organizationName || "Organisation"} et ${terms.client}` : null, `Montant : ${amount(terms)}`].filter(Boolean).join("\n");
 }
 
-export function openProposalPicker(conversation, kind, reload) {
+export function openProposalPicker(conversation, kind, reload, selectedEntity=null) {
   const definition = kinds[kind];
   if (!definition || !state.user?.permissions?.includes("sendMessages") || !state.user?.permissions?.includes(definition.permission)) {
     toast("Votre rôle ne permet pas de proposer cette fiche dans la messagerie.", "error"); return;
@@ -43,8 +43,11 @@ export function openProposalPicker(conversation, kind, reload) {
     id: item.id, title: nonempty(value(item, "title")) || "Sans titre",
     terms: previewTerms(kind, item)
   }));
+  const selectedEntityID=typeof selectedEntity==="string"?selectedEntity:selectedEntity?.id;
+  if(selectedEntityID&&typeof selectedEntity==="object"&&!entries.some(item=>item.id===selectedEntityID))entries.push({id:selectedEntityID,title:nonempty(value(selectedEntity,"title"))||"Sans titre",terms:previewTerms(kind,selectedEntity)});
   const recipient = h("select", { "aria-label": "Destinataire désigné" }, h("option", { value: "", text: "Choisir un participant" }), ...recipients.map(item => h("option", { value: item.id, text: item.name })));
   const entity = h("select", { "aria-label": kind === "mission" ? "Mission" : "Contrat" }, h("option", { value: "", text: "Choisir une fiche" }), ...entries.map(item => h("option", { value: item.id, text: item.title })));
+  if(selectedEntityID&&entries.some(item=>item.id===selectedEntityID))entity.value=selectedEntityID;
   const preview = h("div", { class: "sq-proposal-preview", role: "status" });
   const updatePreview = () => {
     const entry = entries.find(item => item.id === entity.value);
@@ -87,6 +90,14 @@ export function openProposalPicker(conversation, kind, reload) {
     } }]
   });
   return dialog;
+}
+
+export function openRecordProposal(domain,record,reload){
+  const kind=domain==="missions"?"mission":domain==="contracts"?"contract":"";
+  if(!kind||!state.user?.permissions?.includes("sendMessages")||!state.user?.permissions?.includes(kinds[kind].permission))return;
+  const conversations=(state.workspace?.conversations||[]).filter(item=>{const ids=item.participantIDs||item.participantIds||[];return ids.includes(state.user.id)&&ids.some(id=>id!==state.user.id)&&!item.isArchived;});
+  const choice=h("select",{"aria-label":"Conversation"},h("option",{value:"",text:"Choisir une conversation"}),...conversations.map(item=>h("option",{value:item.id,text:item.name||"Conversation"})));
+  modal({title:"Choisir une conversation",content:h("div",{class:"form"},h("p",{class:"page-subtitle",text:`Proposer « ${record.title||value(record,"title")||"Sans titre"} » à un participant d’une conversation existante.`}),field("Conversation",choice),conversations.length?null:emptyState("Aucune conversation disponible","Ouvrez une conversation avec le destinataire depuis Messages, puis revenez ici.","messages")),actions:conversations.length?[{label:"Continuer",kind:"primary",icon:"ArrowRight",onClick:close=>{const conversation=conversations.find(item=>item.id===choice.value);if(!conversation){toast("Choisissez une conversation.","error");return;}close();openProposalPicker(conversation,kind,reload,record);}}]:[]});
 }
 
 async function openSource(proposal) {

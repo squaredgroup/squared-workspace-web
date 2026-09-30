@@ -3,10 +3,9 @@ import { state, subscribe, setRoute, setState, setAppearance } from "./store.js"
 import { SECTIONS, canAccessSection, canAccessSubpage } from "./config.js";
 import { logout } from "./api.js";
 import { h, button, iconButton, modal, confirmAction, toast, relativeDate } from "./ui.js";
-import { storage } from "./storage.js";
+import { pinnedSections, toggleSectionPin } from "./navigation-preferences.js";
 
 let initialized = false;
-const preferences = storage("local");
 const mobile = window.matchMedia("(max-width: 880px)");
 const focusable = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 let pendingInstall = null, recent = [], userId = "", routeKey = "", scheduled = false;
@@ -15,12 +14,7 @@ const enhancedSubnavs = new WeakSet(), enhancedMailReaders = new WeakSet();
 let mailSearchFocus = null;
 
 function allowed(key) { return Boolean(state.user && SECTIONS[key] && canAccessSection(key, state.user)); }
-function pinsKey() { return `sq-mobile-pins:${state.user?.id || "member"}`; }
-function pinnedPages() {
-  let saved = [];
-  try { saved = JSON.parse(preferences.get(pinsKey()) || "[]"); } catch { /* Invalid preference: recover without blocking navigation. */ }
-  return Array.isArray(saved) ? [...new Set(saved)].filter(key => typeof key === "string" && allowed(key)).slice(0, 6) : [];
-}
+const pinnedPages=pinnedSections;
 function go(key) {
   if (!allowed(key)) return;
   const first = SECTIONS[key].subpages?.find(page => canAccessSubpage(page, state.user));
@@ -81,13 +75,10 @@ export function openTools() {
     action("Installer Workspace", "download", openInstall)
   );
   if (allowed(state.route.section)) actions.append(action(pins.includes(state.route.section) ? "Retirer des favoris" : "Épingler cette rubrique", "star", () => {
-    const key = state.route.section;
-    if (!pins.includes(key) && pins.length >= 6) { toast("Vous pouvez épingler jusqu’à six rubriques. Retirez d’abord un favori.", "error"); return; }
-    const next = pins.includes(key) ? pins.filter(value => value !== key) : [...pins, key];
-    const stored = preferences.set(pinsKey(), JSON.stringify(next));
-    if (stored === false) toast("Le navigateur n’a pas pu enregistrer les favoris.", "error");
-    else toast(next.includes(key) ? "Rubrique ajoutée aux favoris" : "Rubrique retirée des favoris");
-    document.querySelectorAll(".sq-mobile-pins").forEach(node => node.remove()); schedule();
+    const result=toggleSectionPin(state.route.section);
+    if(result.full){toast("Vous pouvez épingler jusqu’à six rubriques. Retirez d’abord un favori.","error");return;}
+    if(result.ok)toast(result.pinned?"Rubrique ajoutée aux favoris":"Rubrique retirée des favoris");
+    schedule();
   }));
   content.append(actions);
   function section(title, keys) {
@@ -123,13 +114,6 @@ function syncDrawer(shell) {
     if (open && !sidebar.contains(document.activeElement) && !document.querySelector("#portal-root > .overlay")) sidebar.querySelector(".sq-drawer-close")?.focus({ preventScroll: true });
     if (!open && drawerWasOpen && !document.querySelector("#portal-root > .overlay")) {
       (drawerFocus?.isConnected && !drawerFocus.closest("[inert]") ? drawerFocus : trigger)?.focus({ preventScroll: true });
-    }
-    if (!sidebar.querySelector(".sq-mobile-pins")) {
-      const pins = pinnedPages();
-      if (pins.length) {
-        const group = h("div", { class: "sq-mobile-pins" }, h("strong", { text: "Mes favoris" }), ...pins.map(key => button(SECTIONS[key].title, { iconName: key, onClick: () => go(key) })));
-        sidebar.querySelector(".sidebar-search")?.after(group);
-      }
     }
   } else {
     sidebar.removeAttribute("role"); sidebar.removeAttribute("aria-modal"); sidebar.removeAttribute("aria-label");
