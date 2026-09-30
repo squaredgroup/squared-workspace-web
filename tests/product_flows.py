@@ -68,12 +68,15 @@ DRAFTS = {}
 
 def sample_pdf():
     drawing = b"BT /F1 22 Tf 64 700 Td (Apercu PDF Workspace) Tj ET"
+    second = b"BT /F1 22 Tf 64 700 Td (Page deux Workspace) Tj ET"
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
         b"<< /Length " + str(len(drawing)).encode() + b" >>\nstream\n" + drawing + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 7 0 R >>",
+        b"<< /Length " + str(len(second)).encode() + b" >>\nstream\n" + second + b"\nendstream",
     ]
     chunks = [b"%PDF-1.4\n"]
     offsets = [0]
@@ -81,8 +84,8 @@ def sample_pdf():
         offsets.append(sum(map(len, chunks)))
         chunks.append(str(number).encode() + b" 0 obj\n" + obj + b"\nendobj\n")
     xref = sum(map(len, chunks))
-    chunks.append(b"xref\n0 6\n0000000000 65535 f \n" + b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:]))
-    chunks.append(b"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + str(xref).encode() + b"\n%%EOF\n")
+    chunks.append(b"xref\n0 8\n0000000000 65535 f \n" + b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:]))
+    chunks.append(b"trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n" + str(xref).encode() + b"\n%%EOF\n")
     return b"".join(chunks)
 
 
@@ -274,11 +277,15 @@ with sync_playwright() as playwright:
     canvas = reader.get_by_role("img", name="Lecteur PDF : dossier.pdf")
     expect(canvas).to_have_attribute("data-rendered", "true")
     assert canvas.evaluate("canvas => { const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; for (let i=0;i<pixels.length;i+=16) if (pixels[i]<180 && pixels[i+1]<180 && pixels[i+2]<180) return true; return false; }")
-    expect(reader.get_by_text("1 / 1")).to_be_visible()
+    expect(reader.get_by_text("1 / 2")).to_be_visible()
     expect(reader.get_by_role("button", name="Télécharger")).to_be_visible()
     if visual_dir:
         page.wait_for_timeout(350)
         page.screenshot(path=str(visual_dir / "pdf-reader-desktop.png"))
+    reader.get_by_role("button", name="Page suivante").click()
+    expect(reader.get_by_text("2 / 2")).to_be_visible()
+    expect(canvas).to_have_attribute("data-rendered", "true")
+    assert canvas.evaluate("canvas => { const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; for (let i=0;i<pixels.length;i+=16) if (pixels[i]<180 && pixels[i+1]<180 && pixels[i+2]<180) return true; return false; }")
     reader.get_by_role("button", name="Fermer").click()
     composer = page.get_by_placeholder("Écrire un message…")
     composer.fill("Validation fonctionnelle terminée.")
@@ -392,14 +399,17 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(400)
         page.screenshot(path=str(visual_dir / "dashboard-mobile.png"), full_page=True)
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('messages')}""")
+    expect(page.get_by_role("button", name="Direction produit", exact=False)).to_be_visible()
     if visual_dir:
         page.screenshot(path=str(visual_dir / "messages-list-mobile.png"))
     page.get_by_role("button", name="Direction produit", exact=False).click()
+    expect(page.get_by_role("log", name="Messages de Direction produit")).to_be_visible()
     if visual_dir:
         page.screenshot(path=str(visual_dir / "messages-thread-mobile.png"))
     page.get_by_role("button", name="Ouvrir dossier.pdf dans le lecteur").click()
     mobile_reader = page.get_by_role("dialog", name="dossier.pdf")
     expect(mobile_reader.get_by_role("img", name="Lecteur PDF : dossier.pdf")).to_have_attribute("data-rendered", "true")
+    expect(mobile_reader.get_by_text("1 / 2")).to_be_visible()
     assert mobile_reader.bounding_box()["height"] > page.viewport_size["height"] * 0.65
     if visual_dir:
         page.wait_for_timeout(350)

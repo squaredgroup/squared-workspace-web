@@ -30,18 +30,19 @@ function releaseMedia() {
 function attachmentKind(file) {
   const name = String(file.fileName || "").toLowerCase();
   const type = String(file.mediaType || file.contentType || "").toLowerCase();
-  if (/^image\/(?:png|jpeg|gif|webp|avif)$/.test(type) || /\.(?:png|jpe?g|gif|webp|avif)$/.test(name)) return "image";
-  if (/^video\/(?:mp4|webm|ogg)$/.test(type) || /\.(?:mp4|webm|ogv)$/.test(name)) return "video";
-  if (/^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a)$/.test(type) || /\.(?:mp3|m4a|aac|ogg|wav|webm)$/.test(name)) return "audio";
+  if (/^image\/(?:png|jpeg|gif|webp|avif|heic|heif|bmp)$/.test(type) || /\.(?:png|jpe?g|gif|webp|avif|heic|heif|bmp)$/.test(name)) return "image";
+  if (/^video\/(?:mp4|webm|ogg|quicktime|x-m4v)$/.test(type) || /\.(?:mp4|webm|ogv|mov|m4v)$/.test(name)) return "video";
+  if (/^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a|flac)$/.test(type) || /\.(?:mp3|m4a|aac|ogg|wav|webm|flac)$/.test(name)) return "audio";
   if (type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
   if (type === "text/plain" || name.endsWith(".txt")) return "text";
   return "document";
 }
 const attachmentLabel = kind => ({ image: "Image", video: "Vidéo", audio: "Message vocal", pdf: "Document PDF", text: "Document texte", document: "Document" })[kind];
-function typedAttachmentBlob(blob, kind) {
+function typedAttachmentBlob(blob, kind, file) {
   const fallbackType = ({ image: "image/png", video: "video/mp4", audio: "audio/mpeg", pdf: "application/pdf", text: "text/plain" })[kind];
-  const allowedType = ({ image: /^image\/(?:png|jpeg|gif|webp|avif)$/, video: /^video\/(?:mp4|webm|ogg)$/, audio: /^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a)$/, pdf: /^application\/pdf$/, text: /^text\/plain$/ })[kind];
-  return blob.slice(0, blob.size, allowedType.test(blob.type) ? blob.type : fallbackType);
+  const allowedType = ({ image: /^image\/(?:png|jpeg|gif|webp|avif|heic|heif|bmp)$/, video: /^video\/(?:mp4|webm|ogg|quicktime|x-m4v)$/, audio: /^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a|flac)$/, pdf: /^application\/pdf$/, text: /^text\/plain$/ })[kind];
+  const type = [blob.type, file?.mediaType, file?.contentType].find(value => allowedType.test(String(value || "").toLowerCase()));
+  return blob.slice(0, blob.size, type || fallbackType);
 }
 function openAttachmentViewer(file, cachedBlob = null) {
   activeViewer?.close();
@@ -62,7 +63,7 @@ function openAttachmentViewer(file, cachedBlob = null) {
   const currentUser = state.user?.id;
   void (async () => {
     try {
-      const blob = cachedBlob || typedAttachmentBlob(await fetchFileBlob(id, { signal: controller.signal }), kind);
+      const blob = cachedBlob || typedAttachmentBlob(await fetchFileBlob(id, { signal: controller.signal }), kind, file);
       if (controller.signal.aborted || state.user?.id !== currentUser || activeViewer !== reader) return;
       if (kind === "text") {
         if (blob.size > 256 * 1024) throw new Error("Ce document texte est trop volumineux pour être affiché. Téléchargez-le pour le consulter.");
@@ -90,6 +91,7 @@ function openAttachmentViewer(file, cachedBlob = null) {
           previous.disabled = number === 1;
           next.disabled = number === resource.document.numPages;
           counter.textContent = `${number} / ${resource.document.numPages}`;
+          delete canvas.dataset.rendered;
           sheet.setAttribute("aria-busy", "true");
           try {
             await drawPDFPage(resource.document, number, canvas, Math.min(920, content.clientWidth - 32), signal);
@@ -122,7 +124,7 @@ function attachmentPreview(file, observer, signal) {
         const blob = await fetchFileBlob(id, { signal });
         if (signal.aborted) return;
         // The API serves attachments as downloads; a local blob URL lets the browser display them without exposing a token in the page URL.
-        const typedBlob = typedAttachmentBlob(blob, kind);
+        const typedBlob = typedAttachmentBlob(blob, kind, file);
         cachedBlob = typedBlob;
         if (kind === "text") {
           if (blob.size > 256 * 1024) { fallback(); return; }
@@ -385,7 +387,9 @@ export async function renderMessages() {
           } }) : null,
           mine ? button("Supprimer", { small: true, kind: "ghost", onClick: () => confirmAction({ title: "Supprimer ce message ?", message: "Le message restera marqué comme supprimé dans la conversation.", confirmLabel: "Supprimer", danger: true, onConfirm: () => mutate(() => deleteConversationMessage(conversation.id, message.id)) }) }) : null);
         const reply = profile?.replyToMessageID && messages.find(item => item.id === profile.replyToMessageID);
-        const attachments = removed ? [] : Array.isArray(message.attachments) && message.attachments.length ? message.attachments : message.attachmentName ? [{ fileName: message.attachmentName, storageKey: message.attachmentStorageKey, mediaType: "" }] : [];
+        const attachments = removed ? [] : Array.isArray(message.attachments) && message.attachments.length
+          ? message.attachments.map(file => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(file.fileName || "") && message.attachmentName ? { ...file, fileName: message.attachmentName } : file)
+          : message.attachmentName ? [{ fileName: message.attachmentName, storageKey: message.attachmentStorageKey, mediaType: "" }] : [];
         const body = messageBody(message);
         const generatedCaption = attachments.length && (body === `Pièce jointe : ${attachments[0].fileName}` || body === "Message vocal" || body === attachmentLabel(attachmentKind(attachments[0])));
         nodes.push(h("article", { class: `message-bubble ${mine ? "mine" : ""}` },
