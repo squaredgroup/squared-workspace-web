@@ -75,7 +75,7 @@ function openAttachmentViewer(file, cachedBlob = null) {
         const resource = await openPDF(blob);
         if (controller.signal.aborted || activeViewer !== reader) { void resource.destroy(); return; }
         pdfResource = resource;
-        let currentPage = 1;
+        let currentPage = 1, renderComplete = Promise.resolve();
         const previous = button("Page précédente", { small: true, onClick: () => void showPage(currentPage - 1) });
         const next = button("Page suivante", { small: true, onClick: () => void showPage(currentPage + 1) });
         const counter = h("span", { class: "sq-pdf-counter", "aria-live": "polite" });
@@ -94,7 +94,10 @@ function openAttachmentViewer(file, cachedBlob = null) {
           delete canvas.dataset.rendered;
           sheet.setAttribute("aria-busy", "true");
           try {
-            await drawPDFPage(resource.document, number, canvas, Math.min(920, content.clientWidth - 32), signal);
+            await renderComplete.catch(() => {});
+            if (signal.aborted) return;
+            renderComplete = drawPDFPage(resource.document, number, canvas, Math.min(920, content.clientWidth - 32), signal);
+            await renderComplete;
             if (!signal.aborted) { canvas.dataset.rendered = "true"; sheet.removeAttribute("aria-busy"); }
           } catch (error) {
             if (!signal.aborted) content.replaceChildren(h("p", { class: "sq-reader-error", text: errorMessage(error) }));
