@@ -1,8 +1,9 @@
 import { viewContext } from "../focus-state.js";
 import { mailbox,mailboxThread,updateMailboxMessage,mailboxStyle,saveMailboxStyle,googleMailStatus,connectGoogleMail,syncGoogleMail,disconnectGoogleMail,cancelScheduledMail,downloadFile } from "../api.js";
 import { state } from "../store.js";
-import { h,pageHeader,card,button,toolbar,modal,field,input,textarea,select,validateControls,toast,errorMessage,emptyState,formatDate,relativeDate,row,profileAvatar,confirmAction } from "../ui.js";
+import { h,pageHeader,card,button,icon,toolbar,modal,field,input,textarea,select,validateControls,toast,errorMessage,emptyState,formatDate,relativeDate,row,profileAvatar,confirmAction } from "../ui.js";
 import { openMailComposer } from "./mail-composer.js";
+import { spaceGroteskFaces } from "../typography.js";
 
 const folders=[
   {id:"INBOX",label:"Réception"},
@@ -34,9 +35,10 @@ const formatBytes=value=>{const bytes=Number(value);if(!Number.isFinite(bytes)||
 const can=permission=>state.user?.permissions?.includes(permission);
 
 function safeEmailDocument(mail,showRemote=false,plain=false){
-  const baseStyle="html{color-scheme:light}*,*::before,*::after{box-sizing:border-box}body{max-width:100%;margin:0;padding:28px;background:#fff;color:#171817;font:15px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}a{color:#317d19;text-decoration:underline;pointer-events:none}blockquote{margin:1em 0;padding-left:1em;border-left:3px solid #d9ded6;color:#5f655c}pre{white-space:pre-wrap}hr{border:0;border-top:1px solid #e3e7e1}@media(max-width:480px){body{padding:16px!important}table{width:100%!important;max-width:100%!important}td{max-width:100%!important}h1,h2,h3,p{overflow-wrap:anywhere}}";
+  const faces=spaceGroteskFaces();
+  const baseStyle=faces+"html{color-scheme:light}*,*::before,*::after{box-sizing:border-box;font-family:'Space Grotesk'!important}body{max-width:100%;margin:0;padding:28px;background:#fff;color:#171817;font:15px/1.65 'Space Grotesk';overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}a{color:#317d19;text-decoration:underline;pointer-events:none}blockquote{margin:1em 0;padding-left:1em;border-left:3px solid #d9ded6;color:#5f655c}pre{white-space:pre-wrap}hr{border:0;border-top:1px solid #e3e7e1}@media(max-width:480px){body{padding:16px!important}table{width:100%!important;max-width:100%!important}td{max-width:100%!important}h1,h2,h3,p{overflow-wrap:anywhere}}";
   const imgPolicy=showRemote?"https: http: data: blob:":"data: blob:";
-  const csp=`default-src 'none'; img-src ${imgPolicy}; style-src 'unsafe-inline'; font-src data:; script-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'`;
+  const csp=`default-src 'none'; img-src ${imgPolicy}; style-src 'unsafe-inline'; font-src ${location.origin}; script-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'`;
   if(plain||!htmlBodyOf(mail)){
     const escaped=String(textBodyOf(mail)||"Aucun contenu textuel disponible.").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\n","<br>");
     return`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="${csp}"><style>${baseStyle}</style></head><body>${escaped}</body></html>`;
@@ -44,6 +46,7 @@ function safeEmailDocument(mail,showRemote=false,plain=false){
   const doc=new DOMParser().parseFromString(htmlBodyOf(mail),"text/html");
   doc.querySelectorAll("script,noscript,iframe,frame,frameset,object,embed,form,input,textarea,select,button,video,audio,source,meta,base,link").forEach(node=>node.remove());
   for(const node of doc.querySelectorAll("*")){
+    node.style?.setProperty("font-family","Space Grotesk","important");
     for(const attribute of [...node.attributes]){
       const name=attribute.name.toLowerCase(),value=attribute.value.trim();
       if(name.startsWith("on")||["action","formaction","srcdoc","sandbox","ping"].includes(name)){node.removeAttribute(attribute.name);continue}
@@ -60,7 +63,7 @@ function safeEmailDocument(mail,showRemote=false,plain=false){
 
 function attachmentView(attachment,index){
   const name=attachment.fileName||attachment.file_name||attachment.name||`Pièce jointe ${index+1}`;
-  return h("div",{class:"mail-attachment"},h("span",{class:"mail-attachment-mark","aria-hidden":"true",text:"↗"}),h("div",{},h("strong",{text:name}),h("span",{text:[attachment.contentType||attachment.content_type,formatBytes(attachment.byteCount||attachment.byte_count||attachment.size)].filter(Boolean).join(" · ")||"Pièce jointe"})),attachment.id?button("Télécharger",{small:true,onClick:async()=>{try{await downloadFile(attachment.id,name)}catch(error){toast(errorMessage(error),"error")}}}):null);
+  return h("div",{class:"mail-attachment"},h("span",{class:"mail-attachment-mark","aria-hidden":"true"},icon("document",20)),h("div",{},h("strong",{text:name}),h("span",{text:[attachment.contentType||attachment.content_type,formatBytes(attachment.byteCount||attachment.byte_count||attachment.size)].filter(Boolean).join(" · ")||"Pièce jointe"})),attachment.id?button("Télécharger",{small:true,iconName:"download",onClick:async()=>{try{await downloadFile(attachment.id,name)}catch(error){toast(errorMessage(error),"error")}}}):null);
 }
 
 function bodyPreview(mail){

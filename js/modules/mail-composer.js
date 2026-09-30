@@ -1,3 +1,4 @@
+import { withWorkspaceTypography } from "../typography.js";
 import { mailboxTemplates, previewMail, saveMailDraft, sendMail, uploadFile } from "../api.js";
 import { mailBlocksEditor } from "../mail-blocks.js";
 import { h, button, field, input, textarea, modal, toast, errorMessage, validateControls } from "../ui.js";
@@ -49,7 +50,7 @@ export function openMailComposer(reload, replyTo = null, draft = null) {
     try {
       const result = await previewMail({ subject: subject.value.trim(), body: body.value, blocks: editor.getBlocks(), ...(addresses(to.value).length === 1 ? { recipientEmail: addresses(to.value)[0] } : {}) });
       const frame = h("iframe", { title: "Aperçu du message en cours", sandbox: "", referrerpolicy: "no-referrer" });
-      frame.srcdoc = result.html || ""; previewHost.replaceChildren(frame);
+      frame.srcdoc = withWorkspaceTypography(result.html); previewHost.replaceChildren(frame);
     } catch (error) { toast(errorMessage(error), "error", 6000); }
   } });
   const content = h("div", { class: "form mail-composer-form" }, field("À", to),

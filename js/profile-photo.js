@@ -1,6 +1,6 @@
 import { state } from "./store.js";
 import { updateMe } from "./api.js";
-import { h, button, modal, field, toast, errorMessage, profileAvatar, confirmAction } from "./ui.js";
+import { h, button, iconButton, modal, field, toast, errorMessage, profileAvatar, confirmAction } from "./ui.js";
 
 function profileBody(user,avatarData){
   return {email:user.email,firstName:user.firstName||user.first_name||"",lastName:user.lastName||user.last_name||"",title:user.title||"",company:user.company||"",phone:user.phone||"",phoneCountryCode:user.phoneCountryCode||user.phone_country_code||"FR",avatarData};
@@ -44,7 +44,11 @@ async function photoEditor(file,owner,refresh){
   canvas.addEventListener("pointerdown",event=>{if(busy)return;drag={pointer:event.pointerId,x:event.clientX,y:event.clientY,offsetX:x,offsetY:y};canvas.setPointerCapture(event.pointerId);});
   canvas.addEventListener("pointermove",event=>{if(!drag||drag.pointer!==event.pointerId)return;const ratio=size/canvas.getBoundingClientRect().width;x=drag.offsetX+(event.clientX-drag.x)*ratio;y=drag.offsetY+(event.clientY-drag.y)*ratio;draw();});
   for(const type of ["pointerup","pointercancel"])canvas.addEventListener(type,()=>{drag=null;});
-  const shift=h("div",{class:"sq-photo-position","aria-label":"Déplacer la photo"},...[["←",-14,0,"Déplacer vers la gauche"],["↑",0,-14,"Déplacer vers le haut"],["↓",0,14,"Déplacer vers le bas"],["→",14,0,"Déplacer vers la droite"]].map(([label,dx,dy,name])=>button(label,{ariaLabel:name,onClick:()=>{x+=dx;y+=dy;draw();}})));
+  const shift=h("div",{class:"sq-photo-position","aria-label":"Déplacer la photo"},...[["ArrowLeft",-14,0,0,"Déplacer vers la gauche"],["ArrowLeft",0,-14,90,"Déplacer vers le haut"],["ArrowLeft",0,14,-90,"Déplacer vers le bas"],["ArrowRight",14,0,0,"Déplacer vers la droite"]].map(([glyph,dx,dy,rotation,name])=>{
+    const control=iconButton(glyph,name,()=>{x+=dx;y+=dy;draw();});
+    if(rotation)control.firstElementChild.style.transform=`rotate(${rotation}deg)`;
+    return control;
+  }));
   dialog=modal({title:"Votre photo de profil",className:"sq-photo-editor",content:h("div",{class:"sq-photo-editor-content"},h("p",{text:"Déplacez la photo pour choisir le cadrage."}),h("div",{class:"sq-photo-crop"},canvas),field("Zoom de la photo",zoom),shift,error),beforeClose:()=>!busy,onClose:()=>URL.revokeObjectURL(url),actions:[{label:"Enregistrer la photo",kind:"primary",icon:"check",onClick:async close=>{
     if(busy||state.user?.id!==owner)return;
     busy=true;error.hidden=true;dialog.panel.setAttribute("aria-busy","true");dialog.panel.querySelectorAll("button,input").forEach(control=>control.disabled=true);

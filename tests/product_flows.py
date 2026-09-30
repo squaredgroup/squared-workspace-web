@@ -20,6 +20,11 @@ ROOT = PROJECT / "_site"
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        if self.path.startswith('/assets/fonts/'):
+            self.send_header('Access-Control-Allow-Origin', '*')
+        super().end_headers()
+
     def log_message(self, *args):
         pass
 
@@ -205,14 +210,14 @@ with sync_playwright() as playwright:
     page.get_by_label("Mot de passe", exact=True).fill("FixturePassword123")
     page.get_by_role("button", name="Se connecter", exact=True).click()
     expect(page.get_by_role("heading", name="Tableau de bord", exact=True)).to_be_visible()
-    expect(page.get_by_role("img",name="Main qui salue",exact=True)).to_be_visible()
-    expect(page.locator(".greeting-emoji")).to_have_text("👋")
+    expect(page.get_by_role("img",name="Icône d’accueil",exact=True)).to_be_visible()
+    page.wait_for_function("document.querySelector('.greeting-icon .icon')?.naturalWidth>0")
     for _ in range(3):
         page.reload()
         expect(page.get_by_role("heading", name="Tableau de bord", exact=True)).to_be_visible()
-        expect(page.get_by_role("img", name="Main qui salue", exact=True)).to_be_visible()
-        expect(page.locator(".greeting-emoji")).to_have_text("👋")
-        assert page.locator(".greeting-emoji").evaluate("emoji=>{const style=getComputedStyle(emoji),box=emoji.getBoundingClientRect();return style.display==='grid'&&style.visibility==='visible'&&style.opacity==='1'&&box.width>24&&box.height>24}")
+        expect(page.get_by_role("img", name="Icône d’accueil", exact=True)).to_be_visible()
+        page.wait_for_function("document.querySelector('.greeting-icon .icon')?.naturalWidth>0")
+        assert page.locator(".greeting-icon").evaluate("emoji=>{const style=getComputedStyle(emoji),box=emoji.getBoundingClientRect();return style.display==='grid'&&style.visibility==='visible'&&style.opacity==='1'&&box.width>24&&box.height>24}")
     expect(page.locator(".account-card .profile-avatar-image")).to_be_visible()
     assert page.locator(".account-card .profile-avatar-image").evaluate("image=>image.naturalWidth>0")
     expect(page.get_by_role("button", name="Notifications, 1 non lue", exact=True)).to_be_visible()
@@ -306,6 +311,11 @@ with sync_playwright() as playwright:
     page.get_by_label("Objet", exact=True).fill("Une nouveauté Workspace")
     page.get_by_role("button", name="Aperçu", exact=True).click()
     expect(page.get_by_title("Aperçu : Une nouveauté Workspace")).to_be_visible()
+    template_text = page.frame_locator('iframe[title="Aperçu : Une nouveauté Workspace"]').locator('body')
+    assert template_text.evaluate('''async body=>{
+      const doc=body.ownerDocument;await doc.fonts.ready;
+      return (await doc.fonts.load('400 14px "Space Grotesk"')).length===1&&getComputedStyle(body).fontFamily.replaceAll('"','').trim()==='Space Grotesk';
+    }''')
     page.get_by_role("button", name="Enregistrer", exact=True).click()
     expect(page.get_by_text("Personnalisé", exact=False)).to_be_visible()
     assert any(method == "PUT" and path == "/v1/mailbox/system-templates/notification" and body.get("subject") == "Une nouveauté Workspace" for method, path, body in requests if body)
@@ -319,6 +329,11 @@ with sync_playwright() as playwright:
     preview = page.get_by_title("Aperçu de l’e-mail")
     expect(preview).to_be_visible()
     assert preview.get_attribute("sandbox") == ""
+    mail_text = page.frame_locator('iframe[title="Aperçu de l’e-mail"]').locator('body')
+    assert mail_text.evaluate('''async body=>{
+      const doc=body.ownerDocument;await doc.fonts.ready;
+      return (await doc.fonts.load('400 14px "Space Grotesk"')).length===1&&getComputedStyle(body).fontFamily.replaceAll('"','').trim()==='Space Grotesk';
+    }''')
     expect(page.frame_locator('iframe[title="Aperçu de l’e-mail"]').get_by_text("Le Workspace est prêt pour la validation finale.", exact=True)).to_be_visible()
     srcdoc = preview.get_attribute("srcdoc")
     assert "tracking.example.invalid" not in srcdoc

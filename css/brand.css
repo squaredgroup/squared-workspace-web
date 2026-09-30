@@ -1,0 +1,20 @@
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:300;font-display:swap;src:url("/assets/fonts/space-grotesk-light.woff") format("woff")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url("/assets/fonts/space-grotesk-regular.woff") format("woff")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/space-grotesk-medium.woff") format("woff")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url("/assets/fonts/space-grotesk-semibold.woff") format("woff")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:700;font-display:swap;src:url("/assets/fonts/space-grotesk-bold.woff") format("woff")}
+
+html,body,button,input,textarea,select,option,pre,code,kbd,samp{font-family:var(--sq-font)}
+details>summary{display:flex;align-items:center;gap:8px;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"";display:block;flex:none;margin-left:auto;width:18px;height:18px;background:currentColor;mask:url("/assets/icons/IconlyRegularChevronDown.svg") center/contain no-repeat}
+details[open]>summary::after{transform:rotate(180deg)}
+select{appearance:none;background-image:url("/assets/icons/IconlyRegularChevronDown.svg")!important;background-position:right 12px center!important;background-size:16px!important;background-repeat:no-repeat!important;padding-right:36px!important}
+html:not([data-theme="light"]) select{background-image:url("/assets/icons/contrast/IconlyRegularChevronDown.svg")!important}
+.greeting-icon{display:grid;place-items:center;width:1.08em;min-width:1.08em;height:1.08em;line-height:1}
+.greeting-icon>.icon{width:.85em!important;height:.85em!important}
+.sq-photo-position>.icon-button{width:40px;min-height:36px;padding:0}
+.mail-attachment-mark>.icon{width:20px!important;height:20px!important}
+.sq-audio-preview{display:inline-flex;align-items:center;gap:8px}
+@media(pointer:coarse){.sq-photo-position>.icon-button{min-height:44px}}
+@media(forced-colors:active){html select{appearance:auto;background-image:none!important}details>summary::after{background:CanvasText}}

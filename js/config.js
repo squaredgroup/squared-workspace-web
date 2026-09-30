@@ -1,3 +1,5 @@
+import { iconlyPath } from "./iconly.js";
+
 export const APP_NAME = "Squared Workspace";
 
 export const API_BASE_URL = String(window.SQUARED_CONFIG?.apiBaseUrl || `${location.origin}/api`).replace(/\/$/, "");
@@ -11,6 +13,7 @@ export function realtimeURL(path = "/v1/realtime") {
 
 
 export const ICONS = {
+  More:"Sliders", Expand:"External", Paperclip:"Add", DoubleCheck:"Check",
   dashboard:"SidebarDashboard", today:"SidebarToday", projects:"SidebarProjects", missions:"SidebarMissions", tasks:"SidebarTasks", planning:"SidebarPlanning", map:"SidebarMap",
   businessUnits:"SidebarBusinessUnits", objectives:"SidebarObjectives", reports:"SidebarReports", finance:"SidebarFinance", timeExpenses:"SidebarTimeExpenses",
   validations:"SidebarValidations", deliverables:"SidebarDeliverables", contracts:"SidebarContracts", documents:"SidebarDocuments", resources:"SidebarResources",
@@ -22,8 +25,7 @@ export const ICONS = {
 
 export function iconPath(name, fill=false){
   const token = ICONS[name] || name || "Grid";
-  const prefix = fill ? "IconlyFill" : "IconlyRegular";
-  return `/assets/icons/${prefix}${token}.svg`;
+  return iconlyPath(token, fill);
 }
 
 const p = (title,id,summary,icon="document",permissions=[]) => ({ title,id:id||slug(title),summary,icon,permissions });

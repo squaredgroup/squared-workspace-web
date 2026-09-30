@@ -8,3 +8,5 @@
 /sw.js
   Service-Worker-Allowed: /
 
+/assets/fonts/*
+  Access-Control-Allow-Origin: *

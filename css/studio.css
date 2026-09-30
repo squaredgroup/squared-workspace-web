@@ -1,5 +1,5 @@
 /* One workspace language: neutral surfaces, readable type, deliberate green actions. */
-:root{--sq-font:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--sq-radius-card:16px;--sq-radius-control:10px;--sq-border:#2b2e33;--sq-border-soft:#24272b;--sq-muted:#a1a7b0;--sq-subtle:#87909b;--sq-card:#15171b;--sq-surface:#15171b;--sq-shell:#101216;--sq-bg:#0e1013;--sq-control:#1e2127;--sq-control-hover:#262a31;--sq-shadow-sm:0 2px 8px rgba(0,0,0,.12);--sq-hairline:var(--sq-border)}
+:root{--sq-radius-card:16px;--sq-radius-control:10px;--sq-border:#2b2e33;--sq-border-soft:#24272b;--sq-muted:#a1a7b0;--sq-subtle:#87909b;--sq-card:#15171b;--sq-surface:#15171b;--sq-shell:#101216;--sq-bg:#0e1013;--sq-control:#1e2127;--sq-control-hover:#262a31;--sq-shadow-sm:0 2px 8px rgba(0,0,0,.12);--sq-hairline:var(--sq-border)}
 html[data-theme="light"]{--sq-bg:#f6f7f9;--sq-shell:#fcfcfd;--sq-card:#fff;--sq-surface:#fff;--sq-surface-2:#f4f5f7;--sq-control:#f3f4f6;--sq-control-hover:#eaeef2;--sq-border:#e2e6eb;--sq-border-soft:#edf0f3;--sq-border-strong:#c3cad3;--sq-text:#17212b;--sq-text-soft:#374151;--sq-muted:#626d7d;--sq-subtle:#738091;--sq-hairline:var(--sq-border);--sq-shadow-sm:0 2px 8px rgba(28,39,52,.035)}
 .workspace{font-family:var(--sq-font);-webkit-font-smoothing:antialiased}
 .workspace .main{background:var(--sq-bg)}
@@ -9,7 +9,7 @@ html[data-theme="light"] .workspace .main{background:var(--sq-bg)}
 .workspace .page-head{align-items:center;gap:20px;margin-bottom:26px;padding-bottom:24px;border-bottom:1px solid var(--sq-border)}
 .workspace .page-head::after{display:none}
 .workspace .page-head .eyebrow{color:var(--sq-muted);font-size:10px;font-weight:600;letter-spacing:.1em}
-.workspace .page-title{font-family:"Space Grotesk",var(--sq-font);font-size:clamp(28px,2.8vw,38px);line-height:1.15;font-weight:600;letter-spacing:-.05em}
+.workspace .page-title{font-family:var(--sq-font);font-size:clamp(28px,2.8vw,38px);line-height:1.15;font-weight:600;letter-spacing:-.05em}
 .workspace .page-subtitle{max-width:680px;margin-top:10px;color:var(--sq-muted);font-size:13px;line-height:1.65}
 .workspace .card{padding:22px;border-color:var(--sq-border);background:var(--sq-card);box-shadow:var(--sq-shadow-sm)}
 .workspace .card::after{display:none}

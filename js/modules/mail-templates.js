@@ -1,3 +1,4 @@
+import { withWorkspaceTypography } from "../typography.js";
 import { mailboxTemplates, saveMailboxTemplate, deleteMailboxTemplate, systemMailTemplates, previewSystemMailTemplate, saveSystemMailTemplate, restoreSystemMailTemplate } from "../api.js";
 import { state } from "../store.js";
 import { h, pageHeader, card, button, field, input, textarea, row, toast, errorMessage, emptyState, confirmAction } from "../ui.js";
@@ -6,7 +7,7 @@ import { mailBlocksEditor, newMailBlock } from "../mail-blocks.js";
 const can = permission => state.user?.permissions?.includes(permission);
 function previewFrame(preview) {
   const frame = h("iframe", { class: "system-mail-preview", title: `Aperçu : ${preview.subject || "e-mail"}`, sandbox: "", referrerpolicy: "no-referrer" });
-  frame.srcdoc = preview.html || ""; return frame;
+  frame.srcdoc = withWorkspaceTypography(preview.html); return frame;
 }
 
 export async function renderMailTemplates() {

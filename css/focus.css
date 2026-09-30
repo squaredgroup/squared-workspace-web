@@ -32,8 +32,6 @@ html[data-theme="light"] { --focus-accent:#286619; --focus-danger:#a51738; --sq-
 .focus-record>.button { flex:0 0 auto; }
 .focus-filters,.focus-disclosure { min-width:0; border:1px solid var(--sq-border); border-radius:12px; background:var(--sq-control); }
 .focus-filters>summary,.focus-disclosure>summary { display:flex; align-items:center; gap:8px; padding:12px; min-height:44px; font-size:13px; cursor:pointer; color:var(--sq-text); }
-.focus-filters>summary::after,.focus-disclosure>summary::after { content:"+"; margin-left:auto; padding-left:12px; }
-.focus-filters[open]>summary::after,.focus-disclosure[open]>summary::after { content:"−"; }
 .focus-disclosure .focus-record { margin-inline:12px; }
 .focus-filter-body { padding:12px; display:grid; gap:12px; }
 .focus-list-controls>.search-input { flex:1 1 100%; min-width:0; }

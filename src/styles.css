@@ -11,12 +11,14 @@
 @import "../css/native-parity.css";
 @import "../css/messaging.css";
 @import "../css/studio.css";
+@import "../css/brand.css";
 
 @source "../index.html";
 @source "../js/**/*.js";
 
 @theme inline {
   --font-sans: var(--sq-font);
+  --font-mono: var(--sq-font);
   --color-workspace: var(--sq-bg);
   --color-surface: var(--sq-surface);
   --color-card: var(--sq-card);

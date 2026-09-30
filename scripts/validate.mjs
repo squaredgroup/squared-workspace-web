@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { spawnSync } from "node:child_process";
+import { ICONLY_REGULAR, ICONLY_FILLED, iconlyPath } from "../js/iconly.js";
 const root=process.cwd();
 async function walk(dir){const out=[];for(const entry of await fs.readdir(dir,{withFileTypes:true})){const p=path.join(dir,entry.name);out.push(...(entry.isDirectory()?await walk(p):[p]));}return out;}
 const paths=(await walk(path.join(root,"js"))).filter(p=>p.endsWith(".js"));
@@ -18,5 +19,9 @@ if(!swSource.includes("caches.delete"))throw new Error("Le service worker doit p
 const headers=await fs.readFile("_headers","utf8");
 if(!headers.startsWith("/*\n")||!headers.includes("Cache-Control: no-store"))throw new Error("Toutes les ressources publiques doivent interdire le cache navigateur");
 const config=await fs.readFile("js/config.js","utf8");const iconBlock=config.split("export const ICONS = {")[1].split("};")[0];
-for(const match of iconBlock.matchAll(/:\s*"([A-Za-z0-9]+)"/g))await fs.access(path.join(root,`assets/icons/IconlyRegular${match[1]}.svg`));
+for(const match of iconBlock.matchAll(/:\s*"([A-Za-z0-9]+)"/g)){
+  if(!ICONLY_REGULAR.includes(match[1])&&!ICONLY_FILLED.includes(match[1]))throw new Error(`Icône hors du catalogue Iconly: ${match[1]}`);
+  await fs.access(path.join(root,iconlyPath(match[1]).slice(1)));
+}
+for(const [names,prefix] of [[ICONLY_REGULAR,"IconlyRegular"],[ICONLY_FILLED,"IconlyFill"]])for(const name of names)await fs.access(path.join(root,`assets/icons/${prefix}${name}.svg`));
 console.log(`${paths.length} modules JavaScript liés, ressources, manifest et service worker validés.`);

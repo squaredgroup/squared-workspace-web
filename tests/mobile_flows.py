@@ -32,6 +32,11 @@ MAIL = {'id':'mail-1','direction':'INBOUND','folder':'INBOX','status':'RECEIVED'
 requests, reports, errors, missing_assets = [], [], [], []
 unknown = set()
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        if self.path.startswith('/assets/fonts/'):
+            self.send_header('Access-Control-Allow-Origin', '*')
+        super().end_headers()
+
     def log_message(self, *args):
         pass
 server = ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Handler,directory=str(ROOT / '_site')))

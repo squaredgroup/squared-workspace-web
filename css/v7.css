@@ -75,7 +75,6 @@ html[data-theme="light"] body::before{opacity:.32;background-image:linear-gradie
 .executive-hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(var(--sq-accent-rgb),.32),transparent)}
 .hero-title{display:grid;grid-template-columns:auto minmax(0,1fr);max-width:760px;align-items:start;column-gap:.18em;font-size:clamp(34px,4vw,56px);text-wrap:balance}
 .hero-title>span:last-child{min-width:0;overflow-wrap:anywhere}
-.greeting-emoji{display:grid;place-items:center;width:1.08em;min-width:1.08em;height:1.08em;overflow:visible;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:1em;font-variant-emoji:emoji;font-synthesis:none;letter-spacing:0;line-height:1;opacity:1;visibility:visible;transform:none;animation:none}
 .hero-copy{max-width:680px;font-size:12px}
 .hero-meta{margin-top:24px}
 .pulse-item{min-height:62px;background:color-mix(in srgb,var(--sq-panel-translucent) 90%,transparent);backdrop-filter:blur(18px)}
