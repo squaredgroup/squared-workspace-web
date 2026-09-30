@@ -129,6 +129,7 @@
   .workspace .sq-message-panel .composer{padding:8px 10px;min-height:58px}
   .workspace .sq-message-panel .composer textarea{height:42px;min-height:42px;max-height:96px}
   .workspace .sq-message-panel .composer .sq-composer-add,.workspace .sq-message-panel .composer .button.primary{width:42px;height:42px;min-width:42px;min-height:42px;flex-basis:42px;border-radius:13px}
+  .workspace .sq-message-panel .composer-meta{display:none}
   .workspace .sq-message-panel .sq-scroll-latest:not([hidden]){right:12px;bottom:78px;min-height:34px;font-size:11px}
   html.sq-keyboard-open .workspace .sq-messages.sq-conversation-open .sq-message-panel{height:var(--sq-viewport-height)}
   .sq-pdf-sheet{padding:10px}

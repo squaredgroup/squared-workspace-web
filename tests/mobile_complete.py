@@ -16,7 +16,10 @@ def inspect(page, name):
     actual = page.evaluate('({layout: innerWidth, scroll: document.documentElement.scrollWidth})')
     assert actual['layout'] <= expected_width + 1, (name, actual, expected_width)
     assert actual['scroll'] <= expected_width + 1, (name, actual, expected_width)
-    expect(page.locator('#workspace-main .page-title').first).to_be_visible()
+    if name.startswith('messages/'):
+        expect(page.get_by_role('heading', name='Conversations')).to_be_visible()
+    else:
+        expect(page.locator('#workspace-main .page-title').first).to_be_visible()
     assert not page.locator('#workspace-main .empty strong').filter(has_text='Chargement impossible').count(), name
     assert not page.locator('#workspace-main .empty strong').filter(has_text='Impossible de charger la page').count(), name
     checks.append({'route': name, 'width': expected_width, **actual})

@@ -395,7 +395,7 @@ export async function renderMessages() {
           profile?.isPinned ? h("small", { class: "muted", text: "📌 Message épinglé" }) : null,
           message.proposal ? proposalCard(conversation, message, reload) : body && !generatedCaption ? h("p", { text: body }) : null,
           message.linkedContext ? h("div", { class: "sq-message-reference", text: `${message.linkedContext.entityKind || "Élément"} · ${message.linkedContext.title || "Workspace"}` }) : null,
-          attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, mediaObserver, signal))) : null,
+          attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, message === filtered.at(-1) ? null : mediaObserver, signal))) : null,
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
           actions,
           h("div", { class: "sq-message-footer" },
