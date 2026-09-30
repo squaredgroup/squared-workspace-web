@@ -19,6 +19,7 @@ let owner = "", selectedId = null, listQuery = "", listMode = "all";
 let activeRefresh = null, unsubscribeView = null, generation = 0;
 let mediaAbort = new AbortController(), mediaObserver = null;
 const mediaURLs = new Set();
+let activeViewer = null;
 function releaseMedia() {
   mediaAbort.abort(); mediaAbort = new AbortController();
   mediaObserver?.disconnect(); mediaObserver = null;
@@ -36,11 +37,53 @@ function attachmentKind(file) {
   return "document";
 }
 const attachmentLabel = kind => ({ image: "Image", video: "Vidéo", audio: "Message vocal", pdf: "Document PDF", text: "Document texte", document: "Document" })[kind];
+function typedAttachmentBlob(blob, kind) {
+  const fallbackType = ({ image: "image/png", video: "video/mp4", audio: "audio/mpeg", pdf: "application/pdf", text: "text/plain" })[kind];
+  const allowedType = ({ image: /^image\/(?:png|jpeg|gif|webp|avif)$/, video: /^video\/(?:mp4|webm|ogg)$/, audio: /^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a)$/, pdf: /^application\/pdf$/, text: /^text\/plain$/ })[kind];
+  return blob.slice(0, blob.size, allowedType.test(blob.type) ? blob.type : fallbackType);
+}
+function openAttachmentViewer(file, cachedBlob = null) {
+  activeViewer?.close();
+  const kind = attachmentKind(file), name = file.fileName || "Fichier", id = file.storageKey || file.id;
+  const controller = new AbortController(), content = h("div", { class: `sq-reader-content sq-reader-${kind}`, role: "status" }, h("p", { class: "sq-media-loading", text: "Ouverture du fichier…" }));
+  let readerURL = "", reader;
+  reader = modal({ title: name, wide: true, className: "sq-media-viewer", content,
+    actions: [{ label: "Télécharger", icon: "download", disabled: !id, onClick: async () => {
+      try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); }
+    } }],
+    onClose: () => { controller.abort(); if (readerURL) URL.revokeObjectURL(readerURL); if (activeViewer === reader) activeViewer = null; }
+  });
+  activeViewer = reader;
+  if (kind === "document" || !id) {
+    content.replaceChildren(h("div", { class: "sq-reader-unavailable" }, h("strong", { text: attachmentLabel(kind) }), h("p", { text: id ? "Ce format ne peut pas être prévisualisé dans le navigateur. Vous pouvez le télécharger." : "Ce fichier n’est plus disponible." })));
+    return;
+  }
+  const currentUser = state.user?.id;
+  void (async () => {
+    try {
+      const blob = cachedBlob || typedAttachmentBlob(await fetchFileBlob(id, { signal: controller.signal }), kind);
+      if (controller.signal.aborted || state.user?.id !== currentUser || activeViewer !== reader) return;
+      if (kind === "text") {
+        if (blob.size > 256 * 1024) throw new Error("Ce document texte est trop volumineux pour être affiché. Téléchargez-le pour le consulter.");
+        const value = await blob.text();
+        if (!controller.signal.aborted) content.replaceChildren(h("pre", { text: value }));
+        return;
+      }
+      readerURL = URL.createObjectURL(blob);
+      const media = kind === "image" ? h("img", { src: readerURL, alt: name, onError: () => content.replaceChildren(h("p", { text: "L’image ne peut pas être affichée. Téléchargez-la pour la consulter." })) })
+        : kind === "pdf" ? h("iframe", { src: readerURL, title: `Lecteur PDF : ${name}`, sandbox: "" })
+        : h(kind, { src: readerURL, controls: true, preload: "metadata", "aria-label": name, onError: () => content.replaceChildren(h("p", { text: "Ce média ne peut pas être lu dans le navigateur. Téléchargez-le pour le consulter." })) });
+      if (!controller.signal.aborted) content.replaceChildren(media);
+    } catch (error) { if (!controller.signal.aborted) content.replaceChildren(h("p", { class: "sq-reader-error", text: errorMessage(error) })); }
+  })();
+}
 function attachmentPreview(file, observer, signal) {
   const kind = attachmentKind(file), name = file.fileName || "Fichier", id = file.storageKey || file.id;
+  let cachedBlob = null;
   const preview = h("div", { class: `sq-attachment-preview sq-attachment-${kind}`, "aria-label": `Aperçu de ${name}` });
   const fallback = () => preview.replaceChildren(h("span", { class: "sq-file-symbol", "aria-hidden": "true", text: kind === "pdf" ? "PDF" : kind === "text" ? "TXT" : "▤" }), h("span", { text: kind === "document" ? "Aperçu non disponible pour ce format" : "Aperçu indisponible — télécharger le fichier" }));
-  if (kind === "document" || !id) fallback();
+  if (kind === "audio" && id) preview.replaceChildren(h("span", { class: "sq-audio-preview", text: "▶ Écouter le message vocal" }));
+  else if (kind === "document" || !id) fallback();
   else {
     preview.replaceChildren(h("span", { class: "sq-media-loading", text: "Chargement de l’aperçu…" }));
     const load = async () => {
@@ -48,18 +91,18 @@ function attachmentPreview(file, observer, signal) {
         const blob = await fetchFileBlob(id, { signal });
         if (signal.aborted) return;
         // The API serves attachments as downloads; a local blob URL lets the browser display them without exposing a token in the page URL.
-        const fallbackType = ({ image: "image/png", video: "video/mp4", audio: "audio/mpeg", pdf: "application/pdf", text: "text/plain" })[kind];
-        const allowedType = ({ image: /^image\/(?:png|jpeg|gif|webp|avif)$/, video: /^video\/(?:mp4|webm|ogg)$/, audio: /^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a)$/, pdf: /^application\/pdf$/, text: /^text\/plain$/ })[kind];
-        const typedBlob = blob.slice(0, blob.size, allowedType.test(blob.type) ? blob.type : fallbackType);
+        const typedBlob = typedAttachmentBlob(blob, kind);
+        cachedBlob = typedBlob;
         if (kind === "text") {
           if (blob.size > 256 * 1024) { fallback(); return; }
-          preview.replaceChildren(h("pre", { text: (await typedBlob.text()).slice(0, 4000) }));
+          const value = await typedBlob.text();
+          if (!signal.aborted) preview.replaceChildren(h("pre", { text: value.slice(0, 4000) }));
           return;
         }
         const url = URL.createObjectURL(typedBlob); mediaURLs.add(url);
         const media = kind === "image" ? h("img", { src: url, alt: name, loading: "lazy", onError: fallback })
           : kind === "pdf" ? h("iframe", { src: url, title: `Aperçu PDF : ${name}`, sandbox: "", loading: "lazy" })
-          : h(kind, { src: url, controls: true, preload: "metadata", "aria-label": name, onError: fallback });
+          : h(kind, { src: url, preload: "metadata", "aria-label": name, onError: fallback });
         if (signal.aborted) { URL.revokeObjectURL(url); mediaURLs.delete(url); return; }
         preview.replaceChildren(media);
       } catch (error) { if (!signal.aborted) fallback(); }
@@ -67,12 +110,14 @@ function attachmentPreview(file, observer, signal) {
     if (observer) { preview.addEventListener("sq:preview-visible", load, { once: true }); observer.observe(preview); }
     else void load();
   }
+  const open = button("Ouvrir", { className: "sq-attachment-open", ariaLabel: `Ouvrir ${name} dans le lecteur`, onClick: () => openAttachmentViewer(file, cachedBlob) });
   const download = button("Télécharger", { small: true, disabled: !id, ariaLabel: `Télécharger ${name}`, onClick: async () => { try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); } } });
-  return h("div", { class: "sq-attachment" }, preview, h("div", { class: "sq-attachment-footer" }, h("span", { text: name }), download));
+  return h("div", { class: "sq-attachment" }, h("div", { class: "sq-attachment-stage" }, preview, open), h("div", { class: "sq-attachment-footer" }, h("span", { text: name }), download));
 }
 function resetMessages() {
   owner = ""; selectedId = null; listQuery = ""; listMode = "all";
   volatileDrafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
+  activeViewer?.close();
   releaseMedia();
   unsubscribeView?.(); unsubscribeView = null;
 }

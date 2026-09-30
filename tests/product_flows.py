@@ -64,6 +64,29 @@ SETTINGS = {"appearanceMode": "dark", "dashboardDensity": "balanced", "contentWi
 PLANNING = {"week": None, "version": 0}
 SYSTEM_TEMPLATE = {"key": "notification", "name": "Notifications", "description": "Notification du compte", "tone": "neutral", "subject": "Notification Workspace", "body": "{{event.detail}}", "contentBlocks": [{"id": "00000000-0000-4000-8000-000000000001", "kind": "PARAGRAPH", "text": "{{event.detail}}", "url": "", "alternativeText": ""}], "visualStyle": None, "isCustomized": False, "revision": 0, "variables": ["event.detail"]}
 DRAFTS = {}
+
+
+def sample_pdf():
+    drawing = b"BT /F1 22 Tf 64 700 Td (Apercu PDF Workspace) Tj ET"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length " + str(len(drawing)).encode() + b" >>\nstream\n" + drawing + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    chunks = [b"%PDF-1.4\n"]
+    offsets = [0]
+    for number, obj in enumerate(objects, 1):
+        offsets.append(sum(map(len, chunks)))
+        chunks.append(str(number).encode() + b" 0 obj\n" + obj + b"\nendobj\n")
+    xref = sum(map(len, chunks))
+    chunks.append(b"xref\n0 6\n0000000000 65535 f \n" + b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:]))
+    chunks.append(b"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + str(xref).encode() + b"\n%%EOF\n")
+    return b"".join(chunks)
+
+
+PDF_BYTES = sample_pdf()
 requests = []
 visual_dir = Path(os.environ["WORKSPACE_VISUAL_DIR"]) if os.environ.get("WORKSPACE_VISUAL_DIR") else None
 if visual_dir:
@@ -169,7 +192,7 @@ def fixture(route):
         return respond(route, {"fileId": "00000000-0000-4000-8000-000000000321", "url": "https://storage.example.invalid/upload"}, 201)
     if path.endswith("/content") and method == "GET" and path.startswith("/v1/files/"):
         if path.endswith("000000000322/content"):
-            return route.fulfill(status=200, content_type="application/pdf", headers={"Access-Control-Allow-Origin": origin}, body=b"%PDF-1.4\n1 0 obj <</Type/Catalog>> endobj\n%%EOF")
+            return route.fulfill(status=200, content_type="application/pdf", headers={"Access-Control-Allow-Origin": origin}, body=PDF_BYTES)
         return route.fulfill(status=200, content_type="image/png", headers={"Access-Control-Allow-Origin": origin}, body=base64.b64decode(USER["avatarData"]))
     if path.startswith("/v1/files/") and method in ("PUT", "POST"):
         return respond(route, {"ok": True})
@@ -244,6 +267,15 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Direction produit", exact=False).click()
     expect(page.get_by_title("Aperçu PDF : dossier.pdf")).to_be_visible()
     assert not page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : dossier.pdf", exact=True).count()
+    page.get_by_role("button", name="Ouvrir dossier.pdf dans le lecteur").click()
+    reader = page.get_by_role("dialog", name="dossier.pdf")
+    expect(reader.get_by_title("Lecteur PDF : dossier.pdf")).to_be_visible()
+    assert reader.get_by_title("Lecteur PDF : dossier.pdf").get_attribute("src").startswith("blob:")
+    expect(reader.get_by_role("button", name="Télécharger")).to_be_visible()
+    if visual_dir:
+        page.wait_for_timeout(350)
+        page.screenshot(path=str(visual_dir / "pdf-reader-desktop.png"))
+    reader.get_by_role("button", name="Fermer").click()
     composer = page.get_by_placeholder("Écrire un message…")
     composer.fill("Validation fonctionnelle terminée.")
     page.get_by_role("button", name="Envoyer", exact=True).click()
@@ -261,6 +293,11 @@ with sync_playwright() as playwright:
     expect(picture).to_have_js_property("naturalWidth", 1)
     assert not page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : photo.png", exact=True).count()
     expect(page.get_by_role("button", name="Télécharger photo.png")).to_be_visible()
+    page.get_by_role("button", name="Ouvrir photo.png dans le lecteur").click()
+    picture_reader = page.get_by_role("dialog", name="photo.png")
+    expect(picture_reader.get_by_role("img", name="photo.png")).to_have_js_property("naturalWidth", 1)
+    expect(picture_reader.get_by_role("button", name="Télécharger")).to_be_visible()
+    picture_reader.get_by_role("button", name="Fermer").click()
     assert any(method == "POST" and path == "/v1/files/upload-url" and body.get("entityType") == "messageAttachment" for method, path, body in requests if isinstance(body, dict))
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('planning','personal')}""")
@@ -349,6 +386,16 @@ with sync_playwright() as playwright:
     if visual_dir:
         page.wait_for_timeout(400)
         page.screenshot(path=str(visual_dir / "dashboard-mobile.png"), full_page=True)
+    page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('messages')}""")
+    page.get_by_role("button", name="Direction produit", exact=False).click()
+    page.get_by_role("button", name="Ouvrir dossier.pdf dans le lecteur").click()
+    mobile_reader = page.get_by_role("dialog", name="dossier.pdf")
+    expect(mobile_reader.get_by_title("Lecteur PDF : dossier.pdf")).to_be_visible()
+    assert mobile_reader.bounding_box()["height"] > page.viewport_size["height"] * 0.65
+    if visual_dir:
+        page.wait_for_timeout(350)
+        page.screenshot(path=str(visual_dir / "pdf-reader-mobile.png"))
+    mobile_reader.get_by_role("button", name="Fermer").click()
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('mailbox','mailbox')}""")
     page.get_by_role("button", name="Revue Workspace V4", exact=False).click()
     expect(page.get_by_title("Aperçu de l’e-mail")).to_be_visible()
