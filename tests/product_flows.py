@@ -4,6 +4,7 @@ The suite exercises navigation, permissions, notifications, Messages, E-mails,
 settings and responsive rendering without using a real account or mutating production.
 """
 import functools
+import base64
 import json
 import os
 import threading
@@ -46,7 +47,7 @@ WORKSPACE = {
     "tasks": [{"id": "task-1", "version": 1, "title": "Valider la refonte", "status": "pending", "dueAt": "2026-09-21T12:00:00Z"}],
     "missions": [], "validations": [], "deliverables": [],
     "notifications": [{"id": "notification-1", "version": 1, "title": "Décision requise", "body": "Validez la version Web V4.", "kind": "Produit", "isRead": False, "createdAt": "2026-09-20T09:00:00Z"}],
-    "conversations": [{"id": "conversation-1", "name": "Direction produit", "participantIDs": [USER["id"], "member-2"], "unread": 1, "messages": [{"id": "message-1", "authorId": "member-2", "authorName": "Équipe Design", "body": "La revue est prête.", "createdAt": "2026-09-20T08:30:00Z"}]}],
+    "conversations": [{"id": "conversation-1", "name": "Direction produit", "participantIDs": [USER["id"], "member-2"], "unread": 1, "messages": [{"id": "message-1", "authorId": "member-2", "authorName": "Équipe Design", "body": "La revue est prête.", "createdAt": "2026-09-20T08:30:00Z"}, {"id": "message-pdf", "authorId": "member-2", "authorName": "Équipe Design", "body": "Pièce jointe : dossier.pdf", "attachmentName": "dossier.pdf", "attachmentStorageKey": "00000000-0000-4000-8000-000000000322", "createdAt": "2026-09-20T08:35:00Z"}]}],
     "team": [{"id": USER["id"], "firstName": "Jordan", "lastName": "Alévêque", "email": USER["email"], "role": "OWNER", "isActive": True, "avatarData": USER["avatarData"]}, {"id": "member-2", "firstName": "Équipe", "lastName": "Design", "email": "design@example.invalid", "role": "COLLABORATOR", "isActive": True}],
 }
 MAIL = {
@@ -166,6 +167,10 @@ def fixture(route):
         return respond(route, {"ok": True})
     if path == "/v1/files/upload-url" and method == "POST":
         return respond(route, {"fileId": "00000000-0000-4000-8000-000000000321", "url": "https://storage.example.invalid/upload"}, 201)
+    if path.endswith("/content") and method == "GET" and path.startswith("/v1/files/"):
+        if path.endswith("000000000322/content"):
+            return route.fulfill(status=200, content_type="application/pdf", headers={"Access-Control-Allow-Origin": origin}, body=b"%PDF-1.4\n1 0 obj <</Type/Catalog>> endobj\n%%EOF")
+        return route.fulfill(status=200, content_type="image/png", headers={"Access-Control-Allow-Origin": origin}, body=base64.b64decode(USER["avatarData"]))
     if path.startswith("/v1/files/") and method in ("PUT", "POST"):
         return respond(route, {"ok": True})
     if path == "/health":
@@ -237,6 +242,8 @@ with sync_playwright() as playwright:
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('messages')}""")
     page.get_by_role("button", name="Direction produit", exact=False).click()
+    expect(page.get_by_title("Aperçu PDF : dossier.pdf")).to_be_visible()
+    assert not page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : dossier.pdf", exact=True).count()
     composer = page.get_by_placeholder("Écrire un message…")
     composer.fill("Validation fonctionnelle terminée.")
     page.get_by_role("button", name="Envoyer", exact=True).click()
@@ -248,8 +255,12 @@ with sync_playwright() as playwright:
     page.get_by_role("dialog").get_by_label("Notifications", exact=True).select_option("muted")
     page.get_by_role("dialog").get_by_role("button", name="Enregistrer", exact=True).click()
     assert any(method == "PUT" and path.endswith("/preferences") and body.get("notificationMode") == "muted" for method, path, body in requests if isinstance(body, dict))
-    page.get_by_label("Choisir une pièce jointe").set_input_files({"name": "test.txt", "mimeType": "text/plain", "buffer": b"Exemple Workspace"})
-    expect(page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : test.txt", exact=True)).to_be_visible()
+    page.get_by_label("Choisir une pièce jointe").set_input_files({"name": "photo.png", "mimeType": "image/png", "buffer": base64.b64decode(USER["avatarData"])})
+    picture = page.get_by_role("log", name="Messages de Direction produit").get_by_role("img", name="photo.png")
+    expect(picture).to_be_visible()
+    expect(picture).to_have_js_property("naturalWidth", 1)
+    assert not page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : photo.png", exact=True).count()
+    expect(page.get_by_role("button", name="Télécharger photo.png")).to_be_visible()
     assert any(method == "POST" and path == "/v1/files/upload-url" and body.get("entityType") == "messageAttachment" for method, path, body in requests if isinstance(body, dict))
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('planning','personal')}""")

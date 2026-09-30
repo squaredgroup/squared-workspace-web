@@ -95,16 +95,19 @@ export async function uploadFile(file, entityType, entityId) {
   await request(`/v1/files/${upload.fileId}/complete`, { method: "POST", body: { checksum, byteCount: file.size }, timeoutMs: 120000 });
   return { id: upload.fileId, fileName: file.name, storageKey: upload.fileId, mediaType: file.type || "application/octet-stream", byteCount: file.size };
 }
-export async function downloadFile(id, fileName = "fichier") {
+export async function fetchFileBlob(id, { signal } = {}) {
   const path = `/v1/files/${encodeURIComponent(id)}/content`;
-  const fetchContent = () => fetch(apiURL(path), { headers: { Authorization: `Bearer ${state.accessToken}`, "X-Workspace-Client": "web" }, credentials: "omit", cache: "no-store", mode: "cors" });
+  const fetchContent = () => fetch(apiURL(path), { headers: { Authorization: `Bearer ${state.accessToken}`, "X-Workspace-Client": "web" }, credentials: "omit", cache: "no-store", mode: "cors", signal });
   let response = await fetchContent();
   if (response.status === 401) { await refreshSession(); response = await fetchContent(); }
   if (!response.ok) {
     const payload = response.headers.get("content-type")?.includes("application/json") ? await response.json().catch(() => ({})) : {};
     throw new APIError(response.status, payload);
   }
-  const url = URL.createObjectURL(await response.blob());
+  return response.blob();
+}
+export async function downloadFile(id, fileName = "fichier") {
+  const url = URL.createObjectURL(await fetchFileBlob(id));
   const link = document.createElement("a"); link.href = url; link.download = String(fileName || "fichier").replace(/[\\/\r\n]/g, "_");
   document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);

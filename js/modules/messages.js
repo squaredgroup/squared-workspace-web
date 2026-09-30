@@ -1,6 +1,6 @@
 import { getDraft, saveDraft } from "../focus-state.js";
 import { state, subscribe, setRoute } from "../store.js";
-import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile } from "../api.js";
+import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile, fetchFileBlob } from "../api.js";
 import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
 import { openProposalPicker, proposalCard } from "../message-proposals.js";
 
@@ -17,9 +17,63 @@ const volatileDrafts = new Set();
 const sending = new Set(), reading = new Set();
 let owner = "", selectedId = null, listQuery = "", listMode = "all";
 let activeRefresh = null, unsubscribeView = null, generation = 0;
+let mediaAbort = new AbortController(), mediaObserver = null;
+const mediaURLs = new Set();
+function releaseMedia() {
+  mediaAbort.abort(); mediaAbort = new AbortController();
+  mediaObserver?.disconnect(); mediaObserver = null;
+  for (const url of mediaURLs) URL.revokeObjectURL(url);
+  mediaURLs.clear();
+}
+function attachmentKind(file) {
+  const name = String(file.fileName || "").toLowerCase();
+  const type = String(file.mediaType || file.contentType || "").toLowerCase();
+  if (/^image\/(?:png|jpeg|gif|webp|avif)$/.test(type) || /\.(?:png|jpe?g|gif|webp|avif)$/.test(name)) return "image";
+  if (/^video\/(?:mp4|webm|ogg)$/.test(type) || /\.(?:mp4|webm|ogv)$/.test(name)) return "video";
+  if (/^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a)$/.test(type) || /\.(?:mp3|m4a|aac|ogg|wav|webm)$/.test(name)) return "audio";
+  if (type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+  if (type === "text/plain" || name.endsWith(".txt")) return "text";
+  return "document";
+}
+const attachmentLabel = kind => ({ image: "Image", video: "Vidéo", audio: "Message vocal", pdf: "Document PDF", text: "Document texte", document: "Document" })[kind];
+function attachmentPreview(file, observer, signal) {
+  const kind = attachmentKind(file), name = file.fileName || "Fichier", id = file.storageKey || file.id;
+  const preview = h("div", { class: `sq-attachment-preview sq-attachment-${kind}`, "aria-label": `Aperçu de ${name}` });
+  const fallback = () => preview.replaceChildren(h("span", { class: "sq-file-symbol", "aria-hidden": "true", text: kind === "pdf" ? "PDF" : kind === "text" ? "TXT" : "▤" }), h("span", { text: kind === "document" ? "Aperçu non disponible pour ce format" : "Aperçu indisponible — télécharger le fichier" }));
+  if (kind === "document" || !id) fallback();
+  else {
+    preview.replaceChildren(h("span", { class: "sq-media-loading", text: "Chargement de l’aperçu…" }));
+    const load = async () => {
+      try {
+        const blob = await fetchFileBlob(id, { signal });
+        if (signal.aborted) return;
+        // The API serves attachments as downloads; a local blob URL lets the browser display them without exposing a token in the page URL.
+        const fallbackType = ({ image: "image/png", video: "video/mp4", audio: "audio/mpeg", pdf: "application/pdf", text: "text/plain" })[kind];
+        const allowedType = ({ image: /^image\/(?:png|jpeg|gif|webp|avif)$/, video: /^video\/(?:mp4|webm|ogg)$/, audio: /^audio\/(?:mpeg|mp4|aac|ogg|wav|webm|x-m4a)$/, pdf: /^application\/pdf$/, text: /^text\/plain$/ })[kind];
+        const typedBlob = blob.slice(0, blob.size, allowedType.test(blob.type) ? blob.type : fallbackType);
+        if (kind === "text") {
+          if (blob.size > 256 * 1024) { fallback(); return; }
+          preview.replaceChildren(h("pre", { text: (await typedBlob.text()).slice(0, 4000) }));
+          return;
+        }
+        const url = URL.createObjectURL(typedBlob); mediaURLs.add(url);
+        const media = kind === "image" ? h("img", { src: url, alt: name, loading: "lazy", onError: fallback })
+          : kind === "pdf" ? h("iframe", { src: url, title: `Aperçu PDF : ${name}`, sandbox: "", loading: "lazy" })
+          : h(kind, { src: url, controls: true, preload: "metadata", "aria-label": name, onError: fallback });
+        if (signal.aborted) { URL.revokeObjectURL(url); mediaURLs.delete(url); return; }
+        preview.replaceChildren(media);
+      } catch (error) { if (!signal.aborted) fallback(); }
+    };
+    if (observer) { preview.addEventListener("sq:preview-visible", load, { once: true }); observer.observe(preview); }
+    else void load();
+  }
+  const download = button("Télécharger", { small: true, disabled: !id, ariaLabel: `Télécharger ${name}`, onClick: async () => { try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); } } });
+  return h("div", { class: "sq-attachment" }, preview, h("div", { class: "sq-attachment-footer" }, h("span", { text: name }), download));
+}
 function resetMessages() {
   owner = ""; selectedId = null; listQuery = ""; listMode = "all";
   volatileDrafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
+  releaseMedia();
   unsubscribeView?.(); unsubscribeView = null;
 }
 window.addEventListener("sq:session-ended", resetMessages);
@@ -105,9 +159,11 @@ export async function renderMessages() {
     results.replaceChildren(filtered.length ? h("div", { class: "mail-list" }, ...filtered.map(conversation => {
       const messages = conversationMessages(conversation), last = messages.at(-1), unread = Math.max(0, Number(conversation.unread) || 0);
       const draft = getDraft(conversation.id);
+      const lastAttachment = last?.attachments?.[0] || (last?.attachmentName ? { fileName: last.attachmentName } : null);
+      const lastSummary = lastAttachment ? attachmentLabel(attachmentKind(lastAttachment)) : last ? messageBody(last).slice(0, 90) : participantNames(conversation);
       return h("button", { class: `mail-item conversation-item ${unread ? "unread" : ""} ${selectedId === conversation.id ? "active" : ""}`, type: "button", "aria-pressed": String(selectedId === conversation.id), onClick: () => openConversation(conversation.id, true) },
         profileAvatar(conversationPerson(conversation), { className: "conversation-avatar", size: 38, ariaHidden: true }),
-        h("span", { class: "mail-item-content" }, h("strong", { text: `${pinned.has(conversation.id) ? "📌 " : ""}${conversation.name || "Conversation"}` }), h("p", { text: draft ? "Brouillon non envoyé" : last ? messageBody(last).slice(0, 90) : participantNames(conversation) }), h("p", { text: last && messageDate(last) ? formatDate(messageDate(last)) : `${messages.length} message(s)` })),
+        h("span", { class: "mail-item-content" }, h("strong", { text: `${pinned.has(conversation.id) ? "📌 " : ""}${conversation.name || "Conversation"}` }), h("p", { text: draft ? "Brouillon non envoyé" : lastSummary }), h("p", { text: last && messageDate(last) ? formatDate(messageDate(last)) : `${messages.length} message(s)` })),
         unread ? h("span", { class: "conversation-unread", "aria-label": `${unread} messages non lus`, text: unread > 99 ? "99+" : String(unread) }) : null);
     })) : emptyState(term || listMode !== "all" ? "Aucun résultat" : "Aucune conversation", term ? "Aucune conversation ne correspond à cette recherche." : listMode === "archived" ? "Aucune conversation archivée." : listMode === "pinned" ? "Aucune conversation épinglée." : listMode === "unread" ? "Aucune conversation non lue." : "Créez une conversation avec un membre Workspace.", "messages"));
     resultCount.textContent = `${filtered.length} conversation(s)`;
@@ -178,6 +234,7 @@ export async function renderMessages() {
     });
   }
   function drawThread(userInitiated = false) {
+    releaseMedia();
     const conversation = selected();
     root.classList.toggle("sq-conversation-open", Boolean(conversation));
     if (!conversation) { if(state.route.item){root.classList.add("sq-conversation-open");right.replaceChildren(button("Retour aux conversations",{onClick:()=>{selectedId=null;setRoute("messages");}}),emptyState("Conversation indisponible","Elle n’existe plus ou ne fait pas partie de votre périmètre.","lock"));return;} selectedId = null; right.replaceChildren(emptyState("Sélectionnez une conversation", "Les messages et le champ de réponse apparaîtront ici.", "mail")); return; }
@@ -195,6 +252,11 @@ export async function renderMessages() {
     const latest = button("Derniers messages", { iconName: "ChevronDown", className: "sq-scroll-latest", onClick: () => { thread.scrollTo({ top: thread.scrollHeight, behavior: state.appearance?.reducedMotion || matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }); } });
     latest.hidden = true;
     const drawBubbles = () => {
+      releaseMedia();
+      const signal = mediaAbort.signal;
+      mediaObserver = "IntersectionObserver" in window ? new IntersectionObserver(entries => {
+        for (const entry of entries) if (entry.isIntersecting) { mediaObserver?.unobserve(entry.target); entry.target.dispatchEvent(new Event("sq:preview-visible")); }
+      }, { root: thread, rootMargin: "250px" }) : null;
       const term = normalize(threadQuery.trim()), filtered = term ? messages.filter(message => normalize(`${messageBody(message)} ${message.authorName || message.author || ""}`).includes(term)) : messages;
       const profiles = new Map((state.workspace?.enterprise?.messageProfiles || []).map(profile => [profile.messageID, profile]));
       const nodes = []; let previousDay = "";
@@ -235,15 +297,17 @@ export async function renderMessages() {
           } }) : null,
           mine ? button("Supprimer", { small: true, kind: "ghost", onClick: () => confirmAction({ title: "Supprimer ce message ?", message: "Le message restera marqué comme supprimé dans la conversation.", confirmLabel: "Supprimer", danger: true, onConfirm: () => mutate(() => deleteConversationMessage(conversation.id, message.id)) }) }) : null);
         const reply = profile?.replyToMessageID && messages.find(item => item.id === profile.replyToMessageID);
-        const attachments = removed ? [] : Array.isArray(message.attachments) ? message.attachments : [];
+        const attachments = removed ? [] : Array.isArray(message.attachments) && message.attachments.length ? message.attachments : message.attachmentName ? [{ fileName: message.attachmentName, storageKey: message.attachmentStorageKey, mediaType: "" }] : [];
+        const body = messageBody(message);
+        const generatedCaption = attachments.length && (body === `Pièce jointe : ${attachments[0].fileName}` || body === "Message vocal" || body === attachmentLabel(attachmentKind(attachments[0])));
         nodes.push(h("article", { class: `message-bubble ${mine ? "mine" : ""}` },
           h("div", { class: "message-bubble-head" }, profileAvatar(author, { className: "message-avatar", size: 28, ariaHidden: true }), h("div", {}, h("strong", { text: mine ? "Vous" : message.authorName || message.author || memberName(author) }), h("span", { text: `${valid ? new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date) : ""}${message.editedAt ? " · modifié" : ""}` }))),
           profile?.forwardedFromMessageID ? h("small", { class: "muted", text: "Message transféré" }) : null,
           reply ? h("blockquote", { class: "sq-message-reference", text: `En réponse à : ${messageBody(reply).slice(0, 140)}` }) : null,
           profile?.isPinned ? h("small", { class: "muted", text: "📌 Message épinglé" }) : null,
-          message.proposal ? proposalCard(conversation, message, reload) : h("p", { text: messageBody(message) }),
+          message.proposal ? proposalCard(conversation, message, reload) : body && !generatedCaption ? h("p", { text: body }) : null,
           message.linkedContext ? h("div", { class: "sq-message-reference", text: `${message.linkedContext.entityKind || "Élément"} · ${message.linkedContext.title || "Workspace"}` }) : null,
-          attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => button(`Télécharger · ${file.fileName || "Fichier"}`, { small: true, onClick: async () => { try { await downloadFile(file.id || file.storageKey, file.fileName); } catch (error) { toast(errorMessage(error), "error"); } } }))) : null,
+          attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, mediaObserver, signal))) : null,
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
           mine && !removed ? h("small", { class: "muted", text: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé" }) : null,
           actions));
@@ -305,8 +369,7 @@ export async function renderMessages() {
       sending.add(key); attachmentButton.disabled = true; updateSendState();
       try {
         const uploaded = await uploadFile(file, "messageAttachment", conversation.id);
-        const voice = file.type.startsWith("audio/");
-        await sendConversationMessage(conversation.id, voice ? "Message vocal" : `Pièce jointe : ${file.name}`, null, {
+        await sendConversationMessage(conversation.id, attachmentLabel(attachmentKind(uploaded)), null, {
           attachmentName: file.name, attachmentStorageKey: uploaded.id, attachments: [uploaded]
         });
         toast("Fichier envoyé"); await reload();
