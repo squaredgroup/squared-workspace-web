@@ -173,7 +173,10 @@ export async function renderMessages() {
     const busy = sending.has(draftKey(conversation.id));
     sendButton.disabled = busy || !state.online || !messageBox.value.trim() || messageBox.value.length > 4000;
     sendButton.setAttribute("aria-busy", String(busy)); messageBox.disabled = busy;
-    if (draftNote) draftNote.textContent = !state.online ? "Hors ligne : votre brouillon reste dans cette session. Il ne sera pas envoyé automatiquement." : messageBox.value ? (messageBox.dataset.draftStored==="true"?"Brouillon conservé dans cet onglet, y compris après rechargement, pendant 24 h maximum. Effacé à la déconnexion.":"Stockage indisponible : brouillon en mémoire uniquement. Copiez-le avant de recharger.") : "Les messages sont envoyés uniquement après validation.";
+    if (draftNote) {
+      draftNote.dataset.state = !state.online ? "offline" : messageBox.value ? "draft" : "idle";
+      draftNote.textContent = !state.online ? "Hors ligne : votre brouillon reste dans cette session. Il ne sera pas envoyé automatiquement." : messageBox.value ? (messageBox.dataset.draftStored==="true"?"Brouillon conservé dans cet onglet, y compris après rechargement, pendant 24 h maximum. Effacé à la déconnexion.":"Stockage indisponible : brouillon en mémoire uniquement. Copiez-le avant de recharger.") : "Les messages sont envoyés uniquement après validation.";
+    }
   }
   function backToList() {
     selectedId = null; shownConversation = null; root.classList.remove("sq-conversation-open"); drawList();
@@ -310,7 +313,14 @@ export async function renderMessages() {
           attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, mediaObserver, signal))) : null,
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
           mine && !removed ? h("small", { class: "muted", text: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé" }) : null,
-          actions));
+          actions,
+          actions ? button("Actions", { small: true, className: "sq-message-action-menu", ariaLabel: `Actions sur le message de ${mine ? "vous" : message.authorName || message.author || "un membre"}`, onClick: () => {
+            const choices = [...actions.querySelectorAll(":scope > button")];
+            let menu;
+            menu = modal({ title: "Actions sur le message", content: h("div", { class: "sq-message-action-list" }, ...choices.map(choice => button(choice.textContent.trim(), { onClick: () => {
+              menu.close(); choice.click();
+            } }))) });
+          } }) : null));
       }
       thread.replaceChildren(...(nodes.length ? nodes : [emptyState(term ? "Aucun message correspondant" : "Aucun message", term ? "Essayez un autre mot dans cette discussion." : "Commencez la conversation.", "messages")]));
     };
@@ -347,6 +357,7 @@ export async function renderMessages() {
       }
     };
     sendButton = button("Envoyer", { kind: "primary", iconName: "send" });
+    sendButton.setAttribute("aria-label", "Envoyer");
     sendButton.addEventListener("click", () => { void send(); });
     const attachmentInput = h("input", { type: "file", class: "sr-only", "aria-label": "Choisir une pièce jointe", accept: "*/*" });
     const attachmentButton = button("Joindre un fichier", { small: true, onClick: () => attachmentInput.click() });
@@ -382,7 +393,14 @@ export async function renderMessages() {
       state.user.permissions.includes("manageMissions") ? button("Envoyer une mission", { small: true, onClick: () => openProposalPicker(conversation, "mission", reload) }) : null,
       state.user.permissions.includes("manageContracts") ? button("Envoyer un contrat", { small: true, onClick: () => openProposalPicker(conversation, "contract", reload) }) : null
     ].filter(Boolean) : [];
-    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", {}, h("strong", { text: conversation.name || "Conversation" }), h("small", { text: participantNames(conversation) })), searchToggle, button("Options", { small: true, onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, box, sendButton), h("div", { class: "composer-meta" }, attachmentButton, contextButton, ...proposalButtons, attachmentInput, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
+    const addButton = button("Ajouter", { iconName: "add", className: "sq-composer-add", ariaLabel: "Ajouter au message", onClick: () => {
+      let menu;
+      menu = modal({ title: "Ajouter au message", content: h("div", { class: "sq-message-action-list" }, ...[
+        ["Joindre une photo ou un document", attachmentButton], ["Lier un élément Workspace", contextButton],
+        ...proposalButtons.map(control => [control.textContent.trim(), control])
+      ].map(([label, control]) => button(label, { onClick: () => { menu.close(); control.click(); } }))) });
+    } });
+    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", { class: "sq-thread-identity" }, h("strong", { text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })), searchToggle, button("Options", { small: true, iconName: "Settings", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, attachmentButton, contextButton, ...proposalButtons, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
     drawBubbles(); updateDraft();
     requestAnimationFrame(() => {
       if (!root.isConnected || !alive()) return;
