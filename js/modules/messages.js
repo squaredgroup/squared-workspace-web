@@ -1,7 +1,7 @@
 import { getDraft, saveDraft } from "../focus-state.js";
-import { state, subscribe, setRoute } from "../store.js";
+import { state, subscribe, setRoute, setAppearance } from "../store.js";
 import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile, fetchFileBlob } from "../api.js";
-import { h, pageHeader, card, button, icon, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
+import { h, card, button, icon, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
 import { openProposalPicker, proposalCard } from "../message-proposals.js";
 import { openPDF, drawPDFPage } from "../pdf-reader.js";
 
@@ -27,7 +27,7 @@ let owner = "", selectedId = null, listQuery = "", listMode = "all";
 let activeRefresh = null, unsubscribeView = null, generation = 0;
 let mediaAbort = new AbortController(), mediaObserver = null;
 const mediaURLs = new Set();
-let activeViewer = null;
+let activeViewer = null, activeGallery = null;
 function releaseMedia() {
   mediaAbort.abort(); mediaAbort = new AbortController();
   mediaObserver?.disconnect(); mediaObserver = null;
@@ -120,7 +120,7 @@ function openAttachmentViewer(file, cachedBlob = null) {
     } catch (error) { if (!controller.signal.aborted) content.replaceChildren(h("p", { class: "sq-reader-error", text: errorMessage(error) })); }
   })();
 }
-function attachmentPreview(file, observer, signal) {
+function attachmentPreview(file, observer, signal, resourceURLs = mediaURLs) {
   const kind = attachmentKind(file), name = file.fileName || "Fichier", id = file.storageKey || file.id;
   const detail = h("small", { text: attachmentLabel(kind) });
   let cachedBlob = null;
@@ -150,30 +150,30 @@ function attachmentPreview(file, observer, signal) {
           try {
             resource = await openPDF(typedBlob);
             detail.textContent = `PDF · ${resource.document.numPages} page${resource.document.numPages > 1 ? "s" : ""}`;
-            if (!signal.aborted) { await drawPDFPage(resource.document, 1, canvas, Math.min(300, preview.clientWidth - 16), signal); if (!signal.aborted) canvas.dataset.rendered = "true"; }
+            if (!signal.aborted) { await drawPDFPage(resource.document, 1, canvas, Math.min(108, preview.clientWidth - 20), signal); if (!signal.aborted) canvas.dataset.rendered = "true"; }
           } finally { if (resource) await resource.destroy(); }
           return;
         }
-        const url = URL.createObjectURL(typedBlob); mediaURLs.add(url);
+        const url = URL.createObjectURL(typedBlob); resourceURLs.add(url);
         const media = kind === "image" ? h("img", { src: url, alt: name, loading: "lazy", onError: fallback })
           : h(kind, { src: url, preload: "metadata", "aria-label": name, onError: fallback });
-        if (signal.aborted) { URL.revokeObjectURL(url); mediaURLs.delete(url); return; }
+        if (signal.aborted) { URL.revokeObjectURL(url); resourceURLs.delete(url); return; }
         preview.replaceChildren(media);
       } catch (error) { if (!signal.aborted) fallback(); }
     };
     if (observer) { preview.addEventListener("sq:preview-visible", load, { once: true }); observer.observe(preview); }
     else void load();
   }
-  const open = button("Ouvrir", { iconName: "external", className: "sq-attachment-open", ariaLabel: `Ouvrir ${name} dans le lecteur`, onClick: () => openAttachmentViewer(file, cachedBlob) });
+  const open = button("Ouvrir", { iconName: "Expand", className: "sq-attachment-open", ariaLabel: `Ouvrir ${name} dans le lecteur`, onClick: () => openAttachmentViewer(file, cachedBlob) });
   const download = button("Télécharger", { iconName: "download", small: true, className: "sq-attachment-download", disabled: !id, ariaLabel: `Télécharger ${name}`, onClick: async () => { try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); } } });
   const opaqueName = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?:\.[a-z0-9]+)?$/i.test(name);
-  const caption = h("div", { class: "sq-attachment-caption" }, h("strong", { text: opaqueName ? attachmentLabel(kind) : name, title: name }), detail);
+  const caption = h("button", { type: "button", class: "sq-attachment-caption", "aria-label": `Lire ${name}`, onClick: () => openAttachmentViewer(file, cachedBlob) }, h("strong", { text: opaqueName ? attachmentLabel(kind) : name, title: name }), detail);
   return h("div", { class: `sq-attachment sq-attachment-card-${kind}` }, h("div", { class: "sq-attachment-stage" }, preview, open), h("div", { class: "sq-attachment-footer" }, icon(kind === "image" ? "image" : kind === "video" ? "external" : "document", 18), caption, download));
 }
 function resetMessages() {
   owner = ""; selectedId = null; listQuery = ""; listMode = "all";
   volatileDrafts.clear(); sending.clear(); reading.clear(); activeRefresh = null; generation++;
-  activeViewer?.close();
+  activeViewer?.close(); activeGallery?.close();
   releaseMedia();
   unsubscribeView?.(); unsubscribeView = null;
 }
@@ -237,8 +237,9 @@ export async function renderMessages() {
   const reload = async () => { await loadWorkspace(); if (alive()) paint(); };
   const inboxCount = h("span", { class: "sq-inbox-count" });
   const inboxSummary = h("small", { class: "sq-inbox-summary" });
-  leftCard.querySelector(":scope > .card-head").replaceChildren(h("div", { class: "sq-inbox-heading" }, h("span", { class: "sq-inbox-kicker", text: "Workspace / échanges" }), h("div", { class: "sq-inbox-title" }, h("h2", { class: "card-title", text: "Conversations" }), inboxCount), inboxSummary), button("Nouvelle conversation", { iconName: "edit", ariaLabel: "Nouvelle conversation", className: "sq-new-conversation", onClick: () => newConversation(reload) }));
-  root.append(pageHeader({ eyebrow: "Communication", title: "Messages" }), h("div", { class: "split-view sq-messenger-shell" }, leftCard, rightCard));
+  leftCard.prepend(h("div", { class: "sq-inbox-brandbar" }, h("div", { class: "sq-inbox-brand" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "Squared", width: 28, height: 28 }), h("span", { text: "WORKSPACE", class: "sq-inbox-wordmark" })), h("div", { class: "sq-inbox-account" }, iconButton("sun", "Changer de thème", () => setAppearance({ mode: document.documentElement.dataset.theme === "dark" ? "light" : "dark" })), h("button", { type: "button", class: "sq-inbox-profile", "aria-label": "Ouvrir mon profil", onClick: () => setRoute("profile") }, profileAvatar(state.user, { size: 30, ariaHidden: true })))));
+  leftCard.querySelector(":scope > .card-head").replaceChildren(h("div", { class: "sq-inbox-heading" }, h("span", { class: "sq-inbox-kicker", text: "MESSAGES" }), h("div", { class: "sq-inbox-title" }, h("h1", { class: "card-title", text: "Conversations" }), inboxCount), inboxSummary), button("Nouvelle conversation", { iconName: "edit", ariaLabel: "Nouvelle conversation", className: "sq-new-conversation", onClick: () => newConversation(reload) }));
+  root.append(h("div", { class: "split-view sq-messenger-shell" }, leftCard, rightCard));
   const search = h("input", { class: "search-input", type: "search", placeholder: "Rechercher une conversation…", "aria-label": "Rechercher une conversation", value: listQuery });
   const results = h("div", { class: "sq-conversation-results" });
   const pinnedRail = h("div", { class: "sq-pinned-rail", hidden: true });
@@ -305,6 +306,29 @@ export async function renderMessages() {
     if (userInitiated && !root.classList.contains("sq-conversation-open")) listScroll = window.scrollY;
     if(userInitiated&&state.route.item!==id){setRoute("messages","",id);return;}
     selectedId = id; drawList(); drawThread(userInitiated);
+  }
+  function conversationGallery(conversation) {
+    activeGallery?.close();
+    const galleryURLs = new Set(), seen = new Set();
+    let galleryRender = new AbortController();
+    const files = conversationMessages(conversation).filter(message => !message.deletedAt && !message.deleted_at).flatMap(message => Array.isArray(message.attachments) && message.attachments.length ? message.attachments : message.attachmentName ? [{ fileName: message.attachmentName, storageKey: message.attachmentStorageKey }] : []).filter(file => { const key = file.id || file.storageKey; if (!key || seen.has(key)) return false; seen.add(key); return true; }).reverse();
+    const participants = (conversation.participantIDs || []).map(teamMember).filter(Boolean);
+    const mediaCount = files.filter(file => ["image", "video", "audio"].includes(attachmentKind(file))).length;
+    const summary = h("div", { class: "sq-gallery-summary" }, profileAvatar(conversationPerson(conversation), { size: 56, ariaHidden: true }), h("div", {}, h("strong", { text: conversation.name || "Conversation" }), h("small", { text: `${participants.length} membre${participants.length > 1 ? "s" : ""} · ${files.length} fichier${files.length > 1 ? "s" : ""} partagé${files.length > 1 ? "s" : ""}` })));
+    const grid = h("div", { class: "sq-gallery-grid" });
+    const filters = [["all", `Tout (${files.length})`], ["media", `Médias (${mediaCount})`], ["documents", `Documents (${files.length - mediaCount})`]];
+    let currentFilter = "all";
+    const controls = filters.map(([key, label]) => button(label, { small: true, pressed: key === currentFilter, onClick: () => { currentFilter = key; paintGallery(); } }));
+    function paintGallery() {
+      galleryRender.abort(); galleryRender = new AbortController();
+      for (const url of galleryURLs) URL.revokeObjectURL(url); galleryURLs.clear();
+      controls.forEach((control, index) => control.setAttribute("aria-pressed", String(filters[index][0] === currentFilter)));
+      const visible = files.filter(file => currentFilter === "all" || (["image", "video", "audio"].includes(attachmentKind(file)) ? currentFilter === "media" : currentFilter === "documents"));
+      grid.replaceChildren(...(visible.length ? visible.map(file => attachmentPreview(file, null, galleryRender.signal, galleryURLs)) : [emptyState("Aucun fichier dans cette catégorie", "Les pièces jointes de cette conversation apparaîtront ici.", "document")]));
+    }
+    let gallery;
+    gallery = modal({ title: "Médias partagés", wide: true, className: "sq-conversation-gallery", content: h("div", { class: "sq-gallery-content" }, summary, h("div", { class: "sq-gallery-filters" }, ...controls), grid, h("div", { class: "sq-gallery-members" }, h("h4", { text: "Participants" }), ...participants.map(member => h("div", { class: "sq-gallery-member" }, profileAvatar(member, { size: 28, ariaHidden: true }), h("span", { text: memberName(member) }))))), onClose: () => { galleryRender.abort(); for (const url of galleryURLs) URL.revokeObjectURL(url); galleryURLs.clear(); if (activeGallery === gallery) activeGallery = null; } });
+    activeGallery = gallery; paintGallery();
   }
   function conversationOptions(conversation) {
     const archived = (state.workspace?.intelligence?.archivedEntityIDs || []).includes(conversation.id);
@@ -437,8 +461,8 @@ export async function renderMessages() {
           actions,
           h("div", { class: "sq-message-footer" },
           h("time", { class: "sq-message-clock", datetime: valid ? date.toISOString() : null, text: `${valid ? new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date) : ""}${message.editedAt ? " · modifié" : ""}` }),
-          mine && !removed ? h("small", { class: `sq-message-receipt ${profile?.readBy?.length ? "sq-receipt-read" : ""}`, title: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé", "aria-label": profile?.readBy?.length ? "Lu" : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé", text: profile?.readBy?.length || profile?.deliveryState === "delivered" ? "✓✓" : "✓" }) : null,
-          actions ? button("···", { small: true, className: "sq-message-action-menu", ariaLabel: `Actions sur le message de ${mine ? "vous" : message.authorName || message.author || "un membre"}`, onClick: () => {
+          mine && !removed ? h("small", { class: `sq-message-receipt ${profile?.readBy?.length ? "sq-receipt-read" : ""}`, title: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé", "aria-label": profile?.readBy?.length ? "Lu" : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé" }, icon(profile?.readBy?.length || profile?.deliveryState === "delivered" ? "DoubleCheck" : "check", 13)) : null,
+          actions ? button("Actions", { iconName: "More", small: true, className: "sq-message-action-menu", ariaLabel: `Actions sur le message de ${mine ? "vous" : message.authorName || message.author || "un membre"}`, onClick: () => {
             const choices = [...actions.querySelectorAll(":scope > button")];
             let menu;
             menu = modal({ title: "Actions sur le message", className: "sq-message-tools-sheet sq-message-actions-sheet", content: h("div", { class: "sq-message-action-list" }, ...choices.map(choice => button(choice.textContent.trim(), { onClick: () => {
@@ -527,7 +551,7 @@ export async function renderMessages() {
       state.user.permissions.includes("manageMissions") ? button("Envoyer une mission", { small: true, onClick: () => openProposalPicker(conversation, "mission", reload) }) : null,
       state.user.permissions.includes("manageContracts") ? button("Envoyer un contrat", { small: true, onClick: () => openProposalPicker(conversation, "contract", reload) }) : null
     ].filter(Boolean) : [];
-    const addButton = button("Ajouter", { iconName: "add", className: "sq-composer-add", ariaLabel: "Ajouter au message", onClick: () => {
+    const addButton = button("Ajouter", { iconName: "Paperclip", className: "sq-composer-add", ariaLabel: "Ajouter au message", onClick: () => {
       let menu;
       menu = modal({ title: "Ajouter au message", className: "sq-message-tools-sheet", content: h("div", { class: "sq-message-add-grid" }, ...[
         ["Joindre une photo ou un document", "image", "Photos, PDF, vidéos et fichiers", attachmentButton], ["Lier un élément Workspace", "external", "Projet, tâche ou livrable", contextButton],
@@ -538,7 +562,8 @@ export async function renderMessages() {
         return choice;
       })) });
     } });
-    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, profileAvatar(conversationPerson(conversation), { className: "sq-thread-avatar", size: 38, ariaHidden: true }), h("div", { class: "sq-thread-identity" }, h("strong", { title: conversation.name || "Conversation", text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })), searchToggle, button("Options", { small: true, iconName: "Settings", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, h("div", { class: "sq-timeline" }, thread, latest), h("div", { class: "sq-composer-dock" }, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, h("span", { class: "sq-composer-shortcut", text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote));
+    const identity = h("button", { type: "button", class: "sq-thread-profile", "aria-label": "Voir les médias et les participants", onClick: () => conversationGallery(conversation) }, profileAvatar(conversationPerson(conversation), { className: "sq-thread-avatar", size: 36, ariaHidden: true }), h("span", { class: "sq-thread-identity" }, h("strong", { title: conversation.name || "Conversation", text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })));
+    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, identity, searchToggle, button("Options", { small: true, iconName: "More", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, h("div", { class: "sq-timeline" }, thread, latest), h("div", { class: "sq-composer-dock" }, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, h("span", { class: "sq-composer-shortcut", text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote));
     drawBubbles(); updateDraft();
     requestAnimationFrame(() => {
       if (!root.isConnected || !alive()) return;
