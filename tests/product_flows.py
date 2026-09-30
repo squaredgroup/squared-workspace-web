@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from playwright.sync_api import expect, sync_playwright
+from media_fixture import sample_pdf
 
 PROJECT = Path(__file__).resolve().parents[1]
 ROOT = PROJECT / "_site"
@@ -66,27 +67,6 @@ SYSTEM_TEMPLATE = {"key": "notification", "name": "Notifications", "description"
 DRAFTS = {}
 
 
-def sample_pdf():
-    drawing = b"BT /F1 22 Tf 64 700 Td (Apercu PDF Workspace) Tj ET"
-    second = b"BT /F1 22 Tf 64 700 Td (Page deux Workspace) Tj ET"
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-        b"<< /Length " + str(len(drawing)).encode() + b" >>\nstream\n" + drawing + b"\nendstream",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 7 0 R >>",
-        b"<< /Length " + str(len(second)).encode() + b" >>\nstream\n" + second + b"\nendstream",
-    ]
-    chunks = [b"%PDF-1.4\n"]
-    offsets = [0]
-    for number, obj in enumerate(objects, 1):
-        offsets.append(sum(map(len, chunks)))
-        chunks.append(str(number).encode() + b" 0 obj\n" + obj + b"\nendobj\n")
-    xref = sum(map(len, chunks))
-    chunks.append(b"xref\n0 8\n0000000000 65535 f \n" + b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:]))
-    chunks.append(b"trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n" + str(xref).encode() + b"\n%%EOF\n")
-    return b"".join(chunks)
 
 
 PDF_BYTES = sample_pdf()
@@ -401,10 +381,15 @@ with sync_playwright() as playwright:
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('messages')}""")
     expect(page.get_by_role("button", name="Direction produit", exact=False)).to_be_visible()
     if visual_dir:
+        expect(page.locator("#workspace-main")).to_have_attribute("aria-busy", "false")
+        page.wait_for_timeout(250)
         page.screenshot(path=str(visual_dir / "messages-list-mobile.png"))
     page.get_by_role("button", name="Direction produit", exact=False).click()
     expect(page.get_by_role("log", name="Messages de Direction produit")).to_be_visible()
     if visual_dir:
+        expect(page.locator("#workspace-main")).to_have_attribute("aria-busy", "false")
+        expect(page.get_by_role("img", name="Aperçu PDF : dossier.pdf")).to_have_attribute("data-rendered", "true")
+        page.wait_for_timeout(250)
         page.screenshot(path=str(visual_dir / "messages-thread-mobile.png"))
     page.get_by_role("button", name="Ouvrir dossier.pdf dans le lecteur").click()
     mobile_reader = page.get_by_role("dialog", name="dossier.pdf")

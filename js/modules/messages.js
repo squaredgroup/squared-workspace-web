@@ -1,7 +1,7 @@
 import { getDraft, saveDraft } from "../focus-state.js";
 import { state, subscribe, setRoute } from "../store.js";
 import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile, fetchFileBlob } from "../api.js";
-import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
+import { h, pageHeader, card, button, icon, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
 import { openProposalPicker, proposalCard } from "../message-proposals.js";
 import { openPDF, drawPDFPage } from "../pdf-reader.js";
 
@@ -12,6 +12,13 @@ const normalize = text => String(text || "").normalize("NFD").replace(/[\u0300-\
 const messageAuthorId = message => message.authorId || message.authorID || message.author_id || message.senderId || message.senderID;
 const messageDate = message => message.createdAt || message.created_at || message.time;
 const messageBody = message => message.body || message.text || "";
+function conversationTime(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(date);
+}
 const teamMember = id => (state.workspace?.team || []).find(member => memberId(member) === id);
 const volatileDrafts = new Set();
 // Draft content is held exclusively by the bounded, per-session draft store.
@@ -155,9 +162,11 @@ function attachmentPreview(file, observer, signal) {
     if (observer) { preview.addEventListener("sq:preview-visible", load, { once: true }); observer.observe(preview); }
     else void load();
   }
-  const open = button("Ouvrir", { className: "sq-attachment-open", ariaLabel: `Ouvrir ${name} dans le lecteur`, onClick: () => openAttachmentViewer(file, cachedBlob) });
-  const download = button("Télécharger", { small: true, disabled: !id, ariaLabel: `Télécharger ${name}`, onClick: async () => { try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); } } });
-  return h("div", { class: "sq-attachment" }, h("div", { class: "sq-attachment-stage" }, preview, open), h("div", { class: "sq-attachment-footer" }, h("span", { text: name }), download));
+  const open = button("Ouvrir", { iconName: "external", className: "sq-attachment-open", ariaLabel: `Ouvrir ${name} dans le lecteur`, onClick: () => openAttachmentViewer(file, cachedBlob) });
+  const download = button("Télécharger", { iconName: "download", small: true, className: "sq-attachment-download", disabled: !id, ariaLabel: `Télécharger ${name}`, onClick: async () => { try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); } } });
+  const opaqueName = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?:\.[a-z0-9]+)?$/i.test(name);
+  const caption = h("div", { class: "sq-attachment-caption" }, h("strong", { text: opaqueName ? attachmentLabel(kind) : name, title: name }), h("small", { text: attachmentLabel(kind) }));
+  return h("div", { class: `sq-attachment sq-attachment-card-${kind}` }, h("div", { class: "sq-attachment-stage" }, preview, open), h("div", { class: "sq-attachment-footer" }, icon(kind === "image" ? "image" : kind === "video" ? "external" : "document", 18), caption, download));
 }
 function resetMessages() {
   owner = ""; selectedId = null; listQuery = ""; listMode = "all";
@@ -213,7 +222,7 @@ export async function renderMessages() {
   if (owner !== currentOwner) { resetMessages(); owner = currentOwner; }
   unsubscribeView?.(); const version = ++generation;
   selectedId=state.route.item||null;
-  const root = h("div", { class: "sq-messages" }), left = h("div"), right = h("div", { class: "sq-thread-content" });
+  const root = h("div", { class: "sq-messages" }), left = h("div", { class: "sq-inbox-body" }), right = h("div", { class: "sq-thread-content" });
   const leftCard = card("Conversations", "Canaux auxquels vous avez accès.", left, { iconName: "messages", className: "sq-conversation-list" });
   const rightCard = card("Discussion", "Sélectionnez une conversation.", right, { iconName: "mail", className: "sq-message-panel" });
   rightCard.querySelector(":scope > .card-head")?.remove();
@@ -224,14 +233,16 @@ export async function renderMessages() {
   const selected = () => conversations().find(conversation => conversation.id === selectedId);
   const draftKey = id => `${currentOwner}:${id}`;
   const reload = async () => { await loadWorkspace(); if (alive()) paint(); };
-  root.append(pageHeader({ eyebrow: "Communication", title: "Messages", subtitle: "Vos échanges et vos décisions, dans leur contexte.", actions: [button("Nouvelle conversation", { kind: "primary", iconName: "add", onClick: () => newConversation(reload) })] }), h("div", { class: "split-view" }, leftCard, rightCard));
+  const inboxCount = h("span", { class: "sq-inbox-count" });
+  leftCard.querySelector(":scope > .card-head").replaceChildren(h("div", { class: "sq-inbox-title" }, h("h2", { class: "card-title", text: "Conversations" }), inboxCount), button("Nouvelle conversation", { iconName: "edit", ariaLabel: "Nouvelle conversation", className: "sq-new-conversation", onClick: () => newConversation(reload) }));
+  root.append(pageHeader({ eyebrow: "Communication", title: "Messages" }), h("div", { class: "split-view sq-messenger-shell" }, leftCard, rightCard));
   const search = h("input", { class: "search-input", type: "search", placeholder: "Rechercher une conversation…", "aria-label": "Rechercher une conversation", value: listQuery });
-  const results = h("div", { class: "section-gap" });
+  const results = h("div", { class: "sq-conversation-results" });
   const resultCount = h("span", { class: "sr-only", role: "status", "aria-live": "polite" });
   const filters = [
     ["all", "Toutes"], ["unread", "Non lues"], ["pinned", "Épinglées"], ["archived", "Archivées"]
   ].map(([mode, label]) => button(label, { small: true, pressed: listMode === mode, onClick: () => setFilter(mode) }));
-  left.append(h("div", { class: "sq-conversation-search" }, search, h("div", { class: "sq-conversation-filters" }, ...filters)), resultCount, results);
+  left.append(h("div", { class: "sq-conversation-search" }, h("div", { class: "sq-inbox-search" }, icon("search", 17), search), h("div", { class: "sq-conversation-filters" }, ...filters)), resultCount, results);
   search.addEventListener("input", () => { listQuery = search.value; drawList(); });
   function setFilter(value) {
     listMode = value; filters.forEach((control, index) => control.setAttribute("aria-pressed", String(["all", "unread", "pinned", "archived"][index] === value))); drawList();
@@ -246,15 +257,17 @@ export async function renderMessages() {
       const visible = listMode === "archived" ? archived.has(conversation.id) : !archived.has(conversation.id) && (listMode === "unread" ? Number(conversation.unread) > 0 : listMode === "pinned" ? pinned.has(conversation.id) : true);
       return visible && normalize(`${conversation.name || ""} ${participantNames(conversation)} ${last ? messageBody(last) : ""}`).includes(term);
     });
+    inboxCount.textContent = String(conversations().filter(conversation => !archived.has(conversation.id)).length);
     results.replaceChildren(filtered.length ? h("div", { class: "mail-list" }, ...filtered.map(conversation => {
       const messages = conversationMessages(conversation), last = messages.at(-1), unread = Math.max(0, Number(conversation.unread) || 0);
       const draft = getDraft(conversation.id);
       const lastAttachment = last?.attachments?.[0] || (last?.attachmentName ? { fileName: last.attachmentName } : null);
       const lastSummary = lastAttachment ? attachmentLabel(attachmentKind(lastAttachment)) : last ? messageBody(last).slice(0, 90) : participantNames(conversation);
       return h("button", { class: `mail-item conversation-item ${unread ? "unread" : ""} ${selectedId === conversation.id ? "active" : ""}`, type: "button", "aria-pressed": String(selectedId === conversation.id), onClick: () => openConversation(conversation.id, true) },
-        profileAvatar(conversationPerson(conversation), { className: "conversation-avatar", size: 38, ariaHidden: true }),
-        h("span", { class: "mail-item-content" }, h("strong", { text: `${pinned.has(conversation.id) ? "📌 " : ""}${conversation.name || "Conversation"}` }), h("p", { text: draft ? "Brouillon non envoyé" : lastSummary }), h("p", { text: last && messageDate(last) ? formatDate(messageDate(last)) : `${messages.length} message(s)` })),
-        unread ? h("span", { class: "conversation-unread", "aria-label": `${unread} messages non lus`, text: unread > 99 ? "99+" : String(unread) }) : null);
+        profileAvatar(conversationPerson(conversation), { className: "conversation-avatar", size: 46, ariaHidden: true }),
+        h("span", { class: "mail-item-content" },
+          h("span", { class: "sq-conversation-topline" }, h("strong", { title: conversation.name || "Conversation", text: conversation.name || "Conversation" }), h("time", { class: "sq-conversation-time", datetime: last && messageDate(last) || null, text: last ? conversationTime(messageDate(last)) : "" })),
+          h("span", { class: "sq-conversation-bottomline" }, h("p", { class: draft ? "sq-conversation-draft" : "", text: draft ? "Brouillon · " + draft.slice(0, 70) : lastSummary }), unread ? h("span", { class: "conversation-unread", "aria-label": `${unread} messages non lus`, text: unread > 99 ? "99+" : String(unread) }) : pinned.has(conversation.id) ? icon("star", 13) : null)));
     })) : emptyState(term || listMode !== "all" ? "Aucun résultat" : "Aucune conversation", term ? "Aucune conversation ne correspond à cette recherche." : listMode === "archived" ? "Aucune conversation archivée." : listMode === "pinned" ? "Aucune conversation épinglée." : listMode === "unread" ? "Aucune conversation non lue." : "Créez une conversation avec un membre Workspace.", "messages"));
     resultCount.textContent = `${filtered.length} conversation(s)`;
   }
@@ -265,7 +278,8 @@ export async function renderMessages() {
     sendButton.setAttribute("aria-busy", String(busy)); messageBox.disabled = busy;
     if (draftNote) {
       draftNote.dataset.state = !state.online ? "offline" : messageBox.value ? "draft" : "idle";
-      draftNote.textContent = !state.online ? "Hors ligne : votre brouillon reste dans cette session. Il ne sera pas envoyé automatiquement." : messageBox.value ? (messageBox.dataset.draftStored==="true"?"Brouillon conservé dans cet onglet, y compris après rechargement, pendant 24 h maximum. Effacé à la déconnexion.":"Stockage indisponible : brouillon en mémoire uniquement. Copiez-le avant de recharger.") : "Les messages sont envoyés uniquement après validation.";
+      draftNote.textContent = !state.online ? "Hors ligne · Brouillon conservé, envoi en attente de votre action." : messageBox.value ? (messageBox.dataset.draftStored==="true"?"Brouillon enregistré":"Stockage indisponible : copiez votre brouillon avant de recharger.") : "";
+      draftNote.title = messageBox.dataset.draftStored === "true" ? "Conservé dans cet onglet pendant 24 h maximum, puis effacé à la déconnexion." : "";
     }
   }
   function backToList() {
@@ -336,7 +350,7 @@ export async function renderMessages() {
     const atBottom = !oldThread || oldThread.scrollHeight - oldThread.clientHeight - oldThread.scrollTop < 60;
     const newThread = shownConversation !== conversation.id; shownConversation = conversation.id;
     if (newThread) { replyingTo = null; linkedContext = null; }
-    const back = button("Retour", { iconName: "ChevronDown", ariaLabel: "Retour aux conversations", className: "sq-conversation-back", onClick: backToList });
+    const back = button("Retour", { iconName: "ArrowLeft", ariaLabel: "Retour aux conversations", className: "sq-conversation-back", onClick: backToList });
     const thread = h("div", { class: "message-thread", role: "log", "aria-live": "polite", "aria-label": `Messages de ${conversation.name || "la conversation"}`, tabindex: "0" });
     const threadSearch = h("input", { class: "search-input", type: "search", value: threadQuery, placeholder: "Rechercher dans cette discussion…", "aria-label": "Rechercher dans cette discussion" });
     const searchArea = h("div", { class: "sq-message-search", hidden: !threadSearchOpen }, threadSearch);
@@ -352,16 +366,19 @@ export async function renderMessages() {
       }, { root: thread, rootMargin: "250px" }) : null;
       const term = normalize(threadQuery.trim()), filtered = term ? messages.filter(message => normalize(`${messageBody(message)} ${message.authorName || message.author || ""}`).includes(term)) : messages;
       const profiles = new Map((state.workspace?.enterprise?.messageProfiles || []).map(profile => [profile.messageID, profile]));
-      const nodes = []; let previousDay = "";
+      const nodes = []; let previousDay = "", previousMessage = null;
       for (const message of filtered) {
         const date = new Date(messageDate(message)), valid = Number.isFinite(date.getTime());
         const day = valid ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(date) : "Date indisponible";
-        if (day !== previousDay) { nodes.push(h("div", { class: "sq-message-date", text: day })); previousDay = day; }
+        if (day !== previousDay) { nodes.push(h("div", { class: "sq-message-date" }, h("span", { text: day }))); previousDay = day; previousMessage = null; }
         if (message.proposalEvent) {
           nodes.push(h("div", { class: "sq-proposal-event", text: `${messageBody(message)} · ${valid ? formatDate(date) : "Date indisponible"}` }));
+          previousMessage = null;
           continue;
         }
         const authorId = messageAuthorId(message), mine = authorId === state.user?.id;
+        const elapsed = previousMessage ? date.getTime() - new Date(messageDate(previousMessage)).getTime() : NaN;
+        const continuation = previousMessage && messageAuthorId(previousMessage) === authorId && elapsed >= 0 && elapsed < 5 * 60 * 1000;
         const author = mine ? state.user : (teamMember(authorId) || { name: message.authorName || message.author || "Membre", avatarData: message.authorAvatarData || message.author_avatar_data });
         const profile = profiles.get(message.id), removed = Boolean(message.deletedAt || message.deleted_at);
         const myName = memberName(state.user);
@@ -395,25 +412,28 @@ export async function renderMessages() {
           : message.attachmentName ? [{ fileName: message.attachmentName, storageKey: message.attachmentStorageKey, mediaType: "" }] : [];
         const body = messageBody(message);
         const generatedCaption = attachments.length && (body === `Pièce jointe : ${attachments[0].fileName}` || body === "Message vocal" || body === attachmentLabel(attachmentKind(attachments[0])));
-        nodes.push(h("article", { class: `message-bubble ${mine ? "mine" : ""}` },
-          h("div", { class: "message-bubble-head" }, profileAvatar(author, { className: "message-avatar", size: 28, ariaHidden: true }), h("div", {}, h("strong", { text: mine ? "Vous" : message.authorName || message.author || memberName(author) }), h("span", { text: `${valid ? new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date) : ""}${message.editedAt ? " · modifié" : ""}` }))),
+        nodes.push(h("article", { class: `message-bubble ${mine ? "mine" : ""} ${continuation ? "sq-message-continuation" : ""} ${attachments.length ? "sq-message-with-media" : ""} ${generatedCaption ? "sq-message-media-only" : ""}`, "aria-label": `Message de ${mine ? "vous" : memberName(author)}` },
+          !mine && !continuation ? h("div", { class: "message-bubble-head" }, profileAvatar(author, { className: "message-avatar", size: 24, ariaHidden: true }), h("strong", { title: memberName(author), text: message.authorName || message.author || memberName(author) })) : null,
+          h("div", { class: "sq-bubble-surface" },
           profile?.forwardedFromMessageID ? h("small", { class: "muted", text: "Message transféré" }) : null,
           reply ? h("blockquote", { class: "sq-message-reference", text: `En réponse à : ${messageBody(reply).slice(0, 140)}` }) : null,
           profile?.isPinned ? h("small", { class: "muted", text: "📌 Message épinglé" }) : null,
           message.proposal ? proposalCard(conversation, message, reload) : body && !generatedCaption ? h("p", { text: body }) : null,
           message.linkedContext ? h("div", { class: "sq-message-reference", text: `${message.linkedContext.entityKind || "Élément"} · ${message.linkedContext.title || "Workspace"}` }) : null,
-          attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, message === filtered.at(-1) ? null : mediaObserver, signal))) : null,
+          attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, message === filtered.at(-1) ? null : mediaObserver, signal))) : null),
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
           actions,
           h("div", { class: "sq-message-footer" },
+          h("time", { class: "sq-message-clock", datetime: valid ? date.toISOString() : null, text: `${valid ? new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(date) : ""}${message.editedAt ? " · modifié" : ""}` }),
           mine && !removed ? h("small", { class: "muted sq-message-receipt", title: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : "", text: profile?.readBy?.length ? "Lu" : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé" }) : null,
-          actions ? button("Actions", { small: true, className: "sq-message-action-menu", ariaLabel: `Actions sur le message de ${mine ? "vous" : message.authorName || message.author || "un membre"}`, onClick: () => {
+          actions ? button("···", { small: true, className: "sq-message-action-menu", ariaLabel: `Actions sur le message de ${mine ? "vous" : message.authorName || message.author || "un membre"}`, onClick: () => {
             const choices = [...actions.querySelectorAll(":scope > button")];
             let menu;
-            menu = modal({ title: "Actions sur le message", content: h("div", { class: "sq-message-action-list" }, ...choices.map(choice => button(choice.textContent.trim(), { onClick: () => {
+            menu = modal({ title: "Actions sur le message", className: "sq-message-tools-sheet sq-message-actions-sheet", content: h("div", { class: "sq-message-action-list" }, ...choices.map(choice => button(choice.textContent.trim(), { onClick: () => {
               menu.close(); choice.click();
             } }))) });
           } }) : null)));
+        previousMessage = message;
       }
       thread.replaceChildren(...(nodes.length ? nodes : [emptyState(term ? "Aucun message correspondant" : "Aucun message", term ? "Essayez un autre mot dans cette discussion." : "Commencez la conversation.", "messages")]));
     };
@@ -426,15 +446,14 @@ export async function renderMessages() {
     if (replyingTo) replyHint.replaceChildren(h("span", { text: `En réponse à : ${messageBody(replyingTo).slice(0, 80)}` }), button("Annuler", { small: true, kind: "ghost", onClick: () => { replyingTo = null; replyHint.replaceChildren(); } }));
     draftNote = h("p", { class: "sq-message-draft" });
     const updateDraft = () => {
-      if (window.matchMedia("(max-width: 880px)").matches) {
-        box.style.height = "44px";
-        box.style.height = `${Math.min(96, Math.max(44, box.scrollHeight))}px`;
-      }
+      box.style.height = "44px";
+      box.style.height = `${Math.min(124, Math.max(44, box.scrollHeight))}px`;
       const stored=saveDraft(conversation.id,box.value);
       box.dataset.draftStored=String(stored);
       if(box.value&&!stored)volatileDrafts.add(key);else volatileDrafts.delete(key);
       count.textContent = `${new Intl.NumberFormat("fr-FR").format(box.value.length)} / 4 000`;
       count.classList.toggle("warning", box.value.length > 3600); updateSendState();
+      count.hidden = box.value.length < 3600;
     };
     const send = async () => {
       const text = box.value.trim();
@@ -492,12 +511,16 @@ export async function renderMessages() {
     ].filter(Boolean) : [];
     const addButton = button("Ajouter", { iconName: "add", className: "sq-composer-add", ariaLabel: "Ajouter au message", onClick: () => {
       let menu;
-      menu = modal({ title: "Ajouter au message", content: h("div", { class: "sq-message-action-list" }, ...[
-        ["Joindre une photo ou un document", attachmentButton], ["Lier un élément Workspace", contextButton],
-        ...proposalButtons.map(control => [control.textContent.trim(), control])
-      ].map(([label, control]) => button(label, { onClick: () => { menu.close(); control.click(); } }))) });
+      menu = modal({ title: "Ajouter au message", className: "sq-message-tools-sheet", content: h("div", { class: "sq-message-add-grid" }, ...[
+        ["Joindre une photo ou un document", "image", "Photos, PDF, vidéos et fichiers", attachmentButton], ["Lier un élément Workspace", "external", "Projet, tâche ou livrable", contextButton],
+        ...proposalButtons.map(control => [control.textContent.trim(), control.textContent.includes("mission") ? "missions" : "contracts", control.textContent.includes("mission") ? "Proposer une mission" : "Partager un contrat", control])
+      ].map(([label, symbol, description, control]) => {
+        const choice = button(label, { iconName: symbol, className: "sq-message-add-choice", onClick: () => { menu.close(); control.click(); } });
+        choice.append(h("small", { text: description }));
+        return choice;
+      })) });
     } });
-    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, profileAvatar(conversationPerson(conversation), { className: "sq-thread-avatar", size: 38, ariaHidden: true }), h("div", { class: "sq-thread-identity" }, h("strong", { text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })), searchToggle, button("Options", { small: true, iconName: "Settings", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, attachmentButton, contextButton, ...proposalButtons, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
+    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, profileAvatar(conversationPerson(conversation), { className: "sq-thread-avatar", size: 38, ariaHidden: true }), h("div", { class: "sq-thread-identity" }, h("strong", { title: conversation.name || "Conversation", text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })), searchToggle, button("Options", { small: true, iconName: "Settings", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, h("div", { class: "sq-timeline" }, thread, latest), h("div", { class: "sq-composer-dock" }, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, h("span", { class: "sq-composer-shortcut", text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote));
     drawBubbles(); updateDraft();
     requestAnimationFrame(() => {
       if (!root.isConnected || !alive()) return;

@@ -73,6 +73,9 @@ jobs:
       - name: Test all mobile sections and modal lifecycle
         if: ${{ !inputs.omitAutomatedTests && !cancelled() && steps.build.outcome == 'success' }}
         run: WORKSPACE_VISUAL_DIR=output/playwright/mobile python3 tests/mobile_complete.py
+      - name: Inspect messenger designs with real media in both themes
+        if: ${{ !inputs.omitAutomatedTests && !cancelled() && steps.build.outcome == 'success' }}
+        run: WORKSPACE_VISUAL_DIR=output/playwright/messages python3 tests/messages_design.py
       - name: Test Focus tasks, exact links, search and reload-safe drafts
         if: ${{ !inputs.omitAutomatedTests && !cancelled() && steps.build.outcome == 'success' }}
         run: WORKSPACE_VISUAL_DIR=output/playwright/focus python3 tests/focus_flows.py
