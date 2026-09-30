@@ -5,7 +5,7 @@ html[data-theme="light"] .sq-messages{--chat-surface:#fff;--chat-canvas:#f7f8fa;
 .workspace .sq-messages :is(.sq-conversation-list,.sq-message-panel){display:flex;flex-direction:column;min-width:0;min-height:0;margin:0;padding:0;border:0;border-radius:0;box-shadow:none;overflow:hidden;background:var(--chat-surface)}
 .workspace .sq-messages .sq-conversation-list{border-right:1px solid var(--chat-line)}
 .workspace .sq-messages .sq-inbox-brandbar{display:none}
-.workspace .sq-messages .sq-conversation-list>.card-head{display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;gap:10px;padding:24px 20px 20px;margin:0;border:0}
+.workspace .sq-messages .sq-conversation-list>.card-head{display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;flex-wrap:nowrap;gap:10px;padding:24px 20px 20px;margin:0;border:0}
 .workspace .sq-messages .sq-inbox-heading{display:grid;gap:7px;min-width:0}
 .workspace .sq-messages .sq-inbox-kicker{font-size:9px;font-weight:600;letter-spacing:.15em;color:var(--chat-muted)}
 .workspace .sq-messages .sq-inbox-title{display:flex;align-items:center;gap:8px}
@@ -49,6 +49,7 @@ html[data-theme="light"] .sq-messages{--chat-surface:#fff;--chat-canvas:#f7f8fa;
 .workspace .sq-messages .conversation-unread{flex:none;display:grid;place-items:center;min-width:18px;height:18px;min-height:18px;padding:0 5px;border:0;border-radius:6px;background:var(--sq-accent);color:#19260f;font-size:9px;font-weight:700}
 /* Contact bar and a single scrolling timeline. */
 .workspace .sq-messages .sq-thread-content{position:relative;display:flex;flex-direction:column;flex:1;height:100%;min-height:0;min-width:0;background:var(--chat-canvas)}
+.workspace .sq-messages .sq-thread-content>.empty{flex:1;width:100%;min-height:0;margin:0;padding:40px;border:0;border-radius:0;background:transparent}
 .workspace .sq-messages .sq-thread-heading{display:flex;align-items:center;flex:none;gap:8px;min-height:70px;margin:0;padding:12px 24px;border-bottom:1px solid var(--chat-line);background:var(--chat-surface)}
 .workspace .sq-messages .sq-thread-profile{display:flex;align-items:center;gap:10px;flex:1;min-width:0;margin:0;padding:0;border:0;border-radius:8px;background:transparent;color:var(--sq-text);text-align:left;cursor:pointer}
 .workspace .sq-messages .sq-thread-profile:hover strong{text-decoration:underline;text-decoration-color:var(--chat-muted);text-underline-offset:3px}
@@ -264,7 +265,7 @@ html[data-theme="light"] .sq-messages{--chat-surface:#fff;--chat-canvas:#f7f8fa;
  .workspace .sq-messages .sq-scroll-latest:not([hidden]){bottom:12px;right:14px}
  html.sq-keyboard-open .workspace .sq-messages.sq-conversation-open .sq-message-panel{height:var(--sq-viewport-height);min-height:0}
 }
-@media(max-width:359px){.workspace .sq-messages .sq-thread-heading{padding-inline:7px}.workspace .sq-messages .sq-thread-avatar{display:none}.workspace .sq-messages .sq-thread-heading strong{font-size:12px}.workspace .sq-messages .message-thread{padding-inline:12px}.workspace .sq-messages .message-bubble{max-width:87%}.sq-attachment-card-pdf{grid-template-columns:118px minmax(0,1fr)}}
+@media(max-width:359px){.workspace .sq-messages .sq-inbox-title .card-title{font-size:26px}.workspace .sq-messages .sq-thread-heading{padding-inline:7px}.workspace .sq-messages .sq-thread-avatar{display:none}.workspace .sq-messages .sq-thread-heading strong{font-size:12px}.workspace .sq-messages .message-thread{padding-inline:12px}.workspace .sq-messages .message-bubble{max-width:87%}.sq-attachment-card-pdf{grid-template-columns:118px minmax(0,1fr)}}
 @media(max-width:600px){
  .overlay:has(.sq-message-tools-sheet){align-items:end;padding:0}
  .modal.sq-message-tools-sheet{width:100%;border-radius:20px 20px 0 0;padding-bottom:var(--sq-safe-bottom,0px);border-bottom:0}

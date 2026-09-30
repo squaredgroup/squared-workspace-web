@@ -71,6 +71,9 @@ def run():
                     page.set_viewport_size({'width':width,'height':height});f.go(page,'messages')
                     expect(page.get_by_role('button',name='Ouvrir la conversation épinglée Squared Group')).to_be_visible()
                     expect(page.locator('.sq-inbox-summary')).not_to_be_empty()
+                    inbox_heading=page.locator('.sq-inbox-heading').bounding_box()
+                    new_conversation=page.get_by_role('button',name='Nouvelle conversation',exact=True).bounding_box()
+                    assert new_conversation['y'] < inbox_heading['y']+inbox_heading['height'], 'The compose action must stay alongside the inbox heading'
                     capture(page,f'inbox-{theme}-{width}')
                     if theme == 'light' and width == 390:
                         workspace_tools=page.get_by_role('button',name='Outils Workspace',exact=True)
