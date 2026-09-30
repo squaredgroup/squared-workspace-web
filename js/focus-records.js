@@ -4,6 +4,7 @@ import { getCoreEntity, saveCoreEntity, loadWorkspace, downloadFile, uploadFile,
 import { h, button, icon, modal, field, input, textarea, select, emptyState, toast, errorMessage, validateControls, confirmAction, pageHeader } from "./ui.js";
 import { viewContext } from "./focus-state.js";
 import { titleOf, valueOf, dueOf, parentOf, assigneeOf, isMine, isFinished, normalize, dayKey, dateLabel, dueBucket, statusLabel, domainLabels, sectionForDomain, putValue } from "./focus-model.js";
+import { formatMoney } from "./money.js";
 
 const permissions={projects:"manageProjects",tasks:"manageTasks",missions:"manageMissions",events:"manageTasks",validations:"decideValidations",deliverables:"manageDeliverables",documents:"manageDocuments",resources:"manageOrganization",contracts:"manageContracts",clients:"manageClients"};
 export const canEditRecord=domain=>Boolean(state.user?.permissions?.includes(permissions[domain]));
@@ -47,10 +48,10 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
   const oldDue=dueOf(original),date=input(dayKey(oldDue),{type:"date"});
   const priority=choiceWithCurrent(valueOf(original,"priority"),[{value:"low",label:"Basse"},{value:"normal",label:"Normale"},{value:"high",label:"Haute"},{value:"urgent",label:"Urgente"}],"Non définie");
   const controls=[title,status,description],content=h("form",{class:"form focus-editor"},field(domain==="tasks"?"Tâche":"Titre",title),field(domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description",description));
-  const remuneration=domain==="missions"?input(valueOf(original,"remuneration")||"",{placeholder:"Montant et modalités, si applicable",maxLength:240}):null;
+  const remuneration=domain==="missions"?input(valueOf(original,"remuneration")||"",{placeholder:"Ex. 1 250,00 ou modalités convenues",maxLength:240}):null;
   const client=domain==="contracts"?input(valueOf(original,"client")||"",{placeholder:"Partie contractante",required:true,maxLength:240}):null;
   const amount=domain==="contracts"?input(valueOf(original,"amount")||"",{placeholder:"Montant du contrat",required:true,maxLength:120}):null;
-  const currency=domain==="contracts"?input(valueOf(original,"currency")||"EUR",{placeholder:"EUR",required:true,maxLength:3}):null;
+  const currency=["missions","contracts"].includes(domain)?input(valueOf(original,"currency")||"EUR",{placeholder:"EUR",required:true,maxLength:3}):null;
   const metadata=h("div",{class:"form-row"},field("Statut",status));
   if(["tasks","missions","events","deliverables","documents","validations"].includes(domain)){metadata.append(field("Projet",project));controls.push(project);}
   if(["tasks","missions","events","projects","deliverables"].includes(domain)){
@@ -58,7 +59,7 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
     controls.push(assignee,date);
   }
   if(domain==="tasks"){metadata.append(field("Priorité",priority));controls.push(priority);}
-  if(remuneration){content.append(field("Rémunération",remuneration,"Facultative ; elle sera affichée dans la proposition envoyée."));controls.push(remuneration);}
+  if(remuneration&&currency){content.append(h("div",{class:"form-row"},field("Rémunération",remuneration,"Facultative ; elle sera affichée dans la proposition envoyée."),field("Devise",currency)));controls.push(remuneration,currency);}
   if(client&&amount&&currency){content.append(h("div",{class:"form-row"},field("Partie contractante",client),field("Montant",amount)),field("Devise",currency));controls.push(client,amount,currency);}
   content.append(metadata);
   const error=h("p",{class:"focus-form-error",role:"alert",hidden:true});content.append(error);
@@ -81,7 +82,7 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
     // Do not erase an existing timestamp merely by opening and saving the form.
     if(controls.includes(date)&&date.value!==(dayKey(oldDue)))putValue(body,["dueAt","due_at","dueDate","deadline","startAt","start_at","startsAt"],date.value||null);
     if(controls.includes(priority))putValue(body,["priority"],priority.value||null);
-    if(remuneration)putValue(body,["remuneration"],remuneration.value.trim()||null);
+    if(remuneration&&currency){putValue(body,["remuneration"],remuneration.value.trim()||null);putValue(body,["currency"],remuneration.value.trim()?currency.value.trim().toUpperCase():null);}
     if(client&&amount&&currency){putValue(body,["client"],client.value.trim());putValue(body,["amount"],amount.value.trim());putValue(body,["currency"],currency.value.trim().toUpperCase());}
     try {
       await saveCoreEntity(domain,body);
@@ -111,8 +112,8 @@ export function recordRow(domain,record,{onRefresh,compact=false}={}) {
   if(project&&domain!=="projects")metadata.push(titleOf(project));
   if(member)metadata.push(memberName(member));
   if(due)metadata.push(dateLabel(due));
-  const amount=valueOf(record,"amount","total","totalAmount");
-  if(amount!==""&&Number.isFinite(Number(amount))){const currency=valueOf(record,"currency")||"EUR";try{metadata.push(new Intl.NumberFormat("fr-FR",{style:"currency",currency}).format(Number(amount)));}catch{metadata.push(String(amount));}}
+  const amount=domain==="missions"?valueOf(record,"remuneration"):valueOf(record,"amount","amountValue","total","totalAmount");
+  if(amount!==""&&amount!==null&&amount!==undefined)metadata.push(formatMoney(amount,valueOf(record,"currency")||"EUR"));
   const text=h("button",{class:"focus-record-open",type:"button",onClick:()=>openRecord(domain,record.id),"aria-label":`Ouvrir ${titleOf(record)}`},h("strong",{text:titleOf(record)}),h("span",{class:"focus-record-meta",text:metadata.join(" · ")||domainLabels[domain]||domain}),h("span",{class:`focus-status ${dueBucket(record)==="overdue"&&!isFinished(record)?"is-late":""}`,text:statusLabel(valueOf(record,"status"))}));
   const row=h("article",{class:`focus-record ${compact?"compact":""}`,dataset:{recordId:record.id}},h("span",{class:"focus-record-icon","aria-hidden":"true"},icon(sectionForDomain(domain),20)),text);
   if(domain==="tasks"&&canEditRecord(domain)&&!isFinished(record))row.append(button("Terminer",{small:true,kind:"ghost",ariaLabel:`Terminer ${titleOf(record)}`,onClick:()=>finishTask(record,onRefresh)}));
@@ -156,8 +157,8 @@ export async function renderRecord(domain,id) {
   const metadata=h("dl",{class:"focus-properties"});
   const property=(label,value)=>{if(value!==""&&value!==null&&value!==undefined)metadata.append(h("div",{},h("dt",{text:label}),h("dd",{text:value})));};
   property("Échéance",dueOf(record)?dateLabel(dueOf(record)):"Sans échéance");
-  if(domain==="missions")property("Rémunération",valueOf(record,"remuneration"));
-  if(domain==="contracts"){property("Partie contractante",valueOf(record,"client"));property("Montant",valueOf(record,"amount"));property("Devise",valueOf(record,"currency"));}
+  if(domain==="missions")property("Rémunération",formatMoney(valueOf(record,"remuneration"),valueOf(record,"currency")||"EUR","Non renseignée"));
+  if(domain==="contracts"){property("Partie contractante",valueOf(record,"client"));property("Montant",formatMoney(valueOf(record,"amount")||valueOf(record,"amountValue"),valueOf(record,"currency")||"EUR"));property("Devise",valueOf(record,"currency"));}
   property("Responsable",memberName(list("team").find(m=>(m.id||m.memberId)===assigneeOf(record)))==="Membre"?"Non renseigné":memberName(list("team").find(m=>(m.id||m.memberId)===assigneeOf(record))));
   const project=list("projects").find(p=>p.id===parentOf(record));if(project)property("Projet",titleOf(project));
   const release=valueOf(record,"revision","revisionNumber","versionName","fileVersion");property(domain==="deliverables"?"Version du livrable":"Version de l’enregistrement",release||record.version||"Non renseignée");

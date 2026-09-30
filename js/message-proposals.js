@@ -2,6 +2,7 @@ import { state } from "./store.js";
 import { decideMessageProposal, downloadFile, getCoreEntity, loadWorkspace, sendMessageProposal } from "./api.js";
 import { button, confirmAction, emptyState, errorMessage, field, formatDate, h, modal, toast } from "./ui.js";
 import { editRecord } from "./focus-records.js";
+import { formatMoney } from "./money.js";
 
 const kinds = { mission: { collection: "missions", label: "mission", permission: "manageMissions" }, contract: { collection: "contracts", label: "contrat", permission: "manageContracts" } };
 const statusLabels = { pending: "En attente de réponse", accepted: "Proposition acceptée", refused: "Proposition refusée", replaced: "Version remplacée", unavailable: "Fiche indisponible" };
@@ -10,21 +11,20 @@ const memberName = member => member?.name || `${member?.firstName || ""} ${membe
 const nonempty = input => String(input ?? "").trim();
 function previewTerms(kind, item) {
   return kind === "mission"
-    ? { summary: value(item, "summary"), dueAt: value(item, "dueAt"), dueDate: value(item, "dueDate"), remuneration: value(item, "remuneration") }
+    ? { summary: value(item, "summary"), dueAt: value(item, "dueAt"), dueDate: value(item, "dueDate"), remuneration: value(item, "remuneration"), currency: value(item, "currency") }
     : { scope: value(item, "scope"), client: value(item, "client"), organizationName: state.workspace?.enterprise?.organizationProfile?.legalName, amount: value(item, "amount"), amountValue: value(item, "amountValue"), currency: value(item, "currency") };
 }
 
 function amount(terms) {
-  if (nonempty(terms.amount)) return terms.amount;
-  if (terms.amountValue === null || terms.amountValue === undefined || terms.amountValue === "") return "Montant non renseigné";
-  const numeric = Number(terms.amountValue);
-  if (!Number.isFinite(numeric)) return `${terms.amountValue} ${terms.currency || "EUR"}`;
-  try { return new Intl.NumberFormat("fr-FR", { style: "currency", currency: terms.currency || "EUR" }).format(numeric); }
-  catch { return `${numeric} ${terms.currency || "EUR"}`; }
+  return formatMoney(nonempty(terms.amount) || terms.amountValue, terms.currency);
+}
+
+function remuneration(terms) {
+  return formatMoney(terms.remuneration, terms.currency, "Non renseignée");
 }
 
 function termsSummary(kind, terms) {
-  if (kind === "mission") return [terms.summary, terms.dueAt ? `Échéance : ${formatDate(terms.dueAt, { dateOnly: true })}` : terms.dueDate ? `Échéance : ${terms.dueDate}` : null, terms.remuneration ? `Rémunération : ${terms.remuneration}` : null].filter(Boolean).join("\n");
+  if (kind === "mission") return [terms.summary, `Rémunération : ${remuneration(terms)}`, terms.dueAt ? `Échéance : ${formatDate(terms.dueAt, { dateOnly: true })}` : terms.dueDate ? `Échéance : ${terms.dueDate}` : null].filter(Boolean).join("\n");
   return [terms.scope, terms.client ? `Parties : ${terms.organizationName || "Organisation"} et ${terms.client}` : null, `Montant : ${amount(terms)}`].filter(Boolean).join("\n");
 }
 
@@ -114,8 +114,10 @@ export function proposalCard(conversation, message, reload) {
     h("h4", { text: terms.title || (proposal.kind === "mission" ? "Mission" : "Contrat") }),
     terms.summary || terms.scope ? h("p", { class: "sq-proposal-summary", text: terms.summary || terms.scope }) : null,
     proposal.kind === "mission"
-      ? h("div", { class: "sq-proposal-facts" }, terms.dueAt || terms.dueDate ? h("span", { text: `Échéance · ${terms.dueAt ? formatDate(terms.dueAt, { dateOnly: true }) : terms.dueDate}` }) : null, terms.remuneration ? h("strong", { text: `Rémunération · ${terms.remuneration}` }) : null)
-      : h("div", { class: "sq-proposal-facts" }, terms.client ? h("span", { text: `Parties · ${terms.organizationName || "Organisation"} et ${terms.client}` }) : null, h("strong", { class: "sq-proposal-amount", text: amount(terms) })),
+      ? h("div", { class: "sq-proposal-finance" }, h("span", { text: "RÉMUNÉRATION" }), h("strong", { class: nonempty(terms.remuneration) ? "sq-proposal-amount" : "", text: remuneration(terms) }))
+      : h("div", { class: "sq-proposal-finance" }, h("span", { text: "MONTANT DU CONTRAT" }), h("strong", { class: nonempty(terms.amount) || terms.amountValue != null ? "sq-proposal-amount" : "", text: amount(terms) })),
+    proposal.kind === "mission" && (terms.dueAt || terms.dueDate) ? h("div", { class: "sq-proposal-facts" }, h("span", { text: `Échéance · ${terms.dueAt ? formatDate(terms.dueAt, { dateOnly: true }) : terms.dueDate}` })) : null,
+    proposal.kind === "contract" && terms.client ? h("div", { class: "sq-proposal-facts" }, h("span", { text: `Parties · ${terms.organizationName || "Organisation"} et ${terms.client}` })) : null,
     h("div", { class: "sq-proposal-actions" }, button(proposal.kind === "mission" ? "Voir la mission" : "Consulter le contrat", { small: true, onClick: () => openSource(proposal), disabled: proposal.status === "unavailable" })));
   if (proposal.kind === "contract" && proposal.status === "accepted") card.append(h("p", { class: "sq-proposal-footnote", text: "Proposition acceptée. Une signature reste une étape distincte si elle est requise." }));
   if (proposal.status === "pending" && proposal.recipientID === state.user?.id) {
