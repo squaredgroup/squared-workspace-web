@@ -387,6 +387,8 @@ with sync_playwright() as playwright:
     for _ in range(2):
         page.reload()
         expect(page.locator(".focus-home")).to_be_visible()
+    expect(page.get_by_role("img",name="Main qui salue",exact=True)).to_be_visible()
+    expect(page.locator(".greeting-emoji")).to_have_text("👋")
     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     expect(page.locator(".mobile-tabs")).to_be_visible()
     expect(page.locator(".mobile-tabs").get_by_text("Accueil", exact=True)).to_be_visible()

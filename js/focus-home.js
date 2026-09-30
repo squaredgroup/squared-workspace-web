@@ -14,7 +14,12 @@ export async function renderFocusHome(todayOnly=false){
   const name=state.user?.firstName||state.user?.first_name||"";
   const date=new Intl.DateTimeFormat("fr-FR",{weekday:"long",day:"numeric",month:"long"}).format(new Date());
   const scope=select(context.scope,[{value:"mine",label:"Mon travail"},{value:"all",label:"Périmètre visible"}]);scope.setAttribute("aria-label","Périmètre de la journée");
-  root.append(pageHeader({eyebrow:date,title:todayOnly?"Aujourd’hui":`${new Date().getHours()<18?"Bonjour":"Bonsoir"}${name?", "+name:""}.`,subtitle:"Vos prochaines actions, au même endroit."}),h("div",{class:"focus-home-toolbar"},scope,canEditRecord("tasks")?button("Nouvelle tâche",{kind:"primary",iconName:"add",onClick:()=>editRecord("tasks",null,reload)}):null),body);
+  const header=pageHeader({eyebrow:date,title:todayOnly?"Aujourd’hui":`${new Date().getHours()<18?"Bonjour":"Bonsoir"}${name?", "+name:""}.`,subtitle:"Vos prochaines actions, au même endroit."});
+  if(!todayOnly){
+    const title=header.querySelector(".page-title");title.classList.add("focus-greeting");
+    title.replaceChildren(h("span",{class:"greeting-emoji",role:"img","aria-label":"Main qui salue",text:"👋"}),h("span",{text:title.textContent}));
+  }
+  root.append(header,h("div",{class:"focus-home-toolbar"},scope,canEditRecord("tasks")?button("Nouvelle tâche",{kind:"primary",iconName:"add",onClick:()=>editRecord("tasks",null,reload)}):null),body);
   const reload=async()=>{await loadWorkspace();draw();};
   const permitted=domain=>canAccessSection(domain,state.user);
   const array=domain=>permitted(domain)&&Array.isArray(state.workspace?.[domain])?state.workspace[domain]:[];

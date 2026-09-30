@@ -12,6 +12,7 @@ details[open]>summary::after{transform:rotate(180deg)}
 select{appearance:none;background-image:url("/assets/icons/IconlyRegularChevronDown.svg")!important;background-position:right 12px center!important;background-size:16px!important;background-repeat:no-repeat!important;padding-right:36px!important}
 html:not([data-theme="light"]) select{background-image:url("/assets/icons/contrast/IconlyRegularChevronDown.svg")!important}
 .greeting-emoji{display:grid;place-items:center;width:1.08em;min-width:1.08em;height:1.08em;line-height:1}
+.focus-greeting{display:grid;grid-template-columns:1.08em minmax(0,1fr);column-gap:.18em;align-items:start}
 .sq-photo-position>.icon-button{width:40px;min-height:36px;padding:0}
 .mail-attachment-mark>.icon{width:20px!important;height:20px!important}
 .sq-audio-preview{display:inline-flex;align-items:center;gap:8px}
