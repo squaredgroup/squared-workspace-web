@@ -333,6 +333,10 @@ export async function renderMessages() {
     if (replyingTo) replyHint.replaceChildren(h("span", { text: `En réponse à : ${messageBody(replyingTo).slice(0, 80)}` }), button("Annuler", { small: true, kind: "ghost", onClick: () => { replyingTo = null; replyHint.replaceChildren(); } }));
     draftNote = h("p", { class: "sq-message-draft" });
     const updateDraft = () => {
+      if (window.matchMedia("(max-width: 880px)").matches) {
+        box.style.height = "44px";
+        box.style.height = `${Math.min(96, Math.max(44, box.scrollHeight))}px`;
+      }
       const stored=saveDraft(conversation.id,box.value);
       box.dataset.draftStored=String(stored);
       if(box.value&&!stored)volatileDrafts.add(key);else volatileDrafts.delete(key);

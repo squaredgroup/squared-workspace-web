@@ -44,7 +44,7 @@
   .workspace .sq-message-panel .sq-message-action-menu{display:inline-flex;min-height:32px;padding:5px 8px;margin-top:6px;font-size:11px;color:var(--sq-muted);background:transparent;border:0}
   .workspace .sq-message-panel .sq-scroll-latest{position:absolute;z-index:1;right:14px;bottom:82px;min-height:36px;padding:6px 10px;margin:0;box-shadow:var(--sq-shadow)}
   .workspace .sq-message-panel .composer{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-height:64px;margin:0;padding:8px 12px;border-top:1px solid var(--sq-border-soft);background:var(--sq-card)}
-  .workspace .sq-message-panel .composer textarea{flex:1 1 auto;width:auto;min-width:0;min-height:44px;max-height:96px;padding:9px 12px;resize:none;font-size:16px}
+  .workspace .sq-message-panel .composer textarea{flex:1 1 auto;width:auto;min-width:0;height:44px;min-height:44px;max-height:96px;padding:9px 12px;resize:none;font-size:16px}
   .workspace .sq-message-panel .composer .sq-composer-add,.workspace .sq-message-panel .composer .button.primary{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:12px;justify-self:auto;align-self:center}
   .workspace .sq-message-panel .composer .sq-composer-add>span,.workspace .sq-message-panel .composer .button.primary>span{display:none}
   .workspace .sq-message-panel .composer-meta{display:none}
