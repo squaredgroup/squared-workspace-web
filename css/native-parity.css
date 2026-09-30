@@ -58,3 +58,78 @@
 }
 @media(max-width:1000px){.planning-grid{grid-template-columns:repeat(4,minmax(140px,1fr))}.system-mail-layout{grid-template-columns:1fr}.system-mail-list{display:flex;flex-wrap:wrap}}
 @media(max-width:640px){.planning-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.planning-day{min-width:0}.personal-planning .page-actions{flex-wrap:wrap}.system-mail-block-head{align-items:stretch;flex-direction:column}}
+
+/* A conversation occupies the available space; only its timeline scrolls. */
+.workspace .sq-messages .split-view{grid-template-columns:minmax(260px,.72fr) minmax(0,1.28fr);align-items:stretch;min-height:540px;height:min(780px,calc(100dvh - 205px))}
+.workspace .sq-messages .sq-conversation-list{display:flex;flex-direction:column;overflow:hidden}
+.workspace .sq-messages .sq-conversation-list>.card-head{flex:0 0 auto}
+.workspace .sq-conversation-list .mail-list{gap:2px}
+.workspace .sq-conversation-list .mail-item{display:flex;align-items:center;gap:10px;min-height:66px;padding:10px;border-color:transparent;background:transparent}
+.workspace .sq-conversation-list .mail-item.active{border-color:rgba(var(--sq-accent-rgb),.24);background:rgba(var(--sq-accent-rgb),.09)}
+.workspace .sq-conversation-list .mail-item strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace .sq-conversation-list .mail-item p{font-size:11px;margin-top:3px}
+.workspace .sq-conversation-list>div:last-child{min-height:0;overflow:auto}
+.workspace .sq-messages .sq-message-panel{min-width:0;padding:0;overflow:hidden}
+.workspace .sq-message-panel .sq-thread-content{position:relative;display:flex;flex-direction:column;height:100%;min-height:0}
+.workspace .sq-thread-heading{flex:0 0 auto;min-height:70px;margin:0;padding:12px 16px;border-bottom:1px solid var(--sq-border-soft)}
+.workspace .sq-thread-heading .sq-thread-identity{min-width:0;flex:1}
+.workspace .sq-thread-heading strong{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace .sq-thread-heading small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace .sq-thread-avatar{flex:0 0 38px}
+.workspace .sq-message-panel .message-thread{flex:1 1 0;min-height:0;max-height:none;padding:18px 20px 26px;scrollbar-gutter:auto;align-content:start;grid-auto-rows:max-content}
+.workspace .sq-message-panel .message-bubble{max-width:min(76%,530px);padding:10px 12px;border-radius:16px 16px 16px 5px;box-shadow:none}
+.workspace .sq-message-panel .message-bubble.mine{border-radius:16px 16px 5px 16px}
+.workspace .sq-message-panel .message-bubble p{font-size:14px;line-height:1.5}
+.workspace .sq-message-panel .message-bubble-head{margin-bottom:5px}
+.workspace .sq-message-panel .message-bubble-head strong{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace .sq-message-panel .message-bubble-head span{font-size:11px;white-space:nowrap}
+.workspace .sq-message-panel .message-bubble-head>div{min-width:0;overflow:hidden}
+.workspace .sq-message-panel .message-actions{display:none}
+.workspace .sq-message-panel .sq-message-footer{display:flex;align-items:center;gap:8px;margin-top:5px;min-height:24px}
+.workspace .sq-message-panel .sq-message-receipt{font-size:10px}
+.workspace .sq-message-panel .sq-message-action-menu{display:inline-flex;min-height:28px;margin:0 0 0 auto;padding:3px 6px;border:0;background:transparent;color:var(--sq-muted);font-size:10px}
+.workspace .sq-message-panel .composer{display:flex;align-items:center;gap:9px;flex:0 0 auto;margin:0;padding:12px 16px 4px;border-top:1px solid var(--sq-border-soft);background:var(--sq-card)}
+.workspace .sq-message-panel .composer textarea{flex:1;min-width:0;max-height:124px;resize:none;border-radius:16px;font-size:14px}
+.workspace .sq-message-panel .composer-meta{display:flex;align-items:center;justify-content:flex-start;gap:7px;flex-wrap:wrap;margin:0;padding:4px 16px 8px;background:var(--sq-card)}
+.workspace .sq-message-panel .composer-meta>span:first-of-type{margin-left:auto}
+.workspace .sq-message-panel .sq-message-draft{margin:0;padding:0 16px 9px;background:var(--sq-card)}
+.workspace .sq-message-panel .sq-scroll-latest:not([hidden]){position:absolute;z-index:2;right:18px;bottom:130px;margin:0;box-shadow:var(--sq-shadow)}
+.sq-attachment-pdf{display:block;height:300px;min-height:0;overflow:hidden;background:#fff}
+.sq-attachment-pdf canvas{display:block;max-width:100%;margin:8px auto 0;background:#fff}
+.sq-reader-content.sq-reader-pdf{display:flex;flex-direction:column;overflow:hidden}
+.sq-pdf-controls{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;padding:8px 12px;border-bottom:1px solid var(--sq-border);background:var(--sq-card)}
+.sq-pdf-controls .button{min-height:38px}
+.sq-pdf-counter{min-width:64px;font-size:13px;font-variant-numeric:tabular-nums}
+.sq-pdf-scroll{flex:1;min-height:0;width:100%;overflow:auto;overscroll-behavior:contain}
+.sq-pdf-sheet{display:flex;justify-content:center;min-height:100%;padding:16px}
+.sq-pdf-sheet canvas{display:block;max-width:100%;height:max-content;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+@media(max-width:880px){
+  .workspace .sq-messages .split-view{display:block;height:auto;min-height:0}
+  .workspace .sq-messages:not(.sq-conversation-open)>.page-head{display:flex;align-items:center;flex-direction:row;justify-content:flex-end;gap:0;margin:0;padding:14px 16px 2px}
+  .workspace .sq-messages:not(.sq-conversation-open)>.page-head .page-head-main{display:none}
+  .workspace .sq-messages:not(.sq-conversation-open)>.page-head .page-actions{width:auto;margin:0}
+  .workspace .sq-messages:not(.sq-conversation-open)>.page-head .page-actions .button{flex:none;min-height:38px;padding:7px 11px;border-radius:999px;font-size:12px}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-list{padding:0 14px 18px;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-list>.card-head{margin:0;padding:5px 2px 12px;border:0}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-list .card-subtitle{display:none}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-list .card-title{font-size:20px}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-list>div:last-child{overflow:visible}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-search{display:block;margin-bottom:8px}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-search input{height:44px;border-radius:13px}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-filters{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 1px;scrollbar-width:none}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-filters .button{flex:0 0 auto;min-height:36px;padding:7px 11px;border-radius:999px;font-size:12px}
+  .workspace .sq-messages:not(.sq-conversation-open) .sq-conversation-list .mail-item{min-height:72px;padding:10px 8px;border-bottom:1px solid var(--sq-border-soft);border-radius:10px}
+  .workspace:has(.sq-messages.sq-conversation-open) .topbar{display:none}
+  .workspace .sq-messages.sq-conversation-open .sq-message-panel{height:calc(var(--sq-viewport-height) - var(--sq-mobile-nav-height) - var(--sq-safe-bottom));padding:0}
+  .workspace .sq-messages.sq-conversation-open .sq-thread-heading{min-height:calc(60px + var(--sq-safe-top));padding:calc(8px + var(--sq-safe-top)) 10px 8px;gap:8px}
+  .workspace .sq-messages.sq-conversation-open .sq-thread-avatar{width:34px!important;height:34px!important;flex:0 0 34px!important}
+  .workspace .sq-message-panel .message-thread{padding:12px 12px 16px}
+  .workspace .sq-message-panel .message-bubble{max-width:min(82%,480px);padding:9px 11px}
+  .workspace .sq-message-panel .message-bubble p{font-size:14px;line-height:1.45}
+  .workspace .sq-message-panel .composer{padding:8px 10px;min-height:58px}
+  .workspace .sq-message-panel .composer textarea{height:42px;min-height:42px;max-height:96px}
+  .workspace .sq-message-panel .composer .sq-composer-add,.workspace .sq-message-panel .composer .button.primary{width:42px;height:42px;min-width:42px;min-height:42px;flex-basis:42px;border-radius:13px}
+  .workspace .sq-message-panel .sq-scroll-latest:not([hidden]){right:12px;bottom:78px;min-height:34px;font-size:11px}
+  html.sq-keyboard-open .workspace .sq-messages.sq-conversation-open .sq-message-panel{height:var(--sq-viewport-height)}
+  .sq-pdf-sheet{padding:10px}
+}

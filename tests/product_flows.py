@@ -265,12 +265,16 @@ with sync_playwright() as playwright:
 
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('messages')}""")
     page.get_by_role("button", name="Direction produit", exact=False).click()
-    expect(page.get_by_title("Aperçu PDF : dossier.pdf")).to_be_visible()
+    preview = page.get_by_role("img", name="Aperçu PDF : dossier.pdf")
+    expect(preview).to_have_attribute("data-rendered", "true")
+    assert preview.evaluate("canvas => { const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; for (let i=0;i<pixels.length;i+=16) if (pixels[i]<180 && pixels[i+1]<180 && pixels[i+2]<180) return true; return false; }")
     assert not page.get_by_role("log", name="Messages de Direction produit").get_by_text("Pièce jointe : dossier.pdf", exact=True).count()
     page.get_by_role("button", name="Ouvrir dossier.pdf dans le lecteur").click()
     reader = page.get_by_role("dialog", name="dossier.pdf")
-    expect(reader.get_by_title("Lecteur PDF : dossier.pdf")).to_be_visible()
-    assert reader.get_by_title("Lecteur PDF : dossier.pdf").get_attribute("src").startswith("blob:")
+    canvas = reader.get_by_role("img", name="Lecteur PDF : dossier.pdf")
+    expect(canvas).to_have_attribute("data-rendered", "true")
+    assert canvas.evaluate("canvas => { const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; for (let i=0;i<pixels.length;i+=16) if (pixels[i]<180 && pixels[i+1]<180 && pixels[i+2]<180) return true; return false; }")
+    expect(reader.get_by_text("1 / 1")).to_be_visible()
     expect(reader.get_by_role("button", name="Télécharger")).to_be_visible()
     if visual_dir:
         page.wait_for_timeout(350)
@@ -281,7 +285,8 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Envoyer", exact=True).click()
     expect(page.get_by_role("log", name="Messages de Direction produit").get_by_text("Validation fonctionnelle terminée.", exact=True)).to_be_visible()
     message = page.get_by_role("article").filter(has_text="Validation fonctionnelle terminée.")
-    message.get_by_role("button", name="Sauvegarder", exact=True).click()
+    message.get_by_role("button", name="Actions sur le message de vous").click()
+    page.get_by_role("dialog", name="Actions sur le message").get_by_role("button", name="Sauvegarder", exact=True).click()
     assert any(method == "PUT" and path.endswith("/flags") and body.get("isSaved") is True for method, path, body in requests if isinstance(body, dict))
     page.get_by_role("button", name="Options", exact=True).click()
     page.get_by_role("dialog").get_by_label("Notifications", exact=True).select_option("muted")
@@ -387,10 +392,14 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(400)
         page.screenshot(path=str(visual_dir / "dashboard-mobile.png"), full_page=True)
     page.evaluate("""async()=>{const s=await import('/js/store.js');s.setRoute('messages')}""")
+    if visual_dir:
+        page.screenshot(path=str(visual_dir / "messages-list-mobile.png"))
     page.get_by_role("button", name="Direction produit", exact=False).click()
+    if visual_dir:
+        page.screenshot(path=str(visual_dir / "messages-thread-mobile.png"))
     page.get_by_role("button", name="Ouvrir dossier.pdf dans le lecteur").click()
     mobile_reader = page.get_by_role("dialog", name="dossier.pdf")
-    expect(mobile_reader.get_by_title("Lecteur PDF : dossier.pdf")).to_be_visible()
+    expect(mobile_reader.get_by_role("img", name="Lecteur PDF : dossier.pdf")).to_have_attribute("data-rendered", "true")
     assert mobile_reader.bounding_box()["height"] > page.viewport_size["height"] * 0.65
     if visual_dir:
         page.wait_for_timeout(350)

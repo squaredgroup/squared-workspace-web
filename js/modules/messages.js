@@ -3,6 +3,7 @@ import { state, subscribe, setRoute } from "../store.js";
 import { loadWorkspace, sendConversationMessage, createConversation, markConversationRead, editConversationMessage, deleteConversationMessage, reactToConversationMessage, flagConversationMessage, updateConversationPreferences, updateConversationDetails, updateConversationParticipants, deleteConversation, uploadFile, downloadFile, fetchFileBlob } from "../api.js";
 import { h, pageHeader, card, button, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
 import { openProposalPicker, proposalCard } from "../message-proposals.js";
+import { openPDF, drawPDFPage } from "../pdf-reader.js";
 
 const conversationMessages = conversation => Array.isArray(conversation?.messages) ? conversation.messages : [];
 const memberId = member => member.id || member.memberId || member.member_id;
@@ -46,12 +47,12 @@ function openAttachmentViewer(file, cachedBlob = null) {
   activeViewer?.close();
   const kind = attachmentKind(file), name = file.fileName || "Fichier", id = file.storageKey || file.id;
   const controller = new AbortController(), content = h("div", { class: `sq-reader-content sq-reader-${kind}`, role: "status" }, h("p", { class: "sq-media-loading", text: "Ouverture du fichier…" }));
-  let readerURL = "", reader;
+  let readerURL = "", reader, pdfResource = null, pageRender = null;
   reader = modal({ title: name, wide: true, className: "sq-media-viewer", content,
     actions: [{ label: "Télécharger", icon: "download", disabled: !id, onClick: async () => {
       try { await downloadFile(id, name); } catch (error) { toast(errorMessage(error), "error"); }
     } }],
-    onClose: () => { controller.abort(); if (readerURL) URL.revokeObjectURL(readerURL); if (activeViewer === reader) activeViewer = null; }
+    onClose: () => { controller.abort(); pageRender?.abort(); void pdfResource?.destroy(); if (readerURL) URL.revokeObjectURL(readerURL); if (activeViewer === reader) activeViewer = null; }
   });
   activeViewer = reader;
   if (kind === "document" || !id) {
@@ -69,9 +70,39 @@ function openAttachmentViewer(file, cachedBlob = null) {
         if (!controller.signal.aborted) content.replaceChildren(h("pre", { text: value }));
         return;
       }
+      if (kind === "pdf") {
+        const resource = await openPDF(blob);
+        if (controller.signal.aborted || activeViewer !== reader) { void resource.destroy(); return; }
+        pdfResource = resource;
+        let currentPage = 1;
+        const previous = button("Page précédente", { small: true, onClick: () => void showPage(currentPage - 1) });
+        const next = button("Page suivante", { small: true, onClick: () => void showPage(currentPage + 1) });
+        const counter = h("span", { class: "sq-pdf-counter", "aria-live": "polite" });
+        const canvas = h("canvas", { role: "img", "aria-label": `Lecteur PDF : ${name}` });
+        const sheet = h("div", { class: "sq-pdf-sheet" }, canvas);
+        content.removeAttribute("role");
+        content.replaceChildren(h("div", { class: "sq-pdf-controls" }, previous, counter, next), h("div", { class: "sq-pdf-scroll" }, sheet));
+        async function showPage(number) {
+          if (controller.signal.aborted || number < 1 || number > resource.document.numPages) return;
+          pageRender?.abort(); pageRender = new AbortController();
+          const signal = pageRender.signal;
+          currentPage = number;
+          previous.disabled = number === 1;
+          next.disabled = number === resource.document.numPages;
+          counter.textContent = `${number} / ${resource.document.numPages}`;
+          sheet.setAttribute("aria-busy", "true");
+          try {
+            await drawPDFPage(resource.document, number, canvas, Math.min(920, content.clientWidth - 32), signal);
+            if (!signal.aborted) { canvas.dataset.rendered = "true"; sheet.removeAttribute("aria-busy"); }
+          } catch (error) {
+            if (!signal.aborted) content.replaceChildren(h("p", { class: "sq-reader-error", text: errorMessage(error) }));
+          }
+        }
+        await showPage(1);
+        return;
+      }
       readerURL = URL.createObjectURL(blob);
       const media = kind === "image" ? h("img", { src: readerURL, alt: name, onError: () => content.replaceChildren(h("p", { text: "L’image ne peut pas être affichée. Téléchargez-la pour la consulter." })) })
-        : kind === "pdf" ? h("iframe", { src: readerURL, title: `Lecteur PDF : ${name}`, sandbox: "" })
         : h(kind, { src: readerURL, controls: true, preload: "metadata", "aria-label": name, onError: () => content.replaceChildren(h("p", { text: "Ce média ne peut pas être lu dans le navigateur. Téléchargez-le pour le consulter." })) });
       if (!controller.signal.aborted) content.replaceChildren(media);
     } catch (error) { if (!controller.signal.aborted) content.replaceChildren(h("p", { class: "sq-reader-error", text: errorMessage(error) })); }
@@ -99,9 +130,18 @@ function attachmentPreview(file, observer, signal) {
           if (!signal.aborted) preview.replaceChildren(h("pre", { text: value.slice(0, 4000) }));
           return;
         }
+        if (kind === "pdf") {
+          const canvas = h("canvas", { role: "img", "aria-label": `Aperçu PDF : ${name}` });
+          preview.replaceChildren(canvas);
+          let resource;
+          try {
+            resource = await openPDF(typedBlob);
+            if (!signal.aborted) { await drawPDFPage(resource.document, 1, canvas, Math.min(300, preview.clientWidth - 16), signal); if (!signal.aborted) canvas.dataset.rendered = "true"; }
+          } finally { if (resource) await resource.destroy(); }
+          return;
+        }
         const url = URL.createObjectURL(typedBlob); mediaURLs.add(url);
         const media = kind === "image" ? h("img", { src: url, alt: name, loading: "lazy", onError: fallback })
-          : kind === "pdf" ? h("iframe", { src: url, title: `Aperçu PDF : ${name}`, sandbox: "", loading: "lazy" })
           : h(kind, { src: url, preload: "metadata", "aria-label": name, onError: fallback });
         if (signal.aborted) { URL.revokeObjectURL(url); mediaURLs.delete(url); return; }
         preview.replaceChildren(media);
@@ -357,15 +397,16 @@ export async function renderMessages() {
           message.linkedContext ? h("div", { class: "sq-message-reference", text: `${message.linkedContext.entityKind || "Élément"} · ${message.linkedContext.title || "Workspace"}` }) : null,
           attachments.length ? h("div", { class: "message-attachments" }, ...attachments.map(file => attachmentPreview(file, mediaObserver, signal))) : null,
           reactions.length ? h("div", { class: "message-reactions" }, ...reactions.map(([emoji, members]) => h("span", { text: `${emoji} ${members.length}` }))) : null,
-          mine && !removed ? h("small", { class: "muted", text: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé" }) : null,
           actions,
+          h("div", { class: "sq-message-footer" },
+          mine && !removed ? h("small", { class: "muted sq-message-receipt", title: profile?.readBy?.length ? `Lu par ${profile.readBy.join(", ")}` : "", text: profile?.readBy?.length ? "Lu" : profile?.deliveryState === "delivered" ? "Distribué" : "Envoyé" }) : null,
           actions ? button("Actions", { small: true, className: "sq-message-action-menu", ariaLabel: `Actions sur le message de ${mine ? "vous" : message.authorName || message.author || "un membre"}`, onClick: () => {
             const choices = [...actions.querySelectorAll(":scope > button")];
             let menu;
             menu = modal({ title: "Actions sur le message", content: h("div", { class: "sq-message-action-list" }, ...choices.map(choice => button(choice.textContent.trim(), { onClick: () => {
               menu.close(); choice.click();
             } }))) });
-          } }) : null));
+          } }) : null)));
       }
       thread.replaceChildren(...(nodes.length ? nodes : [emptyState(term ? "Aucun message correspondant" : "Aucun message", term ? "Essayez un autre mot dans cette discussion." : "Commencez la conversation.", "messages")]));
     };
@@ -449,7 +490,7 @@ export async function renderMessages() {
         ...proposalButtons.map(control => [control.textContent.trim(), control])
       ].map(([label, control]) => button(label, { onClick: () => { menu.close(); control.click(); } }))) });
     } });
-    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, h("div", { class: "sq-thread-identity" }, h("strong", { text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })), searchToggle, button("Options", { small: true, iconName: "Settings", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, attachmentButton, contextButton, ...proposalButtons, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
+    right.replaceChildren(h("div", { class: "sq-thread-heading" }, back, profileAvatar(conversationPerson(conversation), { className: "sq-thread-avatar", size: 38, ariaHidden: true }), h("div", { class: "sq-thread-identity" }, h("strong", { text: conversation.name || "Conversation" }), h("small", { class: "sq-heading-participants", text: participantNames(conversation) }), h("small", { class: "sq-heading-mobile", text: conversation.kind === "direct" || (conversation.participantIDs || []).length === 2 ? "Conversation privée" : `${(conversation.participantIDs || []).length} participants` })), searchToggle, button("Options", { small: true, iconName: "Settings", ariaLabel: "Options", className: "sq-thread-options", onClick: () => conversationOptions(conversation) })), searchArea, thread, latest, replyHint, contextHint, h("div", { class: "composer" }, addButton, box, sendButton, attachmentInput), h("div", { class: "composer-meta" }, attachmentButton, contextButton, ...proposalButtons, h("span", { text: "⌘/Ctrl + Entrée pour envoyer" }), count), draftNote);
     drawBubbles(); updateDraft();
     requestAnimationFrame(() => {
       if (!root.isConnected || !alive()) return;
