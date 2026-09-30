@@ -110,6 +110,7 @@ async function sectionPage(section,subpage){
   if(SECTIONS[section]?.cms){const {renderCMS}=await import("./modules/cms.js");return renderCMS(section)}
   if(section==="mailbox"){const {renderMailbox}=await import("./modules/mailbox.js");return renderMailbox(subpage||"mailbox")}
   if(section==="messages"){const {renderMessages}=await import("./modules/messages.js");return renderMessages()}
+  if(section==="support"&&["","tickets-clients","demandes-internes"].includes(subpage)){const {renderSupport}=await import("./modules/support.js");return renderSupport(subpage||"tickets-clients")}
   if(section==="notifications"){const {renderNotifications}=await import("./modules/notifications.js");return renderNotifications()}
   if(section==="training"){const {renderTraining}=await import("./modules/training.js");return renderTraining()}
   if(section==="profile"||section==="settings"){const module=await import("./modules/profile.js");return section==="profile"?module.renderProfile():module.renderSettings()}
@@ -204,7 +205,7 @@ window.addEventListener("keydown",event=>{
 window.addEventListener("pageshow",()=>{ensureLatestRelease()});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){swRegistration?.update().catch(()=>{});ensureLatestRelease();if(uiReady&&state.online)refreshRealtimeView("connected").catch(()=>{})}});
 setInterval(()=>{if(uiReady&&state.user)refreshChrome()},60*1000);
-function signature(){return JSON.stringify({route:state.route,closedGroups:state.closedGroups,sidebarOpen:state.sidebarOpen,appearance:state.appearance,online:state.online,lastSyncAt:state.lastSyncAt?.toISOString?.(),user:[state.user?.firstName,state.user?.first_name,state.user?.lastName,state.user?.last_name,state.user?.email,state.user?.role]})}
+function signature(){return JSON.stringify({profileRevision:state.profileRevision||0,route:state.route,closedGroups:state.closedGroups,sidebarOpen:state.sidebarOpen,appearance:state.appearance,online:state.online,lastSyncAt:state.lastSyncAt?.toISOString?.(),user:[state.user?.firstName,state.user?.first_name,state.user?.lastName,state.user?.last_name,state.user?.email,state.user?.role]})}
 subscribe(()=>{if(!uiReady||!state.user)return;const before=uiSignature?JSON.parse(uiSignature):{};const next=signature();if(next===uiSignature)return;const after=JSON.parse(next);uiSignature=next;if(!refs.shell){buildShell();return}const routeChanged=JSON.stringify(before.route)!==JSON.stringify(after.route);refreshChrome();if(routeChanged)renderCurrent({focus:true})});
 matchMedia("(max-width: 880px)").addEventListener("change",()=>{if(uiReady){refreshChrome();if(!document.querySelector(".overlay"))renderCurrent({focus:false});}});
 bootstrap().catch(error=>{resetInterface();toast(errorMessage(error),"error")});

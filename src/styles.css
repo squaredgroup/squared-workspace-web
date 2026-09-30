@@ -10,6 +10,7 @@
 @import "../css/v8.css";
 @import "../css/native-parity.css";
 @import "../css/messaging.css";
+@import "../css/studio.css";
 
 @source "../index.html";
 @source "../js/**/*.js";

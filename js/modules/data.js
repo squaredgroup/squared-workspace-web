@@ -3,6 +3,7 @@ import { editRecord, recordList, supportsRecord } from "../focus-records.js";
 import { strictObject, domainLabels } from "../focus-model.js";
 import { collectionInsights } from "../data-insights.js";
 import { viewContext } from "../focus-state.js";
+import { businessUnitList } from "./business-units.js";
 import { state } from "../store.js";
 import { listCoreDomain,saveCoreEntity,archiveCoreEntity,listSpecialized,saveSpecialized,archiveSpecialized,uploadFile,loadWorkspace,loadDomainCatalog } from "../api.js";
 import { h,pageHeader,row,button,modal,field,input,select,jsonEditor,validateControls,emptyState,skeletonPage,toast,errorMessage,card,pretty,formatDate,relativeDate,advancedEditor,confirmAction,statePanel } from "../ui.js";
@@ -129,6 +130,7 @@ function archiveAction({kind,item,specialized,reload}){
   });
 }
 function renderDomainList({kind,items,writable,reload,specialized=false}){
+  if(specialized&&kind==="business-units")return businessUnitList({items,writable,reload,onEdit:item=>specializedForm(kind,item,reload)});
   if(!specialized&&supportsRecord(kind))return recordList(kind,items,reload,{writable});
   const saved=viewContext(`domain:${state.route.section}:${state.route.subpage}:${kind}`,{query:"",status:"all",sort:"recent",limit:40});
   const host=h("div"),results=h("div",{class:"list"}),summary=h("div",{class:"collection-summary",role:"status"});

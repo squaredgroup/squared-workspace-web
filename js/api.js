@@ -17,7 +17,17 @@ export async function requestPasswordReset(email) { await request("/v1/auth/pass
 export async function confirmPasswordReset(email, token, newPassword) { await request("/v1/auth/password-reset/confirm", { method: "POST", auth: false, retry: false, body: { email, token, newPassword } }); }
 export async function confirmEmailVerification(email, token) { await request("/v1/auth/email-verification/confirm", { method: "POST", auth: false, retry: false, body: { email, token } }); }
 export async function loadMe() { const { data } = await request("/v1/me"); setState({ user: data }); return data; }
-export async function updateMe(value) { const { data } = await request("/v1/me", { method: "PATCH", body: value }); setState({ user: data }); return data; }
+export async function updateMe(value) {
+  const owner=state.user?.id;
+  const avatar=state.user?.avatarData||state.user?.avatar_data||null;
+  const body={...value,avatarData:Object.hasOwn(value,"avatarData")?value.avatarData:avatar};
+  const { data } = await request("/v1/me", { method: "PATCH", body });
+  if(state.user?.id===owner){
+    const workspace=state.workspace?{...state.workspace,team:(state.workspace.team||[]).map(member=>(member.id||member.memberId)===owner?{...member,...data}:member)}:state.workspace;
+    setState({user:data,workspace,profileRevision:(state.profileRevision||0)+1});
+  }
+  return data;
+}
 export async function loadSecurity() { return (await request("/v1/me/security")).data; }
 export async function updateSecurity(value) { return (await request("/v1/me/security", { method: "PUT", body: value })).data; }
 export async function changePassword(currentPassword, newPassword) { await request("/v1/me/password", { method: "PUT", body: { currentPassword, newPassword } }); }
