@@ -26,11 +26,18 @@ function applySiteSettings(settings){
   }
   root.style.setProperty("--sq-font",settings.fontFamily==="INTER"?"Inter,system-ui,sans-serif":settings.fontFamily==="SYSTEM"?"system-ui,sans-serif":"'Space Grotesk',system-ui,sans-serif");
   if(settings.seoTitle)document.title=settings.seoTitle;
+  const applicationName=document.querySelector('meta[name="application-name"]');
+  if(applicationName&&settings.siteName)applicationName.content=settings.siteName;
   const description=document.querySelector('meta[name="description"]');
   if(description&&settings.seoDescription)description.content=settings.seoDescription;
   if(/^https:\/\//.test(settings.faviconURL||"")){
     const icon=document.querySelector('link[rel="icon"]');
     if(icon)icon.href=settings.faviconURL;
+  }
+  if(/^https:\/\//.test(settings.socialImageURL||"")){
+    let image=document.querySelector('meta[property="og:image"]');
+    if(!image){image=document.createElement('meta');image.setAttribute('property','og:image');document.head.append(image)}
+    image.content=settings.socialImageURL;
   }
 }
 
