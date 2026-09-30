@@ -184,12 +184,12 @@ function dataOverview(collections,errors){
   const total=reports.reduce((sum,value)=>sum+value.total,0),active=reports.reduce((sum,value)=>sum+value.active,0),overdue=reports.reduce((sum,value)=>sum+value.overdue,0);
   const freshness=state.lastSyncAt?relativeDate(state.lastSyncAt):"à confirmer";
   return h("section",{class:`data-overview ${errors?"has-errors":""}`},
-    h("div",{class:"data-overview-copy"},h("span",{class:"data-overview-kicker",text:"Données Workspace"}),h("h2",{text:"Vue synchronisée et contrôlée"}),h("p",{text:"Les chiffres ci-dessous proviennent uniquement de votre périmètre API autorisé. Aucun contenu de démonstration n’est ajouté."})),
+    h("div",{class:"data-overview-copy"},h("span",{class:"data-overview-kicker",text:"Activité"}),h("h2",{text:"Vue d’ensemble"}),h("p",{text:"Suivez les éléments actifs et les échéances de cette rubrique."})),
     h("div",{class:"data-overview-metrics"},
-      h("div",{},h("strong",{text:String(total)}),h("span",{text:"enregistrements"})),
+      h("div",{},h("strong",{text:String(total)}),h("span",{text:"éléments"})),
       h("div",{},h("strong",{text:String(active)}),h("span",{text:"actifs"})),
       h("div",{},h("strong",{text:String(overdue)}),h("span",{text:"en retard"})),
-      h("div",{},h("strong",{text:String(collections.length)}),h("span",{text:"domaines chargés"}))
+      h("div",{},h("strong",{text:String(collections.length)}),h("span",{text:"collections"}))
     ),
     h("div",{class:"data-overview-sync"},h("i"),h("span",{text:`Synchronisé ${freshness}`}),errors?h("strong",{text:`${errors} domaine${errors>1?"s":""} à relancer`}):null)
   );
@@ -225,7 +225,7 @@ export async function renderDataSection(sectionKey,subpage=""){
       const writable=specialized?Boolean(definition?.writable):canWriteCore(kind);let panel;
       const reload=async()=>{const next=specialized?await listSpecialized(kind):await listCoreDomain(kind);panel.querySelector(".domain-slot")?.replaceChildren(renderDomainList({kind,items:next,writable,reload,specialized}))};
       const slot=h("div",{class:"domain-slot"},renderDomainList({kind,items,writable,reload,specialized}));
-      const title=specialized?pretty(kind):"Liste · "+(domainLabels[kind]||pretty(kind));
+      const title=specialized?({"business-units":"Pôles","legal-entities":"Entités juridiques","establishments":"Établissements","cost-centers":"Centres de coûts","memberships":"Rattachements","service-level-agreements":"Engagements de service","service-incidents":"Incidents","problems":"Problèmes","service-changes":"Changements"}[kind]||pretty(kind)):"Liste · "+(domainLabels[kind]||pretty(kind));
       const subtitle=specialized?`${items.length} enregistrement${items.length>1?"s":""} · ${writable?"modifiable":"lecture seule"}.`:`${items.length} élément${items.length>1?"s":""} synchronisé${items.length>1?"s":""} avec Workspace.`;
       panel=card(title,subtitle,slot,{iconName:specialized?"grid":sectionKey});body.append(panel);
     }

@@ -22,7 +22,7 @@ export function profilePhotoControl(user){
     change.disabled=true;
     try{await photoEditor(file,user.id,refresh);}catch(error){status.textContent=errorMessage(error);}finally{change.disabled=!writable;}
   });
-  return h("div",{class:"sq-profile-photo"},avatar,h("div",{class:"sq-photo-info"},h("strong",{text:`${user.firstName||user.first_name||""} ${user.lastName||user.last_name||""}`.trim()||user.email}),h("span",{text:[user.title,user.company].filter(Boolean).join(" · ")||user.role||"Membre"}),h("div",{class:"button-row"},change,remove),status,h("small",{text:"JPG, PNG ou WebP · 10 Mo maximum"})),picker);
+  return h("div",{class:"sq-profile-photo profile-identity"},avatar,h("div",{class:"sq-photo-info"},h("strong",{text:`${user.firstName||user.first_name||""} ${user.lastName||user.last_name||""}`.trim()||user.email}),h("span",{text:[user.title,user.company].filter(Boolean).join(" · ")||user.role||"Membre"}),h("div",{class:"button-row"},change,remove),status,h("small",{text:"JPG, PNG ou WebP · 10 Mo maximum"})),picker);
 }
 async function photoEditor(file,owner,refresh){
   const url=URL.createObjectURL(file),image=new Image();image.src=url;
