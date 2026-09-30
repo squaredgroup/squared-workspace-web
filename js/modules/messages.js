@@ -4,6 +4,7 @@ import { loadWorkspace, sendConversationMessage, createConversation, markConvers
 import { h, card, button, icon, iconButton, modal, field, input, textarea, toast, errorMessage, emptyState, formatDate, profileAvatar, announce, confirmAction } from "../ui.js";
 import { openProposalPicker, proposalCard } from "../message-proposals.js";
 import { openPDF, drawPDFPage } from "../pdf-reader.js";
+import { openTools } from "../mobile.js";
 
 const conversationMessages = conversation => Array.isArray(conversation?.messages) ? conversation.messages : [];
 const memberId = member => member.id || member.memberId || member.member_id;
@@ -237,7 +238,7 @@ export async function renderMessages() {
   const reload = async () => { await loadWorkspace(); if (alive()) paint(); };
   const inboxCount = h("span", { class: "sq-inbox-count" });
   const inboxSummary = h("small", { class: "sq-inbox-summary" });
-  leftCard.prepend(h("div", { class: "sq-inbox-brandbar" }, h("div", { class: "sq-inbox-brand" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "Squared", width: 28, height: 28 }), h("span", { text: "WORKSPACE", class: "sq-inbox-wordmark" })), h("div", { class: "sq-inbox-account" }, iconButton("sun", "Changer de thème", () => setAppearance({ mode: document.documentElement.dataset.theme === "dark" ? "light" : "dark" })), h("button", { type: "button", class: "sq-inbox-profile", "aria-label": "Ouvrir mon profil", onClick: () => setRoute("profile") }, profileAvatar(state.user, { size: 30, ariaHidden: true })))));
+  leftCard.prepend(h("div", { class: "sq-inbox-brandbar" }, h("div", { class: "sq-inbox-brand" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "Squared", width: 28, height: 28 }), h("span", { text: "WORKSPACE", class: "sq-inbox-wordmark" })), h("div", { class: "sq-inbox-account" }, iconButton("sun", "Changer de thème", () => setAppearance({ mode: document.documentElement.dataset.theme === "dark" ? "light" : "dark" })), iconButton("sliders", "Outils Workspace", openTools), h("button", { type: "button", class: "sq-inbox-profile", "aria-label": "Ouvrir mon profil", onClick: () => setRoute("profile") }, profileAvatar(state.user, { size: 30, ariaHidden: true })))));
   leftCard.querySelector(":scope > .card-head").replaceChildren(h("div", { class: "sq-inbox-heading" }, h("span", { class: "sq-inbox-kicker", text: "MESSAGES" }), h("div", { class: "sq-inbox-title" }, h("h1", { class: "card-title", text: "Conversations" }), inboxCount), inboxSummary), button("Nouvelle conversation", { iconName: "edit", ariaLabel: "Nouvelle conversation", className: "sq-new-conversation", onClick: () => newConversation(reload) }));
   root.append(h("div", { class: "split-view sq-messenger-shell" }, leftCard, rightCard));
   const search = h("input", { class: "search-input", type: "search", placeholder: "Rechercher une conversation…", "aria-label": "Rechercher une conversation", value: listQuery });
@@ -357,6 +358,7 @@ export async function renderMessages() {
         field("Notifications", notification),
         privateThread ? null : h("div", {}, h("strong", { text: "Participants" }), participants)),
       actions: [
+        { label: "Outils Workspace", icon: "sliders", onClick: close => { close(); openTools(); } },
         { label: pinned ? "Désépingler" : "Épingler", onClick: close => toggle("isPinned", !pinned, close) },
         { label: archived ? "Désarchiver" : "Archiver", onClick: close => toggle("isArchived", !archived, close) },
         { label: "Enregistrer", kind: "primary", onClick: async close => {

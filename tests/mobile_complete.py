@@ -65,7 +65,7 @@ def run():
             }''')
             assert immediate == {'focused': True, 'closed': True, 'inert': False}, immediate
             # Modal-to-modal transition must keep the application inert and release it on close.
-            page.locator('.sq-mobile-tools-trigger').click()
+            page.get_by_role('button',name='Outils Workspace',exact=True).click()
             page.locator('.sq-tools-sheet').get_by_role('button', name='Installer Workspace', exact=True).click()
             expect(page.get_by_role('dialog', name='Installer Workspace')).to_be_visible()
             assert page.evaluate('document.querySelector("#app").inert')

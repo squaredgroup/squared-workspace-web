@@ -73,6 +73,11 @@ def run():
                     expect(page.locator('.sq-inbox-summary')).not_to_be_empty()
                     capture(page,f'inbox-{theme}-{width}')
                     if theme == 'light' and width == 390:
+                        workspace_tools=page.get_by_role('button',name='Outils Workspace',exact=True)
+                        workspace_tools.click()
+                        expect(page.get_by_role('dialog',name='Outils Workspace')).to_be_visible()
+                        page.keyboard.press('Escape')
+                        expect(workspace_tools).to_be_focused()
                         page.get_by_role('button',name='Ouvrir la conversation épinglée Squared Group').click();f.settled(page)
                         expect(page.locator('.sq-thread-heading')).to_contain_text('Squared Group')
                         page.get_by_role('button',name='Retour aux conversations').click();f.settled(page)
@@ -83,6 +88,8 @@ def run():
                     page.locator('.message-thread').evaluate('(el)=>el.scrollTop=0')
                     expect(page.get_by_role('img',name='Aperçu PDF : Présentation-Squared.pdf')).to_have_attribute('data-rendered','true')
                     expect(page.locator('.sq-attachment-card-pdf .sq-attachment-caption')).to_contain_text('PDF · 2 pages')
+                    download_icon=page.locator('.sq-attachment-card-pdf .sq-attachment-download > .icon').bounding_box()
+                    assert download_icon['width'] >= 16 and download_icon['height'] >= 16, download_icon
                     capture(page,f'thread-{theme}-{width}')
                     page.locator('.sq-attachment-card-image').scroll_into_view_if_needed()
                     expect(page.locator('.sq-attachment-card-image .sq-attachment-preview img')).to_be_visible()
@@ -106,6 +113,12 @@ def run():
                     expect(gallery.locator('.sq-attachment-card-pdf')).to_have_count(0)
                     gallery.get_by_role('button',name='Fermer',exact=True).click()
                     expect(page.get_by_role('button',name='Voir les médias et les participants')).to_be_focused()
+                    if theme == 'light' and width == 390:
+                        page.get_by_role('button',name='Options',exact=True).click()
+                        page.get_by_role('dialog',name='Options de la conversation').get_by_role('button',name='Outils Workspace',exact=True).click()
+                        expect(page.get_by_role('dialog',name='Outils Workspace')).to_be_visible()
+                        page.keyboard.press('Escape')
+                        expect(page.get_by_role('button',name='Options',exact=True)).to_be_focused()
                     page.get_by_role('button',name='Ajouter au message').click()
                     expect(page.get_by_role('dialog',name='Ajouter au message')).to_be_visible()
                     capture(page,f'tools-{theme}-{width}')
