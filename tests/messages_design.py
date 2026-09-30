@@ -91,11 +91,15 @@ def run():
                     page.locator('.message-thread').evaluate('(el)=>el.scrollTop=0')
                     expect(page.get_by_role('img',name='Aperçu PDF : Présentation-Squared.pdf')).to_have_attribute('data-rendered','true')
                     expect(page.locator('.sq-attachment-card-pdf .sq-attachment-caption')).to_contain_text('PDF · 2 pages')
+                    assert page.locator('.sq-attachment-card-pdf .sq-attachment-open').evaluate("el=>{const color=getComputedStyle(el).backgroundColor;return color.startsWith('rgba(')&&Number(color.match(/[\\d.]+/g).at(-1))<=.03}"), 'The open control must leave the PDF visible'
                     download_icon=page.locator('.sq-attachment-card-pdf .sq-attachment-download > .icon').bounding_box()
                     assert download_icon['width'] >= 16 and download_icon['height'] >= 16, download_icon
                     capture(page,f'thread-{theme}-{width}')
                     page.locator('.sq-attachment-card-image').scroll_into_view_if_needed()
                     expect(page.locator('.sq-attachment-card-image .sq-attachment-preview img')).to_be_visible()
+                    expect(page.locator('.sq-attachment-card-image .sq-attachment-preview img')).to_have_js_property('complete',True)
+                    assert page.locator('.sq-attachment-card-image .sq-attachment-preview img').evaluate('img=>img.naturalWidth>0')
+                    assert page.locator('.sq-attachment-card-image .sq-attachment-open').evaluate("el=>{const color=getComputedStyle(el).backgroundColor;return color.startsWith('rgba(')&&Number(color.match(/[\\d.]+/g).at(-1))<=.03}"), 'The open control must leave the image visible'
                     expect(page.locator('.sq-attachment-card-image .sq-attachment-caption')).to_be_hidden()
                     expect(page.get_by_role('button',name='Télécharger Identité-Squared.png',exact=True)).to_be_visible()
                     capture(page,f'media-{theme}-{width}')
