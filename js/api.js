@@ -47,8 +47,24 @@ export async function loadWorkspace() {
   const { data, response } = await request("/v1/workspace", { headers: state.workspaceEtag ? { "If-None-Match": state.workspaceEtag } : {} });
   if (response?.status === 304) return state.workspace;
   const etag = response?.headers?.get("etag");
+  // A slower read must never replace a newer workspace projection received
+  // after a write or another realtime invalidation.
+  const revision = value => /^"\d+"$/.test(value || "") ? Number(value.slice(1, -1)) : null;
+  const incomingRevision = revision(etag), visibleRevision = revision(state.workspaceEtag);
+  if (incomingRevision !== null && visibleRevision !== null && incomingRevision < visibleRevision) {
+    return state.workspace;
+  }
   setState({ workspace: data || state.workspace, workspaceEtag: etag || state.workspaceEtag, lastSyncAt: new Date() });
   return data || state.workspace;
+}
+
+async function writeWithFreshWorkspaceRevision(write) {
+  try { return await write(); }
+  catch (error) {
+    if (error?.status !== 409 && error?.status !== 412 && error?.status !== 428) throw error;
+    await loadWorkspace();
+    return write();
+  }
 }
 export async function loadDomainCatalog() { const { data } = await request("/v1/domain-data/catalog"); setState({ domainCatalog: data }); return data; }
 
@@ -77,9 +93,9 @@ export async function getCoreEntity(domain, id) { return (await request(`/v1/${d
 export async function saveCoreEntity(domain, entity) {
   const isEdit = Boolean(entity.id && entity.version);
   const path = isEdit ? `/v1/${domain}/${entity.id}` : `/v1/${domain}`;
-  return (await request(path, { method: isEdit ? "PATCH" : "POST", headers: { "If-Match": state.workspaceEtag || '"0"' }, body: entity })).data;
+  return (await writeWithFreshWorkspaceRevision(() => request(path, { method: isEdit ? "PATCH" : "POST", headers: { "If-Match": state.workspaceEtag || '"0"' }, body: entity }))).data;
 }
-export async function archiveCoreEntity(domain, id) { await request(`/v1/${domain}/${id}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } }); }
+export async function archiveCoreEntity(domain, id) { await writeWithFreshWorkspaceRevision(() => request(`/v1/${domain}/${id}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } })); }
 
 export async function listSpecialized(kind,{signal}={}) {
   return paginate(async cursor=>{
@@ -91,9 +107,9 @@ export async function getSpecialized(kind, id) { return (await request(`/v1/doma
 export async function saveSpecialized(kind, entity) {
   const edit = Boolean(entity.id && entity.version);
   const path = edit ? `/v1/domain-data/${kind}/${entity.id}` : `/v1/domain-data/${kind}`;
-  return (await request(path, { method: edit ? "PATCH" : "POST", headers: { "If-Match": state.workspaceEtag || '"0"' }, body: entity })).data;
+  return (await writeWithFreshWorkspaceRevision(() => request(path, { method: edit ? "PATCH" : "POST", headers: { "If-Match": state.workspaceEtag || '"0"' }, body: entity }))).data;
 }
-export async function archiveSpecialized(kind, id, version) { await request(`/v1/domain-data/${kind}/${id}?version=${version}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } }); }
+export async function archiveSpecialized(kind, id, version) { await writeWithFreshWorkspaceRevision(() => request(`/v1/domain-data/${kind}/${id}?version=${version}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } })); }
 
 export async function uploadFile(file, entityType, entityId) {
   if (file.size > 25 * 1024 * 1024) throw new Error("Le fichier dépasse la limite de 25 Mo.");
