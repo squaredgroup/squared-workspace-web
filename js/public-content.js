@@ -4,6 +4,36 @@ let contentPromise=null;
 
 const normalized=item=>({id:item?.id||"",...(item?.data||{})});
 
+async function siteSettings(){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),5000);
+  try{
+    const response=await fetch(`${API_BASE}/settings`,{cache:"no-store",headers:{Accept:"application/json"},signal:controller.signal});
+    if(!response.ok)return null;
+    const payload=await response.json();
+    return payload?.version>0?payload.settings:null;
+  }finally{clearTimeout(timer)}
+}
+
+function applySiteSettings(settings){
+  if(!settings)return;
+  const root=document.documentElement;
+  if(/^#[0-9a-f]{6}$/i.test(settings.accentColor||"")){
+    const rgb=settings.accentColor.slice(1).match(/.{2}/g).map(value=>parseInt(value,16));
+    root.style.setProperty("--sq-accent",settings.accentColor);
+    root.style.setProperty("--sq-accent-rgb",rgb.join(","));
+    root.style.setProperty("--sq-on-accent",(rgb[0]*299+rgb[1]*587+rgb[2]*114)/1000<145?"#FFFFFF":"#0A1207");
+  }
+  root.style.setProperty("--sq-font",settings.fontFamily==="INTER"?"Inter,system-ui,sans-serif":settings.fontFamily==="SYSTEM"?"system-ui,sans-serif":"'Space Grotesk',system-ui,sans-serif");
+  if(settings.seoTitle)document.title=settings.seoTitle;
+  const description=document.querySelector('meta[name="description"]');
+  if(description&&settings.seoDescription)description.content=settings.seoDescription;
+  if(/^https:\/\//.test(settings.faviconURL||"")){
+    const icon=document.querySelector('link[rel="icon"]');
+    if(icon)icon.href=settings.faviconURL;
+  }
+}
+
 async function collection(key){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),5000);
@@ -16,9 +46,16 @@ async function collection(key){
 }
 
 export function loadWorkspaceWebContent(){
-  if(!contentPromise)contentPromise=Promise.allSettled(COLLECTIONS.map(collection)).then(results=>Object.fromEntries(
-    COLLECTIONS.map((key,index)=>[key,results[index].status==="fulfilled"?results[index].value:[]])
-  ));
+  if(!contentPromise)contentPromise=Promise.allSettled([...COLLECTIONS.map(collection),siteSettings()]).then(results=>{
+    const content=Object.fromEntries(COLLECTIONS.map((key,index)=>[key,results[index].status==="fulfilled"?results[index].value:[]]));
+    const settings=results[COLLECTIONS.length].status==="fulfilled"?results[COLLECTIONS.length].value:null;
+    applySiteSettings(settings);
+    if(settings?.announcementText)content.announcements.unshift({
+      id:"workspace-site-announcement",title:settings.announcementText,summary:settings.announcementText,
+      url:safePublicURL(settings.announcementURL),featured:true
+    });
+    return content;
+  });
   return contentPromise;
 }
 
