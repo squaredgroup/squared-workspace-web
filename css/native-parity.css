@@ -22,3 +22,6 @@
 .sq-proposal-finance{display:grid;gap:3px;padding:2px 0;min-width:0}.sq-proposal-finance>span{font-size:10px;font-weight:700;letter-spacing:.07em;color:var(--sq-muted)}.sq-proposal-finance>strong{font-size:12px;font-weight:500;color:var(--sq-muted);line-height:1.35}.sq-proposal-finance>strong.sq-proposal-amount{font-size:21px;font-weight:700;letter-spacing:-.025em;color:var(--sq-text)}
 @media(max-width:1000px){.planning-grid{grid-template-columns:repeat(4,minmax(140px,1fr))}.system-mail-layout{grid-template-columns:1fr}.system-mail-list{display:flex;flex-wrap:wrap}}
 @media(max-width:640px){.planning-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.planning-day{min-width:0}.personal-planning .page-actions{flex-wrap:wrap}.system-mail-block-head{align-items:stretch;flex-direction:column}}
+.toast-stack{width:max-content;max-width:calc(100vw - 36px);justify-items:end}
+.toast{box-sizing:border-box;width:fit-content;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+@media(max-width:880px){.toast-stack{width:auto;max-width:none}}
