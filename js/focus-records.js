@@ -113,7 +113,7 @@ export function recordRow(domain,record,{onRefresh,compact=false}={}) {
   if(member)metadata.push(memberName(member));
   if(due)metadata.push(dateLabel(due));
   const amount=domain==="missions"?valueOf(record,"remuneration"):valueOf(record,"amount","amountValue","total","totalAmount");
-  if(amount!==""&&amount!==null&&amount!==undefined)metadata.push(formatMoney(amount,valueOf(record,"currency")||"EUR"));
+  if(amount!==""&&amount!==null&&amount!==undefined)metadata.push(formatMoney(amount,valueOf(record,"currency")||(domain==="missions"?"":"EUR")));
   const text=h("button",{class:"focus-record-open",type:"button",onClick:()=>openRecord(domain,record.id),"aria-label":`Ouvrir ${titleOf(record)}`},h("strong",{text:titleOf(record)}),h("span",{class:"focus-record-meta",text:metadata.join(" · ")||domainLabels[domain]||domain}),h("span",{class:`focus-status ${dueBucket(record)==="overdue"&&!isFinished(record)?"is-late":""}`,text:statusLabel(valueOf(record,"status"))}));
   const row=h("article",{class:`focus-record ${compact?"compact":""}`,dataset:{recordId:record.id}},h("span",{class:"focus-record-icon","aria-hidden":"true"},icon(sectionForDomain(domain),20)),text);
   if(domain==="tasks"&&canEditRecord(domain)&&!isFinished(record))row.append(button("Terminer",{small:true,kind:"ghost",ariaLabel:`Terminer ${titleOf(record)}`,onClick:()=>finishTask(record,onRefresh)}));
@@ -157,7 +157,7 @@ export async function renderRecord(domain,id) {
   const metadata=h("dl",{class:"focus-properties"});
   const property=(label,value)=>{if(value!==""&&value!==null&&value!==undefined)metadata.append(h("div",{},h("dt",{text:label}),h("dd",{text:value})));};
   property("Échéance",dueOf(record)?dateLabel(dueOf(record)):"Sans échéance");
-  if(domain==="missions")property("Rémunération",formatMoney(valueOf(record,"remuneration"),valueOf(record,"currency")||"EUR","Non renseignée"));
+  if(domain==="missions")property("Rémunération",formatMoney(valueOf(record,"remuneration"),valueOf(record,"currency")||"","Non renseignée"));
   if(domain==="contracts"){property("Partie contractante",valueOf(record,"client"));property("Montant",formatMoney(valueOf(record,"amount")||valueOf(record,"amountValue"),valueOf(record,"currency")||"EUR"));property("Devise",valueOf(record,"currency"));}
   property("Responsable",memberName(list("team").find(m=>(m.id||m.memberId)===assigneeOf(record)))==="Membre"?"Non renseigné":memberName(list("team").find(m=>(m.id||m.memberId)===assigneeOf(record))));
   const project=list("projects").find(p=>p.id===parentOf(record));if(project)property("Projet",titleOf(project));

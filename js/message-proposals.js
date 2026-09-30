@@ -20,7 +20,7 @@ function amount(terms) {
 }
 
 function remuneration(terms) {
-  return formatMoney(terms.remuneration, terms.currency, "Non renseignée");
+  return formatMoney(terms.remuneration, terms.currency || "", "Non renseignée");
 }
 
 function termsSummary(kind, terms) {
