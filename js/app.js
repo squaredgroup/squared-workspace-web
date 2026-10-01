@@ -12,7 +12,7 @@ import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredS
 import { renderAuth } from "./modules/auth.js";
 import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar,roleLabel } from "./ui.js";
 
-let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let navigationPrefix=false;let activeViewTransition=null;
+let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let navigationPrefix=false;
 const app=document.querySelector("#app");
 
 function accessibleSections(){return Object.keys(SECTIONS).filter(key=>canAccessSection(key,state.user))}
@@ -147,12 +147,9 @@ async function renderCurrent({focus=true}={}){
       refs.content.setAttribute("aria-busy","false");renderedRouteKey=key;
       document.title=`${SECTIONS[route.section]?.title||"Workspace"} — Squared Workspace`;
     };
-    const reduced=state.appearance?.reducedMotion||matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if(document.startViewTransition&&!reduced&&!activeViewTransition){
-      const transition=document.startViewTransition(apply);activeViewTransition=transition;
-      await transition.updateCallbackDone.catch(()=>{});
-      transition.finished.catch(()=>{}).finally(()=>{if(activeViewTransition===transition)activeViewTransition=null;});
-    }else apply();
+    // Show the ready page immediately. Animating a snapshot of the loading
+    // placeholder can keep it above the new content during navigation.
+    apply();
     if(generation!==renderGeneration)return;
     requestAnimationFrame(()=>{if(generation===renderGeneration)window.scrollTo({top:returnY,behavior:"instant"});});
     if(focus&&!document.querySelector("#portal-root > .overlay")){refs.content.focus({preventScroll:true});announce(`${SECTIONS[route.section]?.title||"Workspace"} chargé`);}
