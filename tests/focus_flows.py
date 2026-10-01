@@ -69,7 +69,7 @@ def run():
                     for route in ['dashboard','tasks','projects','notifications','spaces','messages','mailbox']:
                         go(page,route);width_check(page,f'{route}-{width}-{theme}')
                     if width in [390,1440]:
-                        go(page,'dashboard');expect(page.locator('.focus-home')).to_be_visible();f.settled(page);expect(page.locator('.skeleton-grid')).to_have_count(0);page.screenshot(path=str(f.OUT/f'focus-home-{width}-{theme}.png'),full_page=True,animations='disabled')
+                        go(page,'dashboard');expect(page.locator('.focus-home')).to_be_visible();f.settled(page);expect(page.locator('#workspace-main .skeleton')).to_have_count(0);page.screenshot(path=str(f.OUT/f'focus-home-{width}-{theme}.png'),full_page=True,animations='disabled')
             page.set_viewport_size({'width':390,'height':844});go(page,'tasks')
             search=page.get_by_label('Rechercher dans la liste',exact=True)
             search.evaluate('node=>window.__focusSearchNode=node')

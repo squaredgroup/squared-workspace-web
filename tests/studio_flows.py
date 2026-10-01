@@ -84,6 +84,10 @@ def run():
         context.route_web_socket('wss://workspace.squaredgroup.studio/**',lambda ws:ws.on_message(lambda message:None))
         page=context.new_page();page.on('pageerror',lambda error:errors.append(str(error)))
         page.goto(f.origin);page.locator('input[name=email]').fill(f.USER['email']);page.locator('input[name=password]').fill('fixture-pass123');page.get_by_role('button',name='Se connecter',exact=True).click();f.settled(page)
+        expect(page.locator('.focus-home')).to_be_visible();expect(page.get_by_role('img',name='Main qui salue')).to_be_visible()
+        expect(page.locator('#workspace-main .skeleton')).to_have_count(0)
+        page.wait_for_timeout(300);page.screenshot(path=str(OUT/'studio-home-ready-1440.png'),animations='disabled')
+        (OUT/'studio-home-ready.json').write_text(json.dumps(page.evaluate("()=>({busy:document.querySelector('#workspace-main').getAttribute('aria-busy'),classes:[...document.querySelector('#workspace-main').children].map(n=>n.className),headings:[...document.querySelectorAll('#workspace-main h1,#workspace-main h2')].map(n=>({text:n.textContent,y:n.getBoundingClientRect().y,visible:!!n.getClientRects().length})),skeletons:[...document.querySelectorAll('#workspace-main [class*=skeleton]')].map(n=>n.className)})"),ensure_ascii=False,indent=2))
         for theme in ['light','dark']:
             page.evaluate('async theme=>{const s=await import("/js/store.js");s.setAppearance({mode:theme})}',theme)
             for width,height in [(320,740),(390,844),(768,1024),(1440,1000)]:

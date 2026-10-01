@@ -137,7 +137,10 @@ async function renderCurrent({focus=true}={}){
   if(renderedRouteKey&&refs.content.getAttribute("aria-busy")!=="true")viewContext("scroll:"+renderedRouteKey).y=window.scrollY;
   const route={...state.route},key=JSON.stringify(route),generation=++renderGeneration;
   const returnY=viewContext("scroll:"+key,{y:0}).y;
-  refs.content.setAttribute("aria-busy","true");refs.content.replaceChildren(skeletonPage());
+  refs.content.setAttribute("aria-busy","true");
+  // Keep a loaded page visible during background refreshes and resizing.
+  // Navigation to a different page still gets an explicit loading state.
+  if(focus||renderedRouteKey!==key||!refs.content.children.length)refs.content.replaceChildren(skeletonPage());
   try{
     const page=await sectionPage(route.section,route.subpage);
     if(generation!==renderGeneration||!refs.content)return;

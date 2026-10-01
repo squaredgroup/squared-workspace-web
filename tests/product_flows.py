@@ -224,7 +224,7 @@ with sync_playwright() as playwright:
     if visual_dir:
         page.wait_for_timeout(400)
         expect(page.locator('.focus-home')).to_be_visible()
-        expect(page.locator('.skeleton-grid')).to_have_count(0)
+        expect(page.locator('#workspace-main .skeleton')).to_have_count(0)
         page.screenshot(path=str(visual_dir / "dashboard-desktop.png"), full_page=True,animations='disabled')
 
     sections = page.evaluate("""async()=>{const c=await import('/js/config.js');return Object.entries(c.SECTIONS).map(([key,s])=>({key,title:s.title,heading:key==='messages'?'Conversations':key==='planning'?'Ma semaine type':key==='siteHelp'?((s.subpages||[])[0]?.title||s.title):s.title,subpage:(s.subpages||[])[0]?.id||''}))}""")

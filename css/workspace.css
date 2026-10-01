@@ -319,4 +319,4 @@ html[data-density="airy"] .workspace .focus-record{min-height:92px;padding:20px}
 @media(prefers-reduced-motion:reduce){.workspace *,.modal *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 html[data-reduced-motion="true"] .workspace *,html[data-reduced-motion="true"] .modal *{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 .workspace .sq-board-search>input,.workspace .sq-messages .sq-inbox-search>input{border:0!important;background:transparent!important;padding:0!important;box-shadow:none!important;min-height:44px}
-.button.sq-attachment-open{background:transparent;border:0;box-shadow:none;min-height:0;padding:8px;border-radius:0}.button.sq-attachment-open:hover{background:rgba(0,0,0,.03);border:0;box-shadow:none}
+.button.sq-attachment-open{background:transparent!important;border:0!important;box-shadow:none;min-height:0;padding:8px;border-radius:0}.button.sq-attachment-open:hover{background:rgba(0,0,0,.03)!important;border:0!important;box-shadow:none}
