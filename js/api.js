@@ -149,6 +149,36 @@ export async function cmsItem(collectionId, itemId) { return (await request(`/v1
 export async function saveCMSItem(collectionId, itemId, value) { return (await request(`/v1/cms/collections/${encodeURIComponent(collectionId)}/items${itemId ? `/${encodeURIComponent(itemId)}` : ""}`, { method: itemId ? "PATCH" : "POST", body: value })).data; }
 export async function deleteCMSItem(collectionId, itemId) { await request(`/v1/cms/collections/${encodeURIComponent(collectionId)}/items/${encodeURIComponent(itemId)}`, { method: "DELETE" }); }
 
+const cmsStudioPath = path => `/v1/cms-studio${path}`;
+export async function cmsStudioSites() { return (await request(cmsStudioPath("/sites"))).data; }
+export async function cmsStudioWorkspace(site) { return (await request(cmsStudioPath(`/sites/${encodeURIComponent(site)}/workspace`))).data; }
+export async function cmsStudioEntries(site, collection, { query = "", phase = "", offset = 0 } = {}) {
+  const params = new URLSearchParams({ collection, q: query, phase, offset: String(offset) });
+  return (await request(cmsStudioPath(`/sites/${encodeURIComponent(site)}/entries?${params}`))).data;
+}
+export async function saveCMSStudioEntry(entry) {
+  return (await request(cmsStudioPath(`/entries/${encodeURIComponent(entry.id)}`), { method: "PUT", body: { entry, expectedRevision: Number(entry.revision || 0) } })).data;
+}
+export async function cmsStudioEntryAction(entry, action, value = {}) {
+  return (await request(cmsStudioPath(`/entries/${encodeURIComponent(entry.id)}/actions`), { method: "POST", body: { expectedRevision: Number(entry.revision || 0), action, ...value } })).data;
+}
+export async function cmsStudioEntryHistory(id) { return (await request(cmsStudioPath(`/entries/${encodeURIComponent(id)}/history`))).data; }
+export async function addCMSStudioComment(id, note, field = null) { return (await request(cmsStudioPath(`/entries/${encodeURIComponent(id)}/comments`), { method: "POST", body: { note, field } })).data; }
+export async function cmsStudioAssets(site) { return (await request(cmsStudioPath(`/sites/${encodeURIComponent(site)}/assets`))).data; }
+export async function attachCMSStudioAsset(site, fileID) { return (await request(cmsStudioPath(`/sites/${encodeURIComponent(site)}/assets`), { method: "POST", body: { fileID } })).data; }
+export async function cmsStudioPreview(entry) { return (await request(cmsStudioPath("/preview"), { method: "POST", body: { entry } })).data; }
+export async function saveCMSStudioConfiguration(site, configuration) {
+  return (await request(cmsStudioPath(`/sites/${encodeURIComponent(site)}/configuration`), { method: "PUT", body: { configuration, expectedRevision: Number(configuration.version || 0) } })).data;
+}
+export async function fetchCMSStudioAssetBlob(id, { signal } = {}) {
+  const path = cmsStudioPath(`/assets/${encodeURIComponent(id)}/content`);
+  const fetchContent = () => fetch(apiURL(path), { headers: { Authorization: `Bearer ${state.accessToken}`, "X-Workspace-Client": "web" }, credentials: "omit", cache: "no-store", mode: "cors", signal });
+  let response = await fetchContent();
+  if (response.status === 401) { await refreshSession(); response = await fetchContent(); }
+  if (!response.ok) throw new APIError(response.status, {});
+  return response.blob();
+}
+
 export async function trainingCatalog() { return (await request("/v1/training/catalog")).data; }
 export async function trainingLesson(id) { return (await request(`/v1/training/lessons/${id}`)).data; }
 export async function setTrainingProgress(id, completed) { return (await request(`/v1/training/lessons/${id}/progress`, { method: "PUT", body: { completed } })).data; }

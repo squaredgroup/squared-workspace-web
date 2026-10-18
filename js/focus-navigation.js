@@ -11,8 +11,7 @@ ICONS.spaces="Grid";
 const allowed=key=>canAccessSection(key,state.user);
 const go=key=>setRoute(key,SECTIONS[key]?.subpages?.find(p=>canAccessSubpage(p,state.user))?.id||"");
 export function focusTabs(){
-  const client=state.user?.role==="CLIENT";
-  const entries=[{key:"dashboard",title:"Accueil",active:["dashboard","today"]},{key:client?"projects":"tasks",title:client?"Projets":"Travail",active:["projects","tasks","missions","planning"]},{key:"notifications",title:client?"À valider":"À traiter",active:["notifications","validations"]},{key:"messages",title:"Messages",active:["messages","mailbox"]},{key:"spaces",title:client?"Espace":"Espaces",active:[]}].filter(item=>allowed(item.key));
+  const entries=[{key:"dashboard",title:"Accueil",active:["dashboard","today"]},{key:"projects",title:"Projets",active:["projects","missions","validations","deliverables"]},{key:"tasks",title:"Tâches",active:["tasks","planning"]},{key:"messages",title:"Messages",active:["messages","mailbox","notifications"]},{key:"spaces",title:"Plus",active:[]}].filter(item=>allowed(item.key));
   const matched=entries.find(item=>item.active.includes(state.route.section));
   return h("nav",{class:"mobile-tabs focus-tabs","aria-label":"Navigation mobile"},...entries.map(item=>{
     const active=item===matched||(!matched&&item.key==="spaces");

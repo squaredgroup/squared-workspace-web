@@ -15,7 +15,7 @@ def inspect(page, name):
     brand = page.evaluate('''async()=>{
       await document.fonts.ready;
       const text=[...document.querySelectorAll('body *')].filter(el=>el.getClientRects().length&&[...el.childNodes].some(node=>node.nodeType===3&&node.textContent.trim()));
-      const wrongFonts=text.filter(el=>getComputedStyle(el).fontFamily.replaceAll('"','').trim()!=='Space Grotesk').map(el=>({tag:el.tagName,class:el.className,font:getComputedStyle(el).fontFamily}));
+      const wrongFonts=text.filter(el=>!['Wix Madefor Text, system-ui, sans-serif','Wix Madefor Display, Wix Madefor Text, system-ui, sans-serif'].includes(getComputedStyle(el).fontFamily.replaceAll('"','').trim())).map(el=>({tag:el.tagName,class:el.className,font:getComputedStyle(el).fontFamily}));
       const icons=[...document.querySelectorAll('img.icon,img.nav-icon,img.group-chevron')];
       await Promise.all(icons.map(image=>image.decode().catch(()=>{})));
       const wrongIcons=icons.filter(image=>!new URL(image.src).pathname.match(/^\\/assets\\/icons\\/Iconly(?:Regular|Fill)[A-Za-z0-9]+\\.svg$/)||!image.naturalWidth).map(image=>image.src);
@@ -50,7 +50,7 @@ def run():
             page.goto(f.origin)
             loaded = page.evaluate('''async()=>{
               const weights=[300,400,500,600,700];
-              return Promise.all(weights.map(async weight=>({weight,faces:(await document.fonts.load(`${weight} 14px "Space Grotesk"`)).length})));
+              return Promise.all(weights.filter(weight=>weight!==300).map(async weight=>({weight,faces:(await document.fonts.load(`${weight} 14px "Wix Madefor Text"`)).length})));
             }''')
             assert all(face['faces'] == 1 for face in loaded), loaded
             page.get_by_label('Adresse e-mail', exact=True).fill(f.USER['email'])

@@ -29,6 +29,9 @@ WORKSPACE = {
 }
 SETTINGS = {'appearanceMode':'dark','dashboardDensity':'balanced','contentWidth':'balanced','language':'fr-FR','timezone':'Europe/Paris','compactSidebar':False,'reducedMotion':True}
 MAIL = {'id':'mail-1','direction':'INBOUND','folder':'INBOX','status':'RECEIVED','subject':'Revue mobile et préparation du prochain lancement','fromName':'Équipe Design','fromEmail':'design@example.invalid','toEmails':[USER['email']],'ccEmails':[],'preview':'La revue est disponible.','textBody':'Bonjour,\nLa revue est disponible.','htmlBody':'<html><body><table width="560"><tr><td><h1>La revue est disponible</h1><p>Une mise en page réelle et lisible.</p></td></tr></table></body></html>','attachments':[],'isRead':False,'isStarred':True,'receivedAt':'2026-09-20T08:45:00Z'}
+CMS_SITE = {'id':'workspace-web','title':'Squared Workspace Web','subtitle':'Site administré dans Workspace','publicSiteURL':'https://workspace.squaredgroup.studio','editorKind':'WORKSPACE_CONTENT','collectionCount':1,'itemCount':1,'publishedCount':0}
+CMS_COLLECTION = {'id':'pages','displayName':'Pages','displayField':'title','collectionType':'NATIVE','itemCount':1,'fields':[{'key':'title','displayName':'Titre','type':'TEXT','required':True},{'key':'body','displayName':'Contenu','type':'RICH_TEXT'}]}
+CMS_ENTRY = {'id':'10000000-0000-4000-a000-000000000001','siteID':'workspace-web','collectionID':'pages','sourceID':None,'baseToken':None,'revision':1,'phase':'DRAFT','data':{'title':'Accueil Workspace','body':'Contenu de démonstration'},'references':{},'ownerID':USER['id'],'dueAt':None,'scheduledAt':None,'locale':'fr','updatedAt':'2026-10-18T18:00:00Z'}
 requests, reports, errors, missing_assets = [], [], [], []
 unknown = set()
 class Handler(SimpleHTTPRequestHandler):
@@ -63,6 +66,11 @@ def fixture(route):
     if path=='/v1/admin/security-overview':return send({'healthy':True,'services':[]})
     if path in ('/v1/invitations','/v1/custom-roles'):return send([])
     if path=='/v1/cms/collections':return send({'collections':[]})
+    if path=='/v1/cms-studio/sites':return send({'sites':[CMS_SITE],'canAdminister':True})
+    if path=='/v1/cms-studio/sites/workspace-web/workspace':return send({'collections':[CMS_COLLECTION],'entries':[CMS_ENTRY],'configuration':{'siteID':'workspace-web','title':'Squared Workspace Web','publicURL':'https://workspace.squaredgroup.studio','previewURL':'','defaultLocale':'fr','locales':['fr'],'analyticsEnabled':True,'archived':False,'version':1},'access':[],'canEdit':True,'canPublish':True,'canAdminister':True,'metrics':{'pageViews':420,'downloads':12,'actions':37,'periodDays':30,'collected':True}})
+    if path=='/v1/cms-studio/sites/workspace-web/entries':return send({'collection':CMS_COLLECTION,'entries':[CMS_ENTRY],'totalCount':1,'hasNext':False,'searchComplete':True})
+    if path=='/v1/cms-studio/sites/workspace-web/assets':return send({'assets':[]})
+    if path=='/v1/cms-studio/entries/10000000-0000-4000-a000-000000000001/history':return send({'versions':[],'comments':[]})
     if path=='/v1/mailbox/newsletters/subscribers':return send({'subscribers':[],'counts':{'active':0}})
     if path=='/v1/mailbox/templates':return send({'templates':[]})
     if path=='/v1/mailbox/style':return send({})
@@ -106,8 +114,9 @@ def flows(page):
     expect(page.locator('.sq-mobile-tools-trigger')).to_be_visible()
     for width,height in [(320,740),(360,780),(390,844),(430,932),(768,1024),(880,1024),(844,390),(1024,768),(1440,1000)]:
         page.set_viewport_size({'width':width,'height':height})
-        for section in ['dashboard','projects','tasks','messages','mailbox','notifications','profile','settings','training','people']:
+        for section in ['dashboard','projects','tasks','messages','mailbox','notifications','profile','settings','training','people','webContent']:
             go(page,section);check_width(page,f'{section}-{width}x{height}')
+            if section=='webContent' and width in (390,1440):page.screenshot(path=str(OUT/f'cms-studio-{width}.png'),full_page=True)
         go(page,'dashboard')
         if width in (320,390,768,1440):page.screenshot(path=str(OUT/f'dashboard-{width}.png'),full_page=True)
     page.set_viewport_size({'width':390,'height':844});go(page,'messages')
@@ -142,7 +151,7 @@ def flows(page):
     check_width(page,'mail-reader-390');page.screenshot(path=str(OUT/'mail-reader-390.png'),full_page=True)
     page.locator('.sq-mail-back').click();expect(page.locator('.mail-list-pane')).to_be_visible()
     go(page,'messages')
-    page.locator('.mobile-tabs').get_by_role('button',name='Espaces',exact=True).click()
+    page.locator('.mobile-tabs').get_by_role('button',name='Plus',exact=True).click()
     expect(page.locator('.focus-spaces')).to_be_visible()
     page.get_by_role('searchbox',name='Trouver un espace').fill('Messages')
     page.locator('.focus-space-link').filter(has_text='Messages').click();settled(page)
