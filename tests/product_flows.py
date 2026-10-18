@@ -227,7 +227,7 @@ with sync_playwright() as playwright:
         expect(page.locator('#workspace-main .skeleton')).to_have_count(0)
         page.screenshot(path=str(visual_dir / "dashboard-desktop.png"), full_page=True,animations='disabled')
 
-    sections = page.evaluate("""async()=>{const c=await import('/js/config.js');return Object.entries(c.SECTIONS).map(([key,s])=>({key,title:s.title,heading:key==='messages'?'Conversations':key==='planning'?'Ma semaine type':key==='siteHelp'?((s.subpages||[])[0]?.title||s.title):s.title,subpage:(s.subpages||[])[0]?.id||''}))}""")
+    sections = page.evaluate("""async()=>{const c=await import('/js/config.js');return Object.entries(c.SECTIONS).map(([key,s])=>({key,title:s.title,heading:key==='messages'?'Conversations':key==='webContent'?'Studio de contenus':key==='siteHelp'?((s.subpages||[])[0]?.title||s.title):s.title,subpage:(s.subpages||[])[0]?.id||''}))}""")
     for section in sections:
         page.evaluate("""async value=>{const s=await import('/js/store.js');s.setRoute(value.key,value.subpage)}""", section)
         expect(page.locator("#workspace-main")).to_have_attribute("aria-busy", "false")

@@ -1,5 +1,19 @@
 // Loaded only when a PDF attachment becomes visible or a reader is opened.
 let pdfjsPromise;
+// PDF.js 6 uses the current Map proposal. Keep the reader functional on
+// browsers that have not shipped it yet instead of falling back to download.
+if (!Map.prototype.getOrInsertComputed) {
+  Object.defineProperty(Map.prototype, "getOrInsertComputed", {
+    configurable: true,
+    writable: true,
+    value(key, callback) {
+      if (this.has(key)) return this.get(key);
+      const value = callback(key);
+      this.set(key, value);
+      return value;
+    }
+  });
+}
 async function pdfjs() {
   pdfjsPromise ||= import("/assets/pdfjs/pdf.mjs").then(module => {
     module.GlobalWorkerOptions.workerSrc = "/assets/pdfjs/pdf.worker.mjs";

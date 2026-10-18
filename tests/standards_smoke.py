@@ -111,12 +111,14 @@ with sync_playwright() as p:
     combo.fill("Projets");page.keyboard.press("Enter")
     expect(page.get_by_role("heading",name="Projets",exact=True)).to_be_visible()
     assert page.locator("#workspace-main").evaluate("el=>el===document.activeElement") is True
-    assert page.locator(".nav-group.open").count()==page.locator(".nav-group").count()
-    assert page.locator('.nav-group-head[aria-expanded="true"]').count()==page.locator(".nav-group-head").count()
+    accessible_destinations=["Tableau de bord","Projets","Calendrier","Documents","Communication"]
+    expect(page.locator(".native-nav-areas .nav-area-item")).to_have_count(len(accessible_destinations))
+    assert page.locator(".nav-group, .nav-group-head").count()==0
     expect(page.locator(".nav-item.active")).to_contain_text("Projets")
-    general_group=page.get_by_role("button",name="Général",exact=True)
-    general_group.click();expect(general_group).to_have_attribute("aria-expanded","false")
-    general_group.click();expect(general_group).to_have_attribute("aria-expanded","true")
+    for destination in accessible_destinations:
+        expect(page.get_by_role("button",name=destination,exact=True)).to_be_visible()
+    for restricted_destination in ["Finance","Relations","Marketing","Mes sites"]:
+        expect(page.get_by_role("button",name=restricted_destination,exact=True)).to_have_count(0)
     expect(page.get_by_role("button",name="Nouveau",exact=True)).to_have_count(0)
     expect(page.get_by_role("button",name="Modifier",exact=True)).to_have_count(0)
 
@@ -148,7 +150,7 @@ with sync_playwright() as p:
     c=make_context(390);page=c.new_page();login(page)
     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     assert page.locator(".mobile-tabs").is_visible()
-    page.locator(".mobile-tabs").get_by_role("button",name="Espace",exact=True).click()
+    page.locator(".mobile-tabs").get_by_role("button",name="Plus",exact=True).click()
     expect(page.locator(".focus-spaces")).to_be_visible()
     expect(page.get_by_label("Trouver un espace",exact=True)).to_be_visible()
     page.locator(".mobile-tabs").get_by_role("button",name="Accueil",exact=True).click()
