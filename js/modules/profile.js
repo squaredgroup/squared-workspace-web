@@ -1,8 +1,8 @@
-import { state,setAppearance } from "../store.js";
+import { state,setAppearance,setRoute } from "../store.js";
 import { updateMe,loadSecurity,updateSecurity,changePassword,listSessions,revokeSession,loadSettings,saveSettings,recoveryCodes,createPasskeyOptions,registerPasskey } from "../api.js";
 import { createPasskey } from "../webauthn.js";
 import { profilePhotoControl } from "../profile-photo.js";
-import { h,pageHeader,card,button,field,input,select,validateControls,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor,profileAvatar,roleLabel } from "../ui.js";
+import { h,icon,pageHeader,card,button,field,input,select,validateControls,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor,profileAvatar,roleLabel } from "../ui.js";
 
 function settingRow(title,copy,control){control.setAttribute("aria-label",title);return h("label",{class:"setting-row"},h("div",{},h("strong",{text:title}),h("span",{text:copy})),control)}
 export async function renderProfile(){
@@ -49,8 +49,39 @@ function passwordModal(){
   const current=input("",{type:"password",autocomplete:"current-password",required:true}),next=input("",{type:"password",autocomplete:"new-password",required:true,minLength:10});
   modal({title:"Changer le mot de passe",content:h("div",{class:"form"},field("Mot de passe actuel",current),field("Nouveau mot de passe",next,"10 caractères minimum avec majuscule, minuscule et chiffre.")),actions:[{label:"Modifier",kind:"primary",icon:"check",onClick:async close=>{try{if(!validateControls(current,next))return;await changePassword(current.value,next.value);current.value="";next.value="";toast("Mot de passe modifié. Reconnectez-vous sur vos autres appareils.");close()}catch(error){toast(errorMessage(error),"error")}}}]});
 }
-export async function renderSettings(){
-  const root=h("div");root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Préférences synchronisées et réglages d’affichage du navigateur."}));
+const SETTINGS_DESTINATIONS=[
+  ["Compte","Profil, identité et appareils","user","profile"],
+  ["Notifications","Canaux, alertes et synthèses","notification","notifications"],
+  ["Apparence","Thème, couleurs et interface","sparkles","settings","appearance"],
+  ["Organisation","Identité et règles de l’espace","company","businessUnits"],
+  ["Sécurité","Connexion, MFA, passkeys et sessions","shield","profile"],
+  ["Intégrations","Connexions de service et CMS","grid","siteSystem"],
+  ["Messagerie","Boîte mail, modèles et identité","mail","mailbox"],
+  ["Données & stockage","Exports, reprise et conservation","archive","settings","data"],
+  ["Membres & accès","Rôles, invitations et ressources humaines","users","team","members"],
+  ["Confidentialité","Données personnelles et demandes","lock","settings","privacy"],
+  ["Accessibilité","Mouvement, contraste et densité","eyeOff","settings","accessibility"],
+  ["Tableau de bord","Pilotage et indicateurs","chart","dashboard"],
+  ["Projets & missions","Portefeuille et règles de production","folder","projects","workspace"],
+  ["Tâches","Exécution et priorités","check","tasks"],
+  ["Calendrier","Agendas et rendez-vous","calendar","planning","calendar"],
+  ["Fichiers","Documents, versions et ressources","document","documents"],
+  ["Pôles & entités","Structure du groupe","company","businessUnits"],
+  ["Workflows","Validations et circuits métier","sync","validations"],
+  ["People & RH","Profils et développement","users","people"],
+  ["Automatisations","Scénarios, exécutions et erreurs","sync","automations"],
+  ["Données & conformité","Gouvernance et obligations","shield","governance"],
+  ["Appareils & serveurs","Sessions, parc et infrastructure","cloud","securityOperations"],
+  ["Activité & historique","Actions et journal d’audit","clock","activity"],
+  ["Support","Demandes et incidents","phone","support"]
+];
+
+function settingsDirectory(){
+  return h("section",{class:"settings-directory","aria-label":"Rubriques des paramètres"},...SETTINGS_DESTINATIONS.map(([title,copy,iconName,section,subpage])=>h("button",{type:"button",class:"settings-destination",onClick:()=>setRoute(section,subpage||"")},h("span",{class:"settings-destination-icon"},icon(iconName,18)),h("span",{},h("strong",{text:title}),h("small",{text:copy})),icon("ChevronRight",14))));
+}
+
+export async function renderSettings(subpage=""){
+  const root=h("div",{class:"settings-page"});root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Le centre de réglages de l’app : compte, expérience, accès, données et opérations."}),settingsDirectory());
   try{
     let settings=await loadSettings();
     const densityValue=String(settings.dashboardDensity||"balanced").toLowerCase().replace("équilibrée","balanced").replace("aérée","airy").replace("dense","dense");
@@ -75,7 +106,7 @@ export async function renderSettings(){
         }catch(error){toast(errorMessage(error),"error",6000)}
       }})
     );
-    root.append(card("Apparence & expérience","Ces réglages s’appliquent immédiatement à la version Web.",experience,{iconName:"settings"}),await sessionsCard());
+    root.append(h("div",{class:"grid two"},card("Apparence & expérience","Ces réglages s’appliquent immédiatement à la version Web.",experience,{iconName:"settings"}),await sessionsCard()));
   }catch(error){root.append(emptyState("Paramètres indisponibles",errorMessage(error),"warning"))}
   return root;
 }

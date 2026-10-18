@@ -3,8 +3,17 @@
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/space-grotesk-medium.woff") format("woff")}
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url("/assets/fonts/space-grotesk-semibold.woff") format("woff")}
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:700;font-display:swap;src:url("/assets/fonts/space-grotesk-bold.woff") format("woff")}
+@font-face{font-family:"Wix Madefor Text";font-style:normal;font-weight:400;font-display:swap;src:url("/assets/fonts/WixMadeforText-Regular.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Text";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/WixMadeforText-Medium.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Text";font-style:normal;font-weight:600;font-display:swap;src:url("/assets/fonts/WixMadeforText-SemiBold.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Text";font-style:normal;font-weight:700;font-display:swap;src:url("/assets/fonts/WixMadeforText-Bold.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Display";font-style:normal;font-weight:400;font-display:swap;src:url("/assets/fonts/WixMadeforDisplay-Regular.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Display";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/WixMadeforDisplay-Medium.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Display";font-style:normal;font-weight:600;font-display:swap;src:url("/assets/fonts/WixMadeforDisplay-SemiBold.otf") format("opentype")}
+@font-face{font-family:"Wix Madefor Display";font-style:normal;font-weight:700;font-display:swap;src:url("/assets/fonts/WixMadeforDisplay-Bold.otf") format("opentype")}
 
 html,body,button,input,textarea,select,option,pre,code,kbd,samp{font-family:var(--sq-font)}
+h1,h2,h3,.page-title,.top-title,.auth-title,.brand-copy strong{font-family:var(--sq-font-title)}
 details>summary{display:flex;align-items:center;gap:8px;list-style:none}
 details>summary::-webkit-details-marker{display:none}
 details>summary::after{content:"";display:block;flex:none;margin-left:auto;width:18px;height:18px;background:currentColor;mask:url("/assets/icons/IconlyRegularChevronDown.svg") center/contain no-repeat}

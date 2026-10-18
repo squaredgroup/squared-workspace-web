@@ -19,7 +19,7 @@ export const ICONS = {
   validations:"SidebarValidations", deliverables:"SidebarDeliverables", contracts:"SidebarContracts", documents:"SidebarDocuments", resources:"SidebarResources",
   siteServices:"SidebarSiteServices", siteProducts:"SidebarSiteProducts", siteReferences:"SidebarSiteReferences", siteReleases:"SidebarSiteReleases", sitePublications:"SidebarSitePublications", siteMedia:"SidebarSiteMedia",
   messages:"CircleMessages", mailbox:"Mail", notifications:"Notification", activity:"Clock", clients:"Company", team:"Users", people:"User", securityOperations:"Shield", governance:"SidebarGovernance", support:"HelpSign", marketing:"Sparkles", automations:"Sync", training:"Star", profile:"User", settings:"Settings",
-  siteHelp:"HelpSign", siteTraining:"Star", siteInbox:"Mail", siteNewsletter:"Mail", siteSystem:"Grid", commercial:"Money", suppliers:"Bag",
+  webContent:"Globe", siteHelp:"HelpSign", siteTraining:"Star", siteInbox:"Mail", siteNewsletter:"Mail", siteSystem:"Grid", commercial:"Money", suppliers:"Bag",
   folder:"Folder", chart:"Chart", globe:"Globe", archive:"Archive", calendar:"Calendar", clock:"Clock", users:"Users", wallet:"Wallet", trend:"Trend", money:"Money", bag:"Bag", warning:"Warning", shield:"Shield", document:"Document", check:"Check", company:"Company", key:"Key", user:"User", star:"Star", grid:"Grid", sliders:"Sliders", phone:"Phone", mail:"Mail", cloud:"Cloud", image:"Image", sync:"Sync", invoice:"Invoice", lock:"Lock", eyeOff:"EyeOff", sparkles:"Sparkles", search:"Search", add:"Add", edit:"Edit", trash:"Trash", logout:"Logout", send:"Send", download:"Download", upload:"Upload", external:"External", close:"Close", sun:"Sun", moon:"Moon", notification:"Notification"
 };
 
@@ -40,7 +40,7 @@ export const SECTIONS = {
   dashboard:{title:"Tableau de bord",group:"Général"}, today:{title:"Aujourd’hui",group:"Général"},
   projects:{title:"Projets",group:"Général",subpages:[p("Projets Workspace","workspace","Suivez les projets actifs, leurs responsables et leur progression.","folder"),p("Portefeuille","portfolio","Arbitrez valeur, budget, capacité et risques du portefeuille.","chart",["manageProjects"]),p("Publication","publication","Préparez les projets destinés au site Squared Group.","globe",["manageCMS"]),p("Archives","archives","Restaurez ou purgez les projets retirés du portefeuille.","archive",["manageProjects"])]},
   missions:{title:"Missions",group:"Général"}, tasks:{title:"Tâches",group:"Général"},
-  planning:{title:"Planning",group:"Général",subpages:[p("Planning personnel","personal","Organisez votre semaine type et vos routines personnelles.","calendar"),p("Agenda connecté","connected","Réunissez événements Workspace et calendriers connectés.","clock"),p("Rendez-vous","appointments","Gérez les rendez-vous synchronisés depuis le site.","users",["manageCMS"])]},
+  planning:{title:"Calendrier",group:"Général",subpages:[p("Calendrier","calendar","Réunissez événements Workspace, routines personnelles, agendas autorisés et rendez-vous du site.","calendar"),p("Semaine type","personal","Organisez vos routines privées synchronisées avec votre compte.","clock"),p("Agendas","sources","Gérez les sources, calendriers autorisés et types de rendez-vous.","clock"),p("Rendez-vous à dater","undated","Retrouvez les rendez-vous qui ne possèdent pas encore de date exploitable.","users",["manageCMS"])]},
   map:{title:"Carte",group:"Général"},
 
   finance:{title:"Finance",group:"Finance",permissions:["viewFinance","manageFinance"],subpages:enterprise(["Devis & ventes","Factures clients","Achats & dépenses","Trésorerie","Budgets","Flux inter-pôles","Comptabilité"],"wallet")},
@@ -54,6 +54,7 @@ export const SECTIONS = {
   governance:{title:"Gouvernance",group:"Décision",permissions:["manageRisks","manageCompliance"],subpages:[p("Registre des risques",null,null,"warning",["manageRisks"]),p("Incidents",null,null,"warning",["manageRisks"]),p("Conformité",null,null,"shield",["manageCompliance"]),p("Politiques",null,null,"document",["manageCompliance"]),p("Obligations",null,null,"check",["manageCompliance"]),p("RGPD",null,null,"lock",["manageCompliance"]),p("Audits",null,null,"search",["manageCompliance"]),p("Réunions",null,null,"users",["manageRisks"]),p("Décisions",null,null,"shield",["manageRisks"])]},
 
   training:{title:"Formation BUILD",group:"Documentation"}, siteTraining:{title:"CMS Formation",group:"Documentation",permissions:["manageCMS"],cms:true},
+  webContent:{title:"Mes sites",group:"Documentation",permissions:["manageCMS"],internalNavigation:true,subpages:[p("Vue d’ensemble","overview","Santé éditoriale, activité et accès rapides de vos sites.","grid"),p("Contenus","contents","Parcourez les collections, recherchez et reprenez les brouillons.","document"),p("Pages et navigation","pages","Structurez les pages et la navigation des sites administrés dans Workspace.","folder"),p("Médias","media","Centralisez les images, vidéos, documents et leurs usages.","image"),p("Publications","publications","Pilotez les brouillons, relectures, programmations et publications.","calendar"),p("Réglages","settings","Configurez les sites, langues, accès et mesure d’audience.","settings")]},
   sitePublications:{title:"Publications",group:"Documentation",permissions:["manageCMS"],cms:true,subpages:[p("Publications","publications","Gérez les contenus éditoriaux publiés sur le site.","document"),p("Opportunités","opportunities","Suivez les opportunités éditoriales et commerciales du site.","trend")]},
   documents:{title:"Documents",group:"Documentation"}, siteMedia:{title:"Médias",group:"Documentation",permissions:["manageCMS"],cms:true}, resources:{title:"Ressources",group:"Documentation"}, siteHelp:{title:"Centre d’aide",group:"Documentation",permissions:["manageCMS"],subpages:[p("Vue d’ensemble","overview","Santé éditoriale, accès rapides et signaux du Help Center.","chart"),p("Articles","articles","Rédigez, révisez et publiez les articles administrables.","document"),p("Communauté","community","Suivez les discussions et transformez une solution en connaissance.","users"),p("Support","support","Accédez aux demandes privées et aux indicateurs d’assistance.","phone"),p("Knowledge Health","health","Analysez les recherches sans réponse, retours et contenus à revoir.","trend")]},
 
@@ -71,10 +72,33 @@ export const SECTIONS = {
   team:{title:"Équipe",group:"Administration",permissions:["manageTeam"],subpages:[p("Membres","members","Consultez les rôles, disponibilités et charges de l’équipe.","users"),p("Ressources humaines","human-resources","Gérez le cycle de vie RH et ses informations protégées.","company",["viewHR","manageHR"])]},
   support:{title:"Support",group:"Administration",permissions:["manageSupport","createSupportRequests"],subpages:[p("Tickets clients",null,null,"phone"),p("Demandes internes",null,null,"mail",["manageSupport"]),p("Incidents techniques",null,null,"warning",["manageSupport"]),p("SLA",null,null,"clock",["manageSupport"]),p("Satisfaction",null,null,"star",["manageSupport"]),p("Base de connaissances",null,null,"cloud",["manageSupport"])]},
   securityOperations:{title:"Appareils & serveurs",group:"Administration",adminOnly:true,subpages:[p("Appareils","devices","Supervisez les appareils et sessions des membres.","user"),p("Serveurs","servers","Surveillez la santé et la charge de l’infrastructure.","chart"),p("Contrôle","control","Accédez aux actions de sécurité et au plan de contrôle.","shield"),p("Parc informatique","technology-assets","Gérez équipements, licences, garanties et accès sensibles.","bag",["manageAssets"])]},
-  automations:{title:"Automatisations",group:"Administration",permissions:["manageAutomations"],subpages:enterprise(["Scénarios","Modèles","Exécutions","Erreurs"],"sync")}, siteSystem:{title:"Intégrations",group:"Administration",permissions:["manageCMS"],cms:true}, profile:{title:"Profil",group:"Administration"}, settings:{title:"Paramètres",group:"Administration"}
+  automations:{title:"Automatisations",group:"Administration",permissions:["manageAutomations"],subpages:enterprise(["Scénarios","Modèles","Exécutions","Erreurs"],"sync")}, siteSystem:{title:"Intégrations",group:"Administration",permissions:["manageCMS"],cms:true}, profile:{title:"Profil",group:"Administration"}, settings:{title:"Paramètres",group:"Administration",internalNavigation:true}
 };
 
 export const NAV_GROUPS = ["Pilotage","Général","Finance","Offre","Décision","Documentation","Relations","Marketing","Communication","Administration"].map(name => ({name,sections:Object.keys(SECTIONS).filter(key=>SECTIONS[key].group===name)}));
+
+// La navigation native présente neuf espaces stables. Les anciennes routes restent
+// disponibles dans Espaces, la recherche et les liens profonds, sans recréer une
+// sidebar interminable ni casser les favoris existants.
+export const NAV_AREAS = [
+  {id:"dashboard",title:"Tableau de bord",root:"dashboard",icon:"dashboard",sections:["dashboard","today","objectives","reports","businessUnits","governance","training"]},
+  {id:"projects",title:"Projets",root:"projects",icon:"projects",sections:["projects","missions","tasks","validations","deliverables"]},
+  {id:"planning",title:"Calendrier",root:"planning",icon:"planning",sections:["planning","map"]},
+  {id:"finance",title:"Finance",root:"finance",icon:"finance",sections:["finance","timeExpenses"]},
+  {id:"relations",title:"Relations",root:"clients",icon:"users",sections:["clients","commercial","suppliers","people"]},
+  {id:"documents",title:"Documents",root:"documents",icon:"documents",sections:["documents","contracts","resources"]},
+  {id:"communication",title:"Communication",root:"messages",icon:"messages",sections:["messages","mailbox","notifications"]},
+  {id:"marketing",title:"Marketing",root:"marketing",icon:"marketing",sections:["marketing"]},
+  {id:"sites",title:"Mes sites",root:"webContent",icon:"webContent",sections:["webContent","siteServices","siteProducts","siteReferences","siteReleases","sitePublications","siteHelp","siteMedia","siteInbox","siteNewsletter"]}
+];
+
+export function navigationAreaForSection(sectionKey){
+  return NAV_AREAS.find(area=>area.sections.includes(sectionKey)) || null;
+}
+
+export function navigationAreaDestination(area,user){
+  return area.sections.find(key=>canAccessSection(key,user)) || null;
+}
 
 export const CORE_DOMAIN_BY_SECTION = {projects:"projects",missions:"missions",tasks:"tasks",validations:"validations",deliverables:"deliverables",contracts:"contracts",documents:"documents",resources:"resources",clients:"clients",planning:"events",notifications:"notifications",activity:"activities"};
 
