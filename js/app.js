@@ -7,7 +7,7 @@ import { CORE_DOMAIN_BY_SECTION } from "./config.js";
 import { authContext } from "./auth-flow.js";
 import { state,setState,setRoute,subscribe,setAppearance } from "./store.js";
 import { SECTIONS,NAV_AREAS,canAccessSection,canAccessSubpage,iconPath,realtimeURL,navigationAreaForSection,navigationAreaDestination } from "./config.js";
-import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,hasStoredSession } from "./api.js";
+import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredSession } from "./api.js";
 import { renderAuth } from "./modules/auth.js";
 import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar,roleLabel } from "./ui.js";
 
@@ -90,7 +90,7 @@ function topbar(){
     greeting,
     h("span",{class:"native-role",text:roleLabel(state.user?.role)}),
     h("button",{class:"native-global-search",type:"button","aria-label":"Recherche",onClick:openCommand},icon("search",15),h("span",{text:"Rechercher dans Workspace"}),h("kbd",{text:"⌘ K"})),
-    h("div",{class:"top-actions"},systemState(),refresh,notificationButton(),iconButton("settings","Paramètres",()=>setRoute("settings")),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),h("button",{class:"top-profile",type:"button","aria-label":"Ouvrir le profil",onClick:()=>setRoute("profile")},profileAvatar(state.user,{size:30,ariaHidden:true})),h("button",{class:"native-add",type:"button","aria-label":"Créer dans Workspace",onClick:openTools},icon("add",15)))
+    h("div",{class:"top-actions"},systemState(),refresh,notificationButton(),iconButton("settings","Paramètres",()=>setRoute("settings")),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),h("button",{class:"icon-button native-logout",type:"button","aria-label":"Déconnexion",title:"Déconnexion",onClick:async()=>{await logout()}},h("span",{"aria-hidden":"true",text:"↗"})),h("button",{class:"top-profile",type:"button","aria-label":"Ouvrir le profil",onClick:()=>setRoute("profile")},profileAvatar(state.user,{size:30,ariaHidden:true})),h("button",{class:"native-add",type:"button","aria-label":"Créer dans Workspace",onClick:openTools},icon("add",15)))
   );
 }
 function moduleTabs(){
