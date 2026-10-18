@@ -2,7 +2,6 @@ import { focusTabs, focusHeader, renderSpaces } from "./focus-navigation.js";
 import { configureMobile, openTools } from "./mobile.js";
 import { openFocusSearch } from "./focus-search.js";
 import { viewContext } from "./focus-state.js";
-import { pinnedSections, toggleSectionPin } from "./navigation-preferences.js";
 import { supportsRecord, renderRecord } from "./focus-records.js";
 import { CORE_DOMAIN_BY_SECTION } from "./config.js";
 import { authContext } from "./auth-flow.js";
@@ -24,25 +23,43 @@ function safeRoute(){
   return true;
 }
 function displayName(user){return `${user?.firstName||user?.first_name||""} ${user?.lastName||user?.last_name||""}`.trim()||user?.email||"Membre"}
-function activeSubpage(){
-  const section=SECTIONS[state.route.section];
-  return section?.subpages?.find(p=>p.id===state.route.subpage);
-}
 function navigationAreaItem(area){
   const active=area.sections.includes(state.route.section),destination=navigationAreaDestination(area,state.user);
   if(!destination||!canAccessSection(destination,state.user))return null;
   const section=SECTIONS[destination];
   return h("button",{class:`nav-item nav-area-item ${active?"active":""}`,type:"button","aria-current":active?"page":null,onClick:()=>setRoute(destination,section?.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("img",{class:"nav-icon",src:iconPath(area.icon,active),alt:"",width:19,height:19,decoding:"async"}),h("span",{class:"nav-label",text:area.title}));
 }
+function sidebarShortcut(label,section,iconName,subpage=""){
+  if(!canAccessSection(section,state.user))return null;
+  return h("button",{class:"sidebar-shortcut",type:"button","aria-label":`Ouvrir ${label}`,onClick:()=>setRoute(section,subpage)},icon(iconName,15),h("span",{text:label}));
+}
+function sidebarTeam(){
+  if(!canAccessSection("team",state.user))return null;
+  const members=(state.workspace?.team||[]).filter(Boolean).slice(0,4);
+  if(!members.length)return null;
+  return h("section",{class:"sidebar-team","aria-label":"Mon équipe"},
+    h("div",{class:"studio-nav-heading"},h("span",{text:"Mon équipe"}),h("button",{type:"button","aria-label":"Ouvrir les membres de l’équipe",onClick:()=>setRoute("team","members")},icon("users",14))),
+    ...members.map(member=>h("button",{class:"sidebar-person",type:"button","aria-label":`Ouvrir l’équipe · ${displayName(member)}`,onClick:()=>setRoute("team","members")},profileAvatar(member,{className:"sidebar-person-avatar",size:24,ariaHidden:true}),h("span",{text:displayName(member)}),h("i",{class:`presence-dot ${member.isActive===false?"offline":""}`})))
+  );
+}
 function sidebar(){
   const u=state.user;const nav=h("nav",{"aria-label":"Navigation principale"});
-  nav.append(h("div",{class:"studio-nav-section native-nav-areas"},h("span",{class:"studio-nav-heading",text:"Workspace"}),...NAV_AREAS.map(navigationAreaItem).filter(Boolean)));
+  const canCreate=["OWNER","ADMIN"].includes(u?.role)||(u?.permissions||[]).some(permission=>/^(manage|create|sendMail)/.test(permission));
+  nav.append(
+    h("div",{class:"studio-nav-section native-nav-areas"},h("span",{class:"studio-nav-heading",text:"Workspace"}),...NAV_AREAS.map(navigationAreaItem).filter(Boolean)),
+    h("section",{class:"studio-nav-section sidebar-files","aria-label":"Dossiers"},h("span",{class:"studio-nav-heading",text:"Dossiers"}),
+      sidebarShortcut("Bibliothèque générale","resources","folder"),
+      sidebarShortcut("Documents","documents","documents"),
+      sidebarShortcut("Squared Docs","documents","document"),
+      canAccessSection("documents",state.user)?h("button",{class:"sidebar-shortcut sidebar-create",type:"button",onClick:()=>setRoute("documents")},icon("add",14),h("span",{text:"Créer un dossier"})):null
+    ),
+    sidebarTeam()
+  );
   return h("aside",{class:"sidebar"},
-    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:42,height:42,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{},h("i",{class:"brand-dot"}),"Votre espace de travail"))),
-    h("button",{class:"sidebar-search",type:"button",onClick:openCommand},icon("search",16),h("span",{text:"Rechercher"}),h("span",{class:"shortcut",text:"⌘ K"})),
-    h("div",{class:"sidebar-context"},h("span",{text:"Espace actif"}),h("strong",{text:state.workspace?.workspace?.name||"Squared Group"}),h("small",{text:`${NAV_AREAS.filter(area=>canAccessSection(navigationAreaDestination(area,state.user),state.user)).length} espaces principaux`})),
+    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:36,height:36,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{text:"v1.0.0"}))),
+    h("div",{class:`sidebar-quick-actions ${canCreate?"":"no-create"}`},canCreate?h("button",{class:"sidebar-new",type:"button",onClick:openTools},icon("add",15),h("span",{text:"Nouveau"})):null,h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Rechercher dans Workspace",onClick:openCommand},icon("search",15)),notificationButton("Ouvrir les notifications"),h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Synchroniser le Workspace",onClick:event=>refreshWorkspace(event.currentTarget)},icon("sync",15))),
     nav,
-    h("div",{class:"sidebar-footer"},h("button",{class:"sidebar-settings",type:"button",onClick:()=>setRoute("settings")},icon("settings",17),h("span",{text:"Paramètres"})),h("button",{class:"account-card",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:36,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:roleLabel(u?.role)}))))
+    h("div",{class:"sidebar-footer"},h("button",{class:"sidebar-settings",type:"button",onClick:()=>setRoute("settings")},icon("settings",16),h("span",{text:"Paramètres"})),h("button",{class:"account-card",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:34,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:u?.email||roleLabel(u?.role)})),icon("More",15)))
   );
 }
 function mobileTabs(){return focusTabs()}
@@ -51,9 +68,9 @@ function systemState(){
   return h("div",{class:`system-state ${state.online?"":"offline"}`,role:"status","aria-live":"polite",title:state.online?`Dernière synchro ${last}`:"Connexion réseau indisponible"},h("i",{class:"state-dot"}),h("span",{text:state.online?(state.lastSyncAt?"Données chargées":"Connecté"):"Hors ligne"}),h("strong",{text:state.online?last:""}));
 }
 function unreadNotifications(){return (state.workspace?.notifications||[]).filter(value=>!(value?.isRead??value?.is_read??value?.payload?.isRead??value?.payload?.is_read)).length}
-function notificationButton(){
+function notificationButton(label="Notifications"){
   const count=unreadNotifications();
-  return h("button",{class:"icon-button notification-trigger",type:"button","aria-label":count?`Notifications, ${count} non lue${count>1?"s":""}`:"Notifications",title:"Notifications",onClick:()=>setRoute("notifications")},icon("notification",17),count?h("span",{class:"notification-count",text:count>99?"99+":String(count)}):null);
+  return h("button",{class:"icon-button notification-trigger",type:"button","aria-label":count?`${label}, ${count} non lue${count>1?"s":""}`:label,title:"Notifications",onClick:()=>setRoute("notifications")},icon("notification",17),count?h("span",{class:"notification-count",text:count>99?"99+":String(count)}):null);
 }
 async function refreshWorkspace(button){
   if(state.loading||!state.online)return;
@@ -64,17 +81,26 @@ async function refreshWorkspace(button){
 }
 function topbar(){
   if(matchMedia("(max-width: 880px)").matches)return focusHeader({search:openCommand,tools:openTools,refresh:refreshWorkspace});
-  const section=SECTIONS[state.route.section]||{};const sub=activeSubpage();const area=navigationAreaForSection(state.route.section);
   const refresh=iconButton("sync","Actualiser les données",event=>refreshWorkspace(event.currentTarget));refresh.classList.add("desktop-only");
   const effectiveTheme=document.documentElement.dataset.theme||"dark";
-  const pinned=pinnedSections().includes(state.route.section);
-  const pin=iconButton("star",pinned?"Retirer cette rubrique des favoris":"Épingler cette rubrique",()=>{const result=toggleSectionPin(state.route.section);if(result.full)toast("Six favoris maximum. Retirez une rubrique pour en épingler une autre.","error");});
-  pin.setAttribute("aria-pressed",String(pinned));pin.classList.add("studio-pin-trigger");
+  const greeting=h("div",{class:"native-greeting"},h("span",{class:"native-greeting-emoji","aria-hidden":"true",text:"👋"}),h("span",{text:`Bonjour, ${displayName(state.user)}`}));
   return h("header",{class:"topbar"},
     h("div",{class:"menu-toggle"},iconButton("grid","Ouvrir le menu",()=>setState({sidebarOpen:!state.sidebarOpen}))),
-    h("div",{class:"breadcrumbs"},h("div",{class:"breadcrumb-line"},h("span",{text:area?.title||section.group||"Workspace"}),area&&area.title!==section.title?h("span",{class:"separator",text:"/"}):null,area&&area.title!==section.title?h("span",{text:section.title}):null,sub?h("span",{class:"separator",text:"/"}):null,sub?h("span",{text:sub.title}):null),h("div",{class:"top-title",text:section.title||"Squared Workspace"})),
-    h("div",{class:"top-actions"},systemState(),refresh,pin,notificationButton(),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),iconButton("search","Recherche",openCommand),iconButton("logout","Déconnexion",async()=>{await logout()}))
+    h("div",{class:"native-history"},iconButton("ArrowLeft","Page précédente",()=>history.back()),iconButton("ArrowRight","Page suivante",()=>history.forward())),
+    greeting,
+    h("span",{class:"native-role",text:roleLabel(state.user?.role)}),
+    h("button",{class:"native-global-search",type:"button","aria-label":"Recherche",onClick:openCommand},icon("search",15),h("span",{text:"Rechercher dans Workspace"}),h("kbd",{text:"⌘ K"})),
+    h("div",{class:"top-actions"},systemState(),refresh,notificationButton(),iconButton("settings","Paramètres",()=>setRoute("settings")),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),h("button",{class:"icon-button native-logout",type:"button","aria-label":"Déconnexion",title:"Déconnexion",onClick:async()=>{await logout()}},h("span",{"aria-hidden":"true",text:"↗"})),h("button",{class:"top-profile",type:"button","aria-label":"Ouvrir le profil",onClick:()=>setRoute("profile")},profileAvatar(state.user,{size:30,ariaHidden:true})),h("button",{class:"native-add",type:"button","aria-label":"Créer dans Workspace",onClick:openTools},icon("add",15)))
   );
+}
+function moduleTabs(){
+  const area=navigationAreaForSection(state.route.section)||NAV_AREAS[0];
+  const sections=area.sections.filter(key=>canAccessSection(key,state.user));
+  if(!sections.length)return null;
+  return h("nav",{class:"native-module-tabs","aria-label":`Navigation ${area.title}`},...sections.map(key=>{
+    const active=key===state.route.section,section=SECTIONS[key];
+    return h("button",{type:"button",class:active?"active":"","aria-current":active?"page":null,"aria-label":`Ouvrir ${section.title}`,onClick:()=>setRoute(key,section.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("span",{text:section.title}),key==="training"?h("small",{text:"BUILD"}):null);
+  }));
 }
 function subnav(){
   if(state.route.item)return null;
@@ -84,7 +110,7 @@ function buildShell(){
   if(!safeRoute())return;
   app.replaceChildren();
   const content=h("main",{id:"workspace-main",class:"content",tabindex:"-1","aria-busy":"true"},skeletonPage());
-  const main=h("div",{class:"main"},topbar(),state.online?null:h("div",{class:"network-banner"},icon("warning",15),h("span",{text:"Connexion interrompue. Les données affichées restent visibles ; aucune action n’est envoyée automatiquement."})),content);
+  const main=h("div",{class:"main"},topbar(),moduleTabs(),state.online?null:h("div",{class:"network-banner"},icon("warning",15),h("span",{text:"Connexion interrompue. Les données affichées restent visibles ; aucune action n’est envoyée automatiquement."})),content);
   const shell=h("div",{class:`workspace ${state.sidebarOpen?"sidebar-open":""}`},sidebar(),h("button",{class:"sidebar-backdrop",type:"button","aria-label":"Fermer le menu",onClick:()=>setState({sidebarOpen:false})}),main,mobileTabs());
   app.append(shell);refs={shell,content,main};renderCurrent();
 }
@@ -92,6 +118,7 @@ function refreshChrome(){
   if(!refs.shell)return;
   refs.shell.querySelector(".sidebar")?.replaceWith(sidebar());
   refs.shell.querySelector(".topbar")?.replaceWith(topbar());
+  refs.shell.querySelector(".native-module-tabs")?.replaceWith(moduleTabs());
   refs.shell.querySelector(".mobile-tabs")?.replaceWith(mobileTabs());
   refs.shell.classList.toggle("sidebar-open",state.sidebarOpen);
   const banner=refs.main.querySelector(".network-banner");
