@@ -25,7 +25,7 @@ def execute(work):
  source=(plugin/'scripts/catalog-families.mjs').read_text().replace("const dir=new URL('../mcp/',import.meta.url).pathname;",'const dir='+json.dumps(str(work))+';').replace("JSON.parse(fs.readFileSync(new URL('../.codex-plugin/plugin.json',import.meta.url),'utf8')).version","'web-source-contracts'")
  source=source.replace("const p=r.path,f=r.source.file;","const p=r.path,f=r.source.file;\n if(f==='server-trash-purge-routes.ts')return 'trash';").replace('const labels={',"const labels={trash:'Corbeille et conservation',")
  classifier=work/'catalog-families.mjs';classifier.write_text(source);subprocess.run(['node',str(classifier)],check=True)
- catalog=json.loads((work/'catalog.json').read_text());known={group['id'] for group in old['groups']}|{'trash'};unknown={op['group'] for op in catalog['operations']}-known
+ catalog=json.loads((work/'catalog.json').read_text());known={group['id'] for group in old['groups']}|{'trash','commercial','contracts'};unknown={op['group'] for op in catalog['operations']}-known
  if unknown:raise SystemExit('Configurer explicitement les droits des nouveaux groupes avant leur ajout : '+', '.join(sorted(unknown)))
  labels={group['group']:group['label'] for group in catalog['groups']};operations=[]
  previews={'/v1/workflows/trash/status','/v1/workflows/trash/purge/prepare','/v1/communications/library/preview','/v1/communications/library/archive-manifest'}

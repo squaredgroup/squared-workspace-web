@@ -947,7 +947,7 @@
     "unresolvedSchemas": 0,
     "source": "Backend/src, analyse TypeScript/Zod sans exécution du serveur",
     "compiler": "TypeScript 5.9.3 réutilisé depuis le cache npm, sans installation",
-    "catalogSHA256": "f259700ac7dc37ab9db4cb2dfa2aae62a0afbf9e5f9f747d63c7be8b8e3272b0",
+    "catalogSHA256": "b9e7629b77a7d8e199160217d87eed07b46011c20213a15d2e4f9e8f6a42690e",
     "changes": "12 routes de dossiers Communication et de conservation ajoutées, schémas GET/POST des assets actualisés ; aperçus distingués des mutations, droits maintenus côté serveur."
   }
 }
