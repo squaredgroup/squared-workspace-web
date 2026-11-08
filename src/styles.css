@@ -12,8 +12,9 @@
 @import "../css/messaging.css";
 @import "../css/studio.css";
 @import "../css/brand.css";
-@import "../css/native-current.css";
 @import "../css/workspace.css";
+@import "../css/native-current.css";
+@import "../css/native-fidelity.css";
 
 @source "../index.html";
 @source "../js/**/*.js";

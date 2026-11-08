@@ -1,3 +1,4 @@
+import { entryPresentation } from './native/entry-presentation.js';
 import { buildField } from './native/workflows.js';
 import { mediaEditor,recordMedia } from './native/media.js';
 import { dataTable,actionMenu,statusDot,confirmDialog,downloadBlob } from './native/components.js';
@@ -78,6 +79,7 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   }
   const tags=['projects','missions','documents','resources'].includes(domain)?input((valueOf(original,'tags')||[]).join?.(', ')||valueOf(original,'tags')||'',{placeholder:'Étiquettes séparées par des virgules'}):null;if(tags)content.append(field('Étiquettes',tags));
   content.prepend(media.node);
+  const presentation=entryPresentation(content,{domain,title,status,description,priority,assignee,date,project,client,amount,currency,remuneration,extra,propertyKeys:Object.keys(properties),media:media.node,tags});
   const error=h("p",{class:"focus-form-error",role:"alert",hidden:true});content.append(error);
   let dirty=false,busy=false;
   content.addEventListener("input",()=>dirty=true);content.addEventListener("change",()=>dirty=true);
@@ -112,7 +114,8 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
     }catch(e){if(state.user?.id===person){error.hidden=false;error.textContent=errorMessage(e);}}
     finally{busy=false;}
   };
-  dialog=modal({title:`${editing?"Modifier":"Créer"} · ${domainLabels[domain]||domain}`,content,wide:true,className:"focus-editor-dialog",onClose:media.dispose,beforeClose:()=>!busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
+  dialog=modal({title:presentation.title(editing),initialFocus:"#"+title.id,content,wide:true,className:"focus-editor-dialog",onClose:media.dispose,beforeClose:()=>!busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
+  presentation.attach(dialog.panel);
   content.addEventListener("submit",e=>{e.preventDefault();void save(dialog.close);});
 }
 export async function finishTask(record,reload=async()=>{}) {
