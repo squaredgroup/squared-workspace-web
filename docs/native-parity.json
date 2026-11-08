@@ -105,8 +105,7 @@
     "L’installation et les parcours sur appareils Apple ainsi que la validation visuelle et fonctionnelle restent à effectuer par l’utilisateur."
   ],
   "openVerification": [
-    "Aucun test ni parcours connecté exécuté. Aucun rendu navigateur comparé. La compilation et les empreintes publiées sont des preuves distinctes.",
-    "Le catalogue web de 537 opérations correspond à l’export local du plugin existant. Le générateur de schémas TypeScript 5 ne peut pas être relancé avec le compilateur TypeScript 7 déjà installé ; aucune dépendance supplémentaire installée et aucun contrat inventé."
+    "Aucun test ni parcours connecté exécuté. Aucun rendu navigateur comparé. La compilation et les empreintes publiées sont des preuves distinctes."
   ],
   "formatVersion": 1,
   "recordedAt": "2026-11-08T11:29:56.029671+00:00",
@@ -942,5 +941,13 @@
     "Backend/src/workspace-reference-catalog.ts": "cc083664287161c21d7aa3cdc3f0914aaf6a631d16e6b0ce7609fb1f09a7f4e2",
     "Backend/src/workspace-search.ts": "1e894f9d56479017c8810ad6ad47ab44aa532c9884fbea6a7c3937d734e00f3c"
   },
-  "inventoryMeaning": "Empreintes des sources observées. La couverture du report figure séparément ; ces empreintes ne certifient ni les parcours exécutés ni le rendu visuel."
+  "inventoryMeaning": "Empreintes des sources observées. La couverture du report figure séparément ; ces empreintes ne certifient ni les parcours exécutés ni le rendu visuel.",
+  "nativeContracts": {
+    "operationCount": 549,
+    "unresolvedSchemas": 0,
+    "source": "Backend/src, analyse TypeScript/Zod sans exécution du serveur",
+    "compiler": "TypeScript 5.9.3 réutilisé depuis le cache npm, sans installation",
+    "catalogSHA256": "b9e7629b77a7d8e199160217d87eed07b46011c20213a15d2e4f9e8f6a42690e",
+    "changes": "12 routes de dossiers Communication et de conservation ajoutées, schémas GET/POST des assets actualisés ; aperçus distingués des mutations, droits maintenus côté serveur."
+  }
 }
