@@ -1,3 +1,6 @@
+import { taskProfile,saveTaskProfile } from './native/task-profile.js';
+import { attachmentEditor,recordAttachments } from './native/attachments.js';
+import { missionBriefEditor } from './native/mission-brief.js';
 import { entryPresentation } from './native/entry-presentation.js';
 import { buildField } from './native/workflows.js';
 import { mediaEditor,recordMedia } from './native/media.js';
@@ -41,16 +44,16 @@ function choiceWithCurrent(value,options,label) {
 }
 export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   if(!canEditRecord(domain)){toast("Cette modification n’est pas autorisée.","error");return;}
-  const original=record||defaults,editing=Boolean(original.id),person=state.user?.id;let savedRecord=record;const media=mediaEditor(domain,record?.id);
+  const original=record||defaults,oldTaskProfile=domain==='tasks'?taskProfile(record?.id):null,editing=Boolean(original.id),person=state.user?.id;let savedRecord=record,profileBaseline=oldTaskProfile;const media=mediaEditor(domain,record?.id);
   if(editing&&!(Number(original.version)>0)){toast("Actualisez le détail avant de modifier cet élément.","error");return;}
   const title=input(record?titleOf(record):"",{required:true,maxLength:240,placeholder:domain==="tasks"?"Que faut-il faire ?":"Donnez un titre clair"});
   const status=select(valueOf(original,"status")||(domain==="tasks"?"pending":["projects","missions"].includes(domain)?"planned":"active"),statusOptions(domain,original));
   if(domain==="validations")status.disabled=true;
-  const description=textarea(valueOf(original,...(["missions","projects"].includes(domain)?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"",{rows:4,maxLength:20000,placeholder:"Contexte, résultat attendu, informations utiles…"});
+  const description=textarea(valueOf(original,...(["missions","projects"].includes(domain)?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||oldTaskProfile?.description||"",{rows:4,maxLength:20000,placeholder:"Contexte, résultat attendu, informations utiles…"});
   const project=choiceWithCurrent(parentOf(original),list("projects").map(p=>({value:p.id,label:titleOf(p)})),"Aucun projet");
   const assignee=choiceWithCurrent(assigneeOf(original),list("team").map(m=>({value:m.id||m.memberId,label:memberName(m)})),"Non affecté");
   const oldDue=dueOf(original),date=input(dayKey(oldDue),{type:"date"});
-  const canonicalPriority=valueOf(original,"priorityLevel")||(domain==="tasks"?valueOf(original,"priority"):(["urgent","blocked"].includes(valueOf(original,"priority"))?"critical":"normal"));
+  const canonicalPriority=valueOf(original,"priorityLevel")||oldTaskProfile?.priority||(domain==="tasks"?valueOf(original,"priority"):(["urgent","blocked"].includes(valueOf(original,"priority"))?"critical":"normal"));
   const priority=choiceWithCurrent(canonicalPriority,[{value:"low",label:"Basse"},{value:"normal",label:"Normale"},{value:"high",label:"Haute"},{value:"critical",label:"Critique"}],"Non définie");
   const controls=[title,status,description],content=h("form",{class:"form focus-editor"},field(domain==="tasks"?"Tâche":"Titre",title),field(domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description",description));
   const remuneration=domain==="missions"?input(valueOf(original,"remuneration")||"",{placeholder:"Ex. 1 250,00 ou modalités convenues",maxLength:240}):null;
@@ -68,24 +71,29 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   if(client&&amount&&currency){content.append(h("div",{class:"form-row"},field("Partie contractante",client),field("Montant",amount)),field("Devise",currency));controls.push(client,amount,currency);}
   content.append(metadata);
   const optional=(type,extra={})=>({type,anyOf:[{type,...extra},{type:'null'}]});
-  const properties=domain==='projects'?{clientID:optional('string',{format:'uuid'}),budgetAmount:optional('number',{minimum:0,maximum:1e12}),currency:{type:'string',pattern:'^[A-Z]{3}$'},startsAt:optional('string',{format:'date-time'}),objectives:{type:'string',maxLength:20000},successCriteria:{type:'string',maxLength:20000},objectiveDetails:{type:'array',maxItems:50,items:{type:'object',properties:{id:{type:'string',format:'uuid'},title:{type:'string',minLength:1},criterion:{type:'string'},target:{type:'string'},unit:{type:'string'},dueAt:optional('string',{format:'date-time'})},required:['id','title']}}}:domain==='missions'?{startsAt:optional('string',{format:'date-time'}),estimateHours:optional('number',{minimum:0,maximum:100000}),acceptanceCriteria:{type:'string',maxLength:20000}}:domain==='clients'?{contact:{type:'string'},email:{type:'string',format:'email'},phone:{type:'string'},address:{type:'string'},sector:{type:'string'}}:domain==='events'?{startsAt:optional('string',{format:'date-time'}),endsAt:optional('string',{format:'date-time'}),location:{type:'string'},meetingURL:{type:'string',format:'uri'}}:{};
+  const properties=domain==='tasks'?{missionID:optional('string',{format:'uuid'}),estimateHours:optional('number',{minimum:0,maximum:100000}),subtasks:{type:'array',maxItems:200,items:{type:'string',minLength:1}},dependencyIDs:{type:'array',maxItems:200,items:{type:'string',format:'uuid'}}}:domain==='contracts'?{reference:{type:'string',minLength:1,maxLength:180},clientID:optional('string',{format:'uuid'}),projectID:optional('string',{format:'uuid'}),startsAt:optional('string',{format:'date-time'}),renewalAtDate:optional('string',{format:'date-time'})}:domain==='deliverables'?{missionID:optional('string',{format:'uuid'}),kind:{type:'string'},versionName:{type:'string'},acceptanceCriteria:{type:'string',maxLength:20000},sourceDocumentID:optional('string',{format:'uuid'})}:domain==='projects'?{clientID:optional('string',{format:'uuid'}),budgetAmount:optional('number',{minimum:0,maximum:1e12}),currency:{type:'string',pattern:'^[A-Z]{3}$'},startsAt:optional('string',{format:'date-time'}),objectives:{type:'string',maxLength:20000},successCriteria:{type:'string',maxLength:20000},objectiveDetails:{type:'array',maxItems:50,items:{type:'object',properties:{id:{type:'string',format:'uuid'},title:{type:'string',minLength:1},criterion:{type:'string'},target:{type:'string'},unit:{type:'string'},dueAt:optional('string',{format:'date-time'})},required:['id','title']}}}:domain==='missions'?{startsAt:optional('string',{format:'date-time'}),estimateHours:optional('number',{minimum:0,maximum:100000}),acceptanceCriteria:{type:'string',maxLength:20000}}:domain==='clients'?{contact:{type:'string'},email:{type:'string',format:'email'},phone:{type:'string'},address:{type:'string'},sector:{type:'string'},website:{type:'string',format:'uri'},countryCode:{type:'string',maxLength:2},phoneCountryCode:{type:'string',maxLength:2}}:domain==='events'?{startsAt:optional('string',{format:'date-time'}),endsAt:optional('string',{format:'date-time'}),location:{type:'string'},meetingURL:{type:'string',format:'uri'}}:{};
   for(const key of Object.keys(properties)){const current=valueOf(original,key);if(properties[key].type==='string'&&current&&typeof current==='object')delete properties[key];}
   const initial=Object.fromEntries(Object.keys(properties).map(key=>[key,valueOf(original,key)||(['objectiveDetails'].includes(key)?[]:key==='currency'?'EUR':undefined)]));
-  if(domain==='projects'){const budget=valueOf(original,'budgetAmount');initial.budgetAmount=budget===''?null:budget;}
+  if(domain==='deliverables')initial.versionName=original.payload?.version||valueOf(original,'versionName','fileVersion')||'1.0';
+  if(oldTaskProfile)for(const key of Object.keys(properties))if(oldTaskProfile[key]!==undefined)initial[key]=oldTaskProfile[key];
+  if(domain==='projects'){const budget=valueOf(original,'budgetAmount');initial.budgetAmount=budget===''?(editing?null:0):budget;}
   const extra=Object.keys(properties).length?buildField({type:'object',properties},'Informations',initial,{context:original}):null;if(extra)content.append(extra.node);
   const teamChoices=[];
   if(domain==='projects'){
    const selected=new Set(valueOf(original,'memberIDs')||[]),members=h('div',{class:'sq-member-options'}),search=input('',{type:'search',placeholder:'Rechercher un collaborateur…'});for(const member of list('team')){const id=member.id||member.memberId,choice=h('input',{type:'checkbox',checked:selected.has(id),value:id}),name=memberName(member),line=h('label',{class:'sq-check-row'},choice,h('span',{text:name}));teamChoices.push(choice);members.append(line);search.addEventListener('input',()=>line.hidden=!name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()));}content.append(field('Collaborateurs',h('div',{class:'stack'},search,members)));
   }
-  const tags=['projects','missions','documents','resources'].includes(domain)?input((valueOf(original,'tags')||[]).join?.(', ')||valueOf(original,'tags')||'',{placeholder:'Étiquettes séparées par des virgules'}):null;if(tags)content.append(field('Étiquettes',tags));
+  const tags=['projects','missions','tasks','documents','resources'].includes(domain)?input((valueOf(original,'tags')||oldTaskProfile?.tags||[]).join?.(', ')||valueOf(original,'tags')||'',{placeholder:'Étiquettes séparées par des virgules'}):null;if(tags)content.append(field('Étiquettes',tags));
   content.prepend(media.node);
-  const presentation=entryPresentation(content,{domain,title,status,description,priority,assignee,date,project,client,amount,currency,remuneration,extra,propertyKeys:Object.keys(properties),media:media.node,tags});
+  const budgetDefined=domain==='projects'?h('input',{type:'checkbox',checked:valueOf(original,'budget')!=='À définir'}):null;
+  if(budgetDefined){const budgetField=extra.node.querySelector('input[type=number]'),update=()=>{if(budgetField)budgetField.disabled=!budgetDefined.checked;};budgetDefined.addEventListener('change',update);update();}
+  const attachments=attachmentEditor(domain,record?.id,{projectID:()=>project.value||null}),brief=domain==='missions'?missionBriefEditor(original):null;
+  const presentation=entryPresentation(content,{attachments,brief,budgetDefined,domain,title,status,description,priority,assignee,date,project,client,amount,currency,remuneration,extra,propertyKeys:Object.keys(properties),media:media.node,tags});
   const error=h("p",{class:"focus-form-error",role:"alert",hidden:true});content.append(error);
   let dirty=false,busy=false;
   content.addEventListener("input",()=>dirty=true);content.addEventListener("change",()=>dirty=true);
   let dialog;
   const save=async close=>{
-    if(busy||!validateControls(controls))return;
+    if(busy||attachments?.busy||!validateControls(controls))return;
     if(!title.value.trim()){title.setCustomValidity("Saisissez un titre.");title.reportValidity();title.addEventListener("input",()=>title.setCustomValidity(""),{once:true});return;}
     if(!state.online){error.hidden=false;error.textContent="Connexion nécessaire pour enregistrer. La saisie reste dans cette fenêtre.";return;}
     busy=true;error.hidden=true;
@@ -103,18 +111,26 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
     if(remuneration&&currency){putValue(body,["remuneration"],remuneration.value.trim()||null);putValue(body,["currency"],remuneration.value.trim()?currency.value.trim().toUpperCase():null);}
     if(client&&amount&&currency){putValue(body,["client"],client.value.trim());putValue(body,["amount"],amount.value.trim());putValue(body,["currency"],currency.value.trim().toUpperCase());}
     try {
-      if(extra){const values=extra.read();if(domain==='projects'&&values.objectiveDetails)values.objectiveDetails=values.objectiveDetails.map(v=>({id:v.id,title:v.title||'',criterion:v.criterion||'',target:v.target||'',unit:v.unit||'',dueAt:v.dueAt||null}));for(const[key,value]of Object.entries(values))if(value!==undefined)putValue(body,[key],value);}
+      let extraValues={};if(extra){const values=extra.read();extraValues=values;if(domain==='projects'&&values.objectiveDetails)values.objectiveDetails=values.objectiveDetails.map(v=>({id:v.id,title:v.title||'',criterion:v.criterion||'',target:v.target||'',unit:v.unit||'',dueAt:v.dueAt||null}));for(const[key,value]of Object.entries(values))if(value!==undefined){if(domain==='deliverables'&&key==='versionName')body.payload.version=value;else putValue(body,[key],value);}}
       if(domain==='projects'){const ids=teamChoices.filter(c=>c.checked).map(c=>c.value);if(assignee.value&&!ids.includes(assignee.value))ids.push(assignee.value);putValue(body,['memberIDs'],ids);const lead=list('team').find(m=>(m.id||m.memberId)===assignee.value);if(lead)putValue(body,['lead'],memberName(lead));const clientID=valueOf(body,'clientID'),clientItem=list('clients').find(c=>c.id===clientID);if(clientItem)putValue(body,['client'],titleOf(clientItem));}
       if(tags)putValue(body,['tags'],[...new Set(tags.value.split(',').map(v=>v.trim()).filter(Boolean))]);
+      if(budgetDefined&&!budgetDefined.checked){putValue(body,['budgetAmount'],null);putValue(body,['budget'],'À définir');}
+      if(brief){const next=brief.read();if(next.isDraft&&assignee.value)throw Error("Une mission en brouillon ne doit pas être attribuée. Retirez son responsable.");putValue(body,["brief"],next);}
+      if(domain==='tasks'){const mission=list('missions').find(row=>row.id===extraValues.missionID),projectID=project.value||valueOf(mission,'projectID');if(!mission||!projectID||valueOf(mission,'projectID')!==projectID)throw Error('Sélectionnez une mission appartenant au projet de la tâche.');body.parentId=projectID;putValue(body,['projectID'],projectID);putValue(body,['mission'],titleOf(mission));}
+      if(domain==='clients'&&(!String(extraValues.contact||'').trim()||!/^\S+@\S+\.\S+$/.test(extraValues.email||'')))throw Error('Renseignez le contact principal et une adresse e-mail valide.');
+      if(domain==='deliverables'&&extraValues.sourceDocumentID){const doc=list('documents').find(row=>row.id===extraValues.sourceDocumentID);if(!doc||!valueOf(doc,'storageKey'))throw Error('Le fichier source est indisponible.');for(const key of ['storageKey','originalFileName','byteCount','size'])if(valueOf(doc,key)!=='')putValue(body,[key],valueOf(doc,key));}
+      if(domain==='contracts'&&!extraValues.reference?.trim())throw Error('La référence du contrat est obligatoire.');
       savedRecord=await saveCoreEntity(domain,body);
+      if(domain==='tasks')profileBaseline=await saveTaskProfile(savedRecord.id,profileBaseline,{...extraValues,projectID:body.parentId,missionID:extraValues.missionID,description:description.value,priority:priority.value,tags:(tags?.value||'').split(',').map(value=>value.trim()).filter(Boolean)});
       if(state.user?.id!==person)return;
       await media.save(savedRecord.id);
+      await attachments?.save(savedRecord.id);
       dirty=false;busy=false;close();toast(editing?"Modifications enregistrées":"Élément créé");
       try{await loadWorkspace();await reload();}catch{toast("Enregistrement confirmé. Actualisez la liste lorsque le réseau revient.","error");}
     }catch(e){if(state.user?.id===person){error.hidden=false;error.textContent=errorMessage(e);}}
     finally{busy=false;}
   };
-  dialog=modal({title:presentation.title(editing),initialFocus:"#"+title.id,content,wide:true,className:"focus-editor-dialog",onClose:media.dispose,beforeClose:()=>!busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
+  dialog=modal({title:presentation.title(editing),initialFocus:"#"+title.id,content,wide:true,className:"focus-editor-dialog",onClose:()=>{media.dispose();attachments?.dispose();},beforeClose:()=>!busy&&!attachments?.busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
   presentation.attach(dialog.panel);
   content.addEventListener("submit",e=>{e.preventDefault();void save(dialog.close);});
 }
@@ -162,6 +178,7 @@ export async function renderRecord(domain,id) {
   if(["missions","contracts"].includes(domain)&&canEditRecord(domain)&&state.user?.permissions?.includes("sendMessages"))actions.push(button("Proposer dans une conversation",{iconName:"messages",kind:"primary",onClick:async()=>{const {openRecordProposal}=await import("./message-proposals.js");openRecordProposal(domain,record,redraw);}}));
   root.append(pageHeader({eyebrow:domainLabels[domain],title:titleOf(record),subtitle:statusLabel(valueOf(record,"status")),actions}));
   try{root.append(await recordMedia(domain,id));}catch{}
+  const associated=recordAttachments(domain,id);if(associated)root.append(associated);
   const metadata=h("dl",{class:"focus-properties"});
   const property=(label,value)=>{if(value!==""&&value!==null&&value!==undefined)metadata.append(h("div",{},h("dt",{text:label}),value instanceof Node?h("dd",{},value):h("dd",{text:value})));};
   property("Échéance",dueOf(record)?dateLabel(dueOf(record)):"Sans échéance");
