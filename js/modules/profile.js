@@ -96,6 +96,7 @@ export async function renderSettings(subpage=""){
         try{
           settings={...settings,appearanceMode:theme.value,dashboardDensity:density.value,contentWidth:width.value,language:language.value,timezone:timezone.value,compactSidebar:compact.checked,reducedMotion:motion.checked};
           await saveSettings(settings);
+          state.settings=settings;
           preview();
           toast("Paramètres enregistrés");
         }catch(error){toast(errorMessage(error),"error",6000)}

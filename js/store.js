@@ -71,7 +71,7 @@ export function applyAppearance(){
   document.documentElement.dataset.reducedMotion=state.appearance.reducedMotion?"true":"false";
   document.documentElement.style.colorScheme=mode;
   const themeColor=document.querySelector?.('meta[name="theme-color"]');
-  if(themeColor)themeColor.setAttribute("content",mode==="light"?"#F4F5F1":"#0D0D0E");
+  if(themeColor)themeColor.setAttribute("content",mode==="light"?"#F3F3F4":"#08090B");
   if(/^#[0-9a-f]{6}$/i.test(state.appearance.accent||"")){
     document.documentElement.style.setProperty("--sq-accent",state.appearance.accent);
   }

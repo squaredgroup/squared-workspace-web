@@ -1,4 +1,4 @@
-import { areaBranch, toolsSection, nativeTopbar, unifiedNavigation, folderSidebar } from "./native/shell.js";
+import { createMenu,areaBranch, toolsSection, nativeTopbar, unifiedNavigation, folderSidebar } from "./native/shell.js";
 import { focusTabs, focusHeader, renderSpaces } from "./focus-navigation.js";
 import { configureMobile, openTools } from "./mobile.js";
 import { openFocusSearch } from "./focus-search.js";
@@ -8,8 +8,10 @@ import { CORE_DOMAIN_BY_SECTION } from "./config.js";
 import { authContext } from "./auth-flow.js";
 import { state,setState,setRoute,subscribe,setAppearance } from "./store.js";
 import { SECTIONS,NAV_AREAS,LEGACY_SUBPAGES,canAccessSection,canAccessSubpage,iconPath,realtimeURL,navigationAreaForSection,navigationAreaDestination } from "./config.js";
-import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredSession } from "./api.js";
+import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,loadSettings,logout,hasStoredSession } from "./api.js";
 import { renderAuth } from "./modules/auth.js";
+import { actionMenu } from "./native/components.js";
+import { activeUnreadNotifications } from "./native/dashboard-projection.js";
 import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar,roleLabel } from "./ui.js";
 
 let refs={};let renderGeneration=0;let realtimeRefreshTimer=null;let uiReady=false;let uiSignature="";let swRegistration=null;let navigationPrefix=false;
@@ -40,6 +42,7 @@ function sidebarTeam(){
 }
 function sidebar(){
   const u=state.user;const nav=h("nav",{"aria-label":"Navigation principale"});
+  const newButton=createMenu();newButton.className="sidebar-new";newButton.replaceChildren(icon("Plus4",14),h("span",{text:"Nouveau"}));
   const canCreate=["OWNER","ADMIN"].includes(u?.role)||(u?.permissions||[]).some(permission=>/^(manage|create|sendMail)/.test(permission));
   nav.append(
     h("div",{class:"studio-nav-section native-nav-areas"},h("span",{class:"studio-nav-heading",text:"Workspace"}),...NAV_AREAS.map(navigationAreaItem).filter(Boolean)),
@@ -47,10 +50,10 @@ function sidebar(){
     sidebarTeam(), toolsSection()
   );
   return h("aside",{class:"sidebar"},
-    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:36,height:36,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{text:"Version web"}))),
-    h("div",{class:`sidebar-quick-actions ${canCreate?"":"no-create"}`},canCreate?h("button",{class:"sidebar-new",type:"button",onClick:openTools},icon("add",15),h("span",{text:"Nouveau"})):null,h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Rechercher dans Workspace",onClick:openCommand},icon("search",15)),notificationButton("Ouvrir les notifications"),h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Synchroniser le Workspace",onClick:event=>refreshWorkspace(event.currentTarget)},icon("sync",15))),
+    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:36,height:36,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{class:"brand-version",text:"v1.1.0"}))),
+    h("div",{class:`sidebar-quick-actions ${canCreate?"":"no-create"}`},canCreate?newButton:null,h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Rechercher dans Workspace",onClick:openCommand},icon("search",15)),notificationButton("Ouvrir les notifications"),h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Synchroniser le Workspace",onClick:event=>refreshWorkspace(event.currentTarget)},icon("UpdateRight",15))),
     nav,
-    h("div",{class:"sidebar-footer"},h("button",{class:"sidebar-settings",type:"button",onClick:()=>setRoute("settings")},icon("settings",16),h("span",{text:"Paramètres"})),h("button",{class:"account-card",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:34,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:u?.email||roleLabel(u?.role)})),icon("More",15)))
+    h("div",{class:"sidebar-footer"},h("div",{class:"account-card"},h("button",{class:"account-profile",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:40,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:u?.email||roleLabel(u?.role)}))),actionMenu([{label:"Mon profil",icon:"user",group:"Compte",run:()=>setRoute("profile")},{label:"Paramètres",icon:"settings",group:"Compte",run:()=>setRoute("settings")},{label:"Déconnexion",icon:"logout",group:"Session",run:()=>logout()}],{label:"Options du profil",iconName:"More"})))
   );
 }
 function mobileTabs(){return focusTabs()}
@@ -58,10 +61,10 @@ function systemState(){
   const last=state.lastSyncAt?relativeDate(state.lastSyncAt):"Synchronisation";
   return h("div",{class:`system-state ${state.online?"":"offline"}`,role:"status","aria-live":"polite",title:state.online?`Dernière synchro ${last}`:"Connexion réseau indisponible"},h("i",{class:"state-dot"}),h("span",{text:state.online?(state.lastSyncAt?"Données chargées":"Connecté"):"Hors ligne"}),h("strong",{text:state.online?last:""}));
 }
-function unreadNotifications(){return (state.workspace?.notifications||[]).filter(value=>!(value?.isRead??value?.is_read??value?.payload?.isRead??value?.payload?.is_read)).length}
+function unreadNotifications(){return activeUnreadNotifications(state.workspace,state.user).length}
 function notificationButton(label="Notifications"){
   const count=unreadNotifications();
-  return h("button",{class:"icon-button notification-trigger",type:"button","aria-label":count?`${label}, ${count} non lue${count>1?"s":""}`:label,title:"Notifications",onClick:()=>setRoute("notifications")},icon("notification",17),count?h("span",{class:"notification-count",text:count>99?"99+":String(count)}):null);
+  return h("button",{class:"icon-button notification-trigger",type:"button","aria-label":count?`${label}, ${count} non lue${count>1?"s":""}`:label,title:"Notifications",onClick:()=>setRoute("notifications")},icon("notification",17),count?h("i",{class:"notification-indicator","aria-hidden":"true"}):null);
 }
 async function refreshWorkspace(button){
   if(state.loading||!state.online)return;
@@ -78,7 +81,7 @@ function buildShell(){
   app.replaceChildren();
   const content=h("main",{id:"workspace-main",class:"content",tabindex:"-1","aria-busy":"true"},skeletonPage());
   const main=h("div",{class:"main"},topbar(),moduleTabs(),state.online?null:h("div",{class:"network-banner"},icon("warning",15),h("span",{text:"Connexion interrompue. Les données affichées restent visibles ; aucune action n’est envoyée automatiquement."})),content);
-  const shell=h("div",{class:`workspace ${state.sidebarOpen?"sidebar-open":""}`},sidebar(),h("button",{class:"sidebar-backdrop",type:"button","aria-label":"Fermer le menu",onClick:()=>setState({sidebarOpen:false})}),main,mobileTabs());
+  const shell=h("div",{class:`workspace ${state.sidebarOpen?"sidebar-open":""} ${state.desktopSidebarCollapsed?"sq-sidebar-collapsed":""}`},sidebar(),h("button",{class:"sidebar-backdrop",type:"button","aria-label":"Fermer le menu",onClick:()=>setState({sidebarOpen:false})}),main,mobileTabs());
   app.append(shell);refs={shell,content,main};renderCurrent();
 }
 function refreshChrome(){
@@ -124,7 +127,7 @@ async function sectionPage(section,subpage){
 let renderedRouteKey="";
 async function renderCurrent({focus=true}={}){
   if(!refs.content||!safeRoute())return;
-  if(renderedRouteKey&&refs.content.getAttribute("aria-busy")!=="true")viewContext("scroll:"+renderedRouteKey).y=window.scrollY;
+  if(renderedRouteKey&&refs.content.getAttribute("aria-busy")!=="true")viewContext("scroll:"+renderedRouteKey).y=refs.content.scrollTop;
   const route={...state.route},key=JSON.stringify(route),generation=++renderGeneration;
   const returnY=viewContext("scroll:"+key,{y:0}).y;
   refs.content.setAttribute("aria-busy","true");
@@ -144,7 +147,7 @@ async function renderCurrent({focus=true}={}){
     // placeholder can keep it above the new content during navigation.
     apply();
     if(generation!==renderGeneration)return;
-    requestAnimationFrame(()=>{if(generation===renderGeneration)window.scrollTo({top:returnY,behavior:"instant"});});
+    requestAnimationFrame(()=>{if(generation===renderGeneration)refs.content.scrollTo({top:returnY,behavior:"instant"});});
     if(focus&&!document.querySelector("#portal-root > .overlay")){refs.content.focus({preventScroll:true});announce(`${SECTIONS[route.section]?.title||"Workspace"} chargé`);}
   }catch(error){if(generation!==renderGeneration||!refs.content)return;refs.content.setAttribute("aria-busy","false");refs.content.replaceChildren(emptyState("Chargement impossible",errorMessage(error),"warning"));}
 }
@@ -188,7 +191,12 @@ function connectRealtime(){
     socket.addEventListener("close",()=>{if(socket!==state.realtime)return;state.realtime=null;if(uiReady&&state.accessToken&&state.online){realtimeReconnectTimer=setTimeout(connectRealtime,reconnectDelay);reconnectDelay=Math.min(30000,reconnectDelay*2)}});
   }catch{}
 }
-async function authenticated(){await Promise.all([loadMe(),loadWorkspace(),loadDomainCatalog().catch(()=>null)]);if(!state.user||!state.accessToken)return;uiReady=true;buildShell();uiSignature=signature();connectRealtime()}
+async function authenticated(){
+  await Promise.all([loadMe(),loadWorkspace(),loadDomainCatalog().catch(()=>null)]);if(!state.user||!state.accessToken)return;
+  const settings=await loadSettings().catch(()=>null);if(!state.user||!state.accessToken)return;
+  if(settings){state.settings=settings;const density=String(settings.dashboardDensity||'balanced').toLowerCase().replace('équilibrée','balanced').replace('aérée','airy');setAppearance({mode:settings.appearanceMode==='system'?'light':settings.appearanceMode||state.appearance.mode||'dark',density,contentWidth:settings.contentWidth||'balanced',compactSidebar:Boolean(settings.compactSidebar),reducedMotion:Boolean(settings.reducedMotion)});}
+  uiReady=true;buildShell();uiSignature=signature();connectRealtime();
+}
 function resetInterface(reason=""){renderedRouteKey="";uiReady=false;uiSignature="";renderGeneration++;refs={};stopRealtime();document.querySelector("#portal-root")?.replaceChildren();document.querySelectorAll(".overlay").forEach(node=>node.remove());document.querySelector(".toast-stack")?.replaceChildren();if(app)app.inert=false;renderAuth(authenticated,{message:reason==="expired"?"Votre session a expiré. Reconnectez-vous.":""})}
 window.addEventListener("sq:session-ended",event=>resetInterface(event.detail?.reason));window.addEventListener("offline",stopRealtime);window.addEventListener("online",()=>{if(uiReady)connectRealtime()});
 async function bootstrap(){if(await ensureLatestRelease())return;registerServiceWorker();const restoring=!authContext.action&&hasStoredSession();renderAuth(authenticated,{restoring});if(!restoring)return;try{await refreshSession();await authenticated()}catch(error){if(error.name!=="AbortError")renderAuth(authenticated,{message:errorMessage(error)})}}

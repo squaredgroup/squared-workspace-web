@@ -5,12 +5,13 @@ const nextId=prefix=>prefix+"-"+(++uid);
 const focusableSelector='a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),details>summary,[tabindex]:not([tabindex="-1"])';
 
 export function h(tag,attrs={},...children){
-  const el=document.createElement(tag);
+  const svg=["svg","path","defs","linearGradient","stop","polyline","polygon","circle","rect","line","g","text"].includes(tag);
+  const el=svg?document.createElementNS("http://www.w3.org/2000/svg",tag):document.createElement(tag);
   for(const [key,value] of Object.entries(attrs||{})){
     if(value==null||value===false) continue;
-    if(key==="class") el.className=value;
+    if(key==="class"){if(svg)el.setAttribute("class",value);else el.className=value;}
     else if(key==="text") el.textContent=value;
-    else if(key==="style"&&typeof value==="object") Object.assign(el.style,value);
+    else if(key==="style"&&typeof value==="object"){for(const [property,setting] of Object.entries(value)){if(property.startsWith("--")||property.includes("-"))el.style.setProperty(property,setting);else el.style[property]=setting;}}
     else if(key.startsWith("on")&&typeof value==="function") el.addEventListener(key.slice(2).toLowerCase(),value);
     else if(key==="dataset") Object.assign(el.dataset,value);
     else if(["checked","disabled","selected","open","required","hidden","readonly","multiple","inert"].includes(key)) el[key==="readonly"?"readOnly":key]=Boolean(value);
@@ -23,7 +24,7 @@ export function h(tag,attrs={},...children){
   }
   return el;
 }
-export function icon(name,size=17,fill=false){return h("img",{class:"icon",src:iconPath(name,fill),alt:"",width:size,height:size,decoding:"async",draggable:"false",style:{width:`${size}px`,height:`${size}px`}})}
+export function icon(name,size=17,fill=false,color){if(color)return h("span",{class:"icon is-colored","aria-hidden":"true",style:{width:`${size}px`,height:`${size}px`,backgroundColor:color,maskImage:`url("${iconPath(name,fill)}")`,WebkitMaskImage:`url("${iconPath(name,fill)}")`,maskSize:"contain",WebkitMaskSize:"contain",maskRepeat:"no-repeat",WebkitMaskRepeat:"no-repeat",display:"inline-block",flexShrink:"0"}});return h("img",{class:"icon",src:iconPath(name,fill),alt:"",width:size,height:size,decoding:"async",draggable:"false",style:{width:`${size}px`,height:`${size}px`}})}
 export function avatarInitials(person={}){
   const value=typeof person==="string"?person:(person.name||`${person.firstName||person.first_name||""} ${person.lastName||person.last_name||""}`.trim()||person.email||"");
   return String(value).trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join("").toUpperCase()||"SQ";
