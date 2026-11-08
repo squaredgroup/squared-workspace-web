@@ -5,10 +5,10 @@ import { h, icon, modal, button, emptyState, errorMessage } from "./ui.js";
 import { normalize, titleOf, valueOf, sectionForDomain } from "./focus-model.js";
 import { openRecord } from "./focus-records.js";
 
-export function openFocusSearch({refresh,theme}={}) {
+export function openFocusSearch({refresh,theme,initialQuery=""}={}) {
   if(!state.user||document.querySelector(".command"))return;
   const owner=state.user.id,extra=new Map();let limit=24,active=0,busy=false,visible=[],closed=false;
-  const query=h("input",{class:"command-input",type:"search",role:"combobox","aria-label":"Rechercher dans Workspace","aria-controls":"focus-search-results","aria-expanded":"true","aria-autocomplete":"list",placeholder:"Projet, tâche, document ou page…",autocomplete:"off"});
+  const query=h("input",{class:"command-input",value:initialQuery,type:"search",role:"combobox","aria-label":"Rechercher dans Workspace","aria-controls":"focus-search-results","aria-expanded":"true","aria-autocomplete":"list",placeholder:"Projet, tâche, document ou page…",autocomplete:"off"});
   const results=h("div",{id:"focus-search-results",class:"command-results",role:"listbox","aria-label":"Résultats de recherche"});
   const scope=h("p",{class:"focus-search-scope",role:"status",text:"Pages et données de votre session. La recherche étendue charge aussi les autres éléments autorisés."});
   const more=button("Afficher plus de résultats",{kind:"ghost",onClick:()=>{limit+=24;draw();}});

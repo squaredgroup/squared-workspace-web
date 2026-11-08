@@ -39,7 +39,7 @@ export function slug(value){ return value.normalize("NFD").replace(/[\u0300-\u03
 export const SECTIONS = {
   businessUnits:{title:"Pôles & entités",group:"Pilotage",permissions:["manageBusinessUnits"]},
   objectives:{title:"Objectifs",group:"Pilotage",permissions:["manageObjectives"],subpages:enterprise(["Vision annuelle","Objectifs du groupe","Objectifs par pôle","Résultats clés","Revues","Historique"],"trend")},
-  reports:{title:"Rapports",group:"Pilotage",permissions:["viewReports"],subpages:enterprise(["Direction","Finance","Commercial","Projets","Rentabilité","Ressources humaines","Clients","Marketing","Sécurité","Personnalisés"],"chart")},
+  reports:{title:"Statistiques",group:"Pilotage",permissions:["viewReports"],subpages:enterprise(["Direction","Finance","Commercial","Projets","Rentabilité","Ressources humaines","Clients","Marketing","Sécurité","Personnalisés"],"chart")},
 
   dashboard:{title:"Tableau de bord",group:"Général"}, today:{title:"Aujourd’hui",group:"Général"},
   projects:{title:"Projets",group:"Général",subpages:[p("Projets Workspace","workspace","Suivez les projets actifs, leurs responsables et leur progression.","folder"),p("Portefeuille","portfolio","Arbitrez valeur, budget, capacité et risques du portefeuille.","chart",["manageProjects"]),p("Publication","publication","Préparez les projets destinés au site Squared Group.","globe",["manageCMS"]),p("Archives","archives","Restaurez ou purgez les projets retirés du portefeuille.","archive",["manageProjects"])]},
@@ -146,4 +146,4 @@ export function canAccessSection(sectionKey,user){
   if(section.permissions?.length && !section.permissions.some(p=>user.permissions?.includes(p))) return false;
   return true;
 }
-export function canAccessSubpage(page,user){ return !page?.permissions?.length || page.permissions.some(p=>user?.permissions?.includes(p)); }
+export function canAccessSubpage(page,user){ return (!page?.requiresAdministrator||["OWNER","ADMIN"].includes(user?.role))&&(!page?.permissions?.length || page.permissions.some(p=>user?.permissions?.includes(p))); }

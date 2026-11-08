@@ -83,7 +83,7 @@ export function dataTable({rows=[],columns=[],onOpen,actions=()=>[],selectionAct
  };
  root.append(controls,body,footer);render();return root;
 }
-const secret=/password|secret|privatekey|access.?token|refresh.?token/i;
+const secret=/password|secret|privatekey|access.?token|refresh.?token|ticket|credential/i;
 export function displayValue(value,label='Informations',depth=0,options={}){
  if(value==null)return h('span',{class:'muted',text:'Non renseigné'});
  if(typeof value!=='object')return h('span',{text:typeof value==='boolean'?(value?'Oui':'Non'):String(value)});
