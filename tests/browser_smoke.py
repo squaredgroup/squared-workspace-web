@@ -138,7 +138,8 @@ with sync_playwright() as p:
     c=context();page=c.new_page();page.route('https://workspace.squaredgroup.studio/v1/auth/password',lambda r:r.fulfill(status=202,content_type='application/json',body=json.dumps({'mfaRequired':True,'challengeId':'fixture-challenge','publicKey':{'challenge':'dGVzdA','rpId':'localhost','allowCredentials':[]}})))
     page.goto(origin);page.get_by_label('Adresse e-mail',exact=True).fill(USER['email']);page.get_by_label('Mot de passe',exact=True).fill('FixturePassword123');page.get_by_role('button',name='Se connecter',exact=True).click()
     expect(page.get_by_role('heading',name='Vérification renforcée',exact=True)).to_be_visible()
-    expect(page.get_by_label('Code de récupération',exact=True)).to_be_visible()
+    expect(page.get_by_text('Confirmez la connexion à',exact=False)).to_be_visible()
+    expect(page.get_by_label('Code de récupération',exact=True)).to_have_count(0)
     assert page.evaluate("localStorage.getItem('sq-workspace-web-refresh')") is None
     record('MFA obligatoire : pas de session avant seconde vérification');c.close()
     browser.close()

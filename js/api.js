@@ -11,7 +11,6 @@ export async function passwordLogin(email, password) {
 }
 export async function passkeyOptions(email) { return (await request("/v1/auth/passkey/options", { method: "POST", auth: false, retry: false, body: { email } })).data; }
 export async function verifyPasskey(challengeId, response) { return setSession((await request("/v1/auth/passkey/verify", { method: "POST", auth: false, retry: false, body: { challengeId, response, device: DEVICE() } })).data); }
-export async function verifyRecovery(challengeId, recoveryCode) { return setSession((await request("/v1/auth/mfa/recovery", { method: "POST", auth: false, retry: false, body: { challengeId, recoveryCode, device: DEVICE() } })).data); }
 export async function activateAccount(payload) { return setSession((await request("/v1/auth/activate", { method: "POST", auth: false, retry: false, body: { ...payload, device: DEVICE() } })).data); }
 export async function requestPasswordReset(email) { await request("/v1/auth/password-reset/request", { method: "POST", auth: false, retry: false, body: { email } }); }
 export async function confirmPasswordReset(email, token, newPassword) { await request("/v1/auth/password-reset/confirm", { method: "POST", auth: false, retry: false, body: { email, token, newPassword } }); }
@@ -33,7 +32,6 @@ export async function updateSecurity(value) { return (await request("/v1/me/secu
 export async function changePassword(currentPassword, newPassword) { await request("/v1/me/password", { method: "PUT", body: { currentPassword, newPassword } }); }
 export async function createPasskeyOptions() { return (await request("/v1/me/passkeys/options", { method: "POST" })).data; }
 export async function registerPasskey(challengeId, response, name) { return (await request("/v1/me/passkeys", { method: "POST", body: { challengeId, response, name } })).data; }
-export async function recoveryCodes() { return (await request("/v1/me/recovery-codes", { method: "POST" })).data; }
 export async function listSessions() { return (await request("/v1/sessions")).data || []; }
 export async function revokeSession(id) { await request(`/v1/sessions/${id}`, { method: "DELETE" }); }
 export async function loadSettings() { return (await request("/v1/settings")).data; }
