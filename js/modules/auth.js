@@ -1,5 +1,5 @@
 import { h, button, field, input, icon, toast, errorMessage } from "../ui.js";
-import { passwordLogin, passkeyOptions, verifyPasskey, verifyRecovery, activateAccount, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, probeConnection } from "../api.js";
+import { passwordLogin, passkeyOptions, verifyPasskey, activateAccount, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, probeConnection } from "../api.js";
 import { getPasskey, webauthnSupported } from "../webauthn.js";
 import { authContext, clearAuthContext } from "../auth-flow.js";
 import { setAppearance } from "../store.js";
@@ -7,8 +7,8 @@ import { setAppearance } from "../store.js";
 let authFieldId = 0;
 
 function authError(error) {
-  if (error?.name === "NotAllowedError") return "Vérification annulée ou délai dépassé. Réessayez ou utilisez votre code de récupération.";
-  if (error?.name === "SecurityError") return "La passkey n’est pas disponible sur cette adresse Web. Utilisez votre mot de passe et, si nécessaire, un code de récupération. Le serveur doit autoriser ce nouveau domaine.";
+  if (error?.name === "NotAllowedError") return "Vérification annulée ou délai dépassé. Réessayez avec votre passkey.";
+  if (error?.name === "SecurityError") return "La passkey n’est pas disponible sur cette adresse Web. Vérifiez le domaine ou réessayez sur un appareil compatible.";
   return errorMessage(error);
 }
 function control(value, options = {}) {
@@ -149,10 +149,8 @@ function showLogin(panel, onAuthenticated, message = "", restoring = false) {
     h("div", { class: "auth-diagnostic" }, h("span", {}, h("i", { class: "auth-live-dot" }), "Services Workspace"), diagnostic));
 }
 function showMFA(panel, challenge, email, onAuthenticated) {
-  const code = control("", { name: "recovery-code", autocomplete: "one-time-code", placeholder: "Code de récupération", minLength: 8, maxLength: 40 });
-  const form = h("form", { class: "form" }, field("Code de récupération", code), button("Valider le code", { kind: "primary", type: "submit" }));
-  const status = show(panel, "Vérification renforcée", `Une seconde vérification est requise pour ${email}.`, form, back(panel, onAuthenticated));
-  busyForm(form, status, async () => { await verifyRecovery(challenge.challengeId, code.value.trim()); code.value = ""; clearAuthContext(); await onAuthenticated(); });
+  const content = h("div", { class: "form" });
+  const status = show(panel, "Vérification renforcée", `Confirmez la connexion à ${email} avec votre passkey.`, content, back(panel, onAuthenticated));
   if (webauthnSupported()) {
     const passkey = button("Valider avec ma passkey", { iconName: "key", onClick: async () => {
       passkey.disabled = true; status.textContent = "";
@@ -160,7 +158,9 @@ function showMFA(panel, challenge, email, onAuthenticated) {
       catch (error) { status.textContent = authError(error); }
       finally { passkey.disabled = false; }
     } });
-    form.before(passkey, h("p", { class: "muted", text: "Ou utilisez l’un des codes de récupération remis à l’activation de votre sécurité renforcée." }));
+    content.append(passkey);
+  } else {
+    status.textContent = "Ce navigateur ne prend pas en charge les passkeys. Réessayez sur un appareil compatible.";
   }
 }
 function showActivation(panel, onAuthenticated) {

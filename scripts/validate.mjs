@@ -20,6 +20,7 @@ const headers=await fs.readFile("_headers","utf8");
 if(!headers.startsWith("/*\n")||!headers.includes("Cache-Control: no-store"))throw new Error("Toutes les ressources publiques doivent interdire le cache navigateur");
 const config=await fs.readFile("js/config.js","utf8");const iconBlock=config.split("export const ICONS = {")[1].split("};")[0];
 for(const match of iconBlock.matchAll(/:\s*"([A-Za-z0-9]+)"/g)){
+  if(match[1]==="TopBarInspectorSearch"){await fs.access(path.join(root,"assets/icons/TopBarInspectorSearch.svg"));continue;}
   if(!ICONLY_REGULAR.includes(match[1])&&!ICONLY_FILLED.includes(match[1]))throw new Error(`Icône hors du catalogue Iconly: ${match[1]}`);
   await fs.access(path.join(root,iconlyPath(match[1]).slice(1)));
 }

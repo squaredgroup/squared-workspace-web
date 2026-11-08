@@ -1,5 +1,5 @@
 export function spaceGroteskFaces(){
-  return [[300,"light"],[400,"regular"],[500,"medium"],[600,"semibold"],[700,"bold"]].map(([weight,name])=>`@font-face{font-family:'Space Grotesk';font-style:normal;font-weight:${weight};font-display:swap;src:url('${location.origin}/assets/fonts/space-grotesk-${name}.woff') format('woff')}`).join("");
+  return `@font-face{font-family:'Space Grotesk';font-style:normal;font-weight:300 700;font-display:swap;src:url('${location.origin}/assets/fonts/SpaceGrotesk-Variable.ttf') format('truetype')}`;
 }
 
 export function withWorkspaceTypography(html){

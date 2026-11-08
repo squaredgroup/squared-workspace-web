@@ -1,3 +1,6 @@
+import { buildField,contracts,openOperation,renderWorkflowGroup,groupAllowed } from '../native/workflows.js';
+import { dataTable,displayValue,labelFor,statusDot,confirmDialog } from '../native/components.js';
+import { mediaEditor } from '../native/media.js';
 import { CORE_DOMAIN_BY_SECTION,SPECIALIZED_BY_SECTION,SUBPAGE_DOMAIN_HINTS,SECTIONS,SECTION_DESCRIPTIONS } from "../config.js";
 import { editRecord, recordList, supportsRecord } from "../focus-records.js";
 import { strictObject, domainLabels } from "../focus-model.js";
@@ -6,7 +9,7 @@ import { viewContext } from "../focus-state.js";
 import { businessUnitList } from "./business-units.js";
 import { state } from "../store.js";
 import { listCoreDomain,saveCoreEntity,archiveCoreEntity,listSpecialized,saveSpecialized,archiveSpecialized,uploadFile,loadWorkspace,loadDomainCatalog } from "../api.js";
-import { h,pageHeader,row,button,modal,field,input,select,jsonEditor,validateControls,emptyState,skeletonPage,toast,errorMessage,card,pretty,formatDate,relativeDate,advancedEditor,confirmAction,statePanel } from "../ui.js";
+import { h,pageHeader,row,button,modal,field,input,textarea,select,jsonEditor,validateControls,emptyState,skeletonPage,toast,errorMessage,card,pretty,formatDate,relativeDate,advancedEditor,confirmAction,statePanel } from "../ui.js";
 
 function routeKinds(sectionKey,subpage){
   const hinted=SUBPAGE_DOMAIN_HINTS[`${sectionKey}:${subpage}`];
@@ -78,30 +81,19 @@ function catalogValue(meta,control){
   if(["number","integer","decimal","currency","percent"].includes(meta.type))return control.value===""?null:Number(control.value);
   return control.value.trim()===""?null:control.value.trim();
 }
-function specializedForm(kind,entity,reload){
-  const definition=catalogKind(kind)||{};
-  const isEdit=Boolean(entity?.id);
-  const title=input(entity?.title||"",{required:true,placeholder:"Titre"});
-  const status=select(entity?.status||definition.statuses?.[0]||"active",statusOptions(kind));
-  const data={...(entity?.data||{})};
-  const structuredInputs=catalogFields(definition).map(meta=>{
-    const control=catalogControl(meta,data[meta.key]);if(meta.required&&!["boolean","bool"].includes(meta.type))control.required=true;
-    const label=meta.label||meta.displayName||pretty(meta.key),hint=meta.description||meta.help||(meta.required?"Champ requis par ce domaine métier.":"");
-    return{meta,control,node:field(label,control,hint)};
-  });
-  const advanced=jsonEditor(data,"data");
-  const content=h("div",{class:"form"},field("Titre",title),field("Statut",status),structuredInputs.length?h("div",{class:"form-grid"},...structuredInputs.map(item=>item.node)):null,advancedEditor("Données techniques",advanced,"Les champs non encore représentés dans le formulaire restent modifiables ici. Les valeurs du formulaire ci-dessus restent prioritaires."));
-  modal({title:`${isEdit?"Modifier":"Créer"} · ${pretty(kind)}`,content,wide:true,actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:async close=>{
-    try{
-      if(!validateControls(title,status,...structuredInputs.map(item=>item.control)))return;
-      const finalData=strictObject(advanced.value);
-      for(const {meta,control} of structuredInputs)finalData[meta.key]=catalogValue(meta,control);
-      for(const key of ["title","name","legalName","subject"])if(key in finalData)finalData[key]=title.value.trim();
-      for(const key of ["state","lifecycle","status"])if(key in finalData)finalData[key]=status.value;
-      await saveSpecialized(kind,{...(isEdit?{id:entity.id,version:entity.version}:{}),title:title.value.trim(),status:status.value,data:finalData});
-      toast("Donnée métier enregistrée");close();await reload();
-    }catch(error){toast(errorMessage(error),"error",5500)}
-  }}]});
+function valueSchema(key,value){
+ if(Array.isArray(value))return{type:'array',items:value.length?valueSchema('item',value[0]):{type:'string'}};
+ if(value&&typeof value==='object')return{type:'object',properties:Object.fromEntries(Object.entries(value).map(([k,v])=>[k,valueSchema(k,v)]))};
+ if(typeof value==='number')return{type:'number'};if(typeof value==='boolean')return{type:'boolean'};
+ if(/ID$|Id$/.test(key))return{type:'string',format:'uuid'};if(/At$|Date$/.test(key))return{type:'string',format:typeof value==='string'&&value.includes('T')?'date-time':'date'};
+ return{type:'string',...(typeof value==='string'&&value.length>250?{maxLength:20000}:{}),...(value===null?{anyOf:[{type:'string'},{type:'null'}]}:{})};
+}
+export function specializedForm(kind,entity,reload){
+ const definition=catalogKind(kind);if(!definition?.writable||definition.genericUpdate===false&&entity||definition.genericCreate===false&&!entity){toast('Utilisez le circuit métier de cette fiche.','error');return;}
+ let savedEntity=entity;const media=mediaEditor('domain:'+kind,entity?.id),data=entity?.data||{},title=input(entity?.title||'',{required:true,maxLength:300}),status=select(entity?.status||definition.statuses?.[0]||'draft',statusOptions(kind).map(value=>({value,label:labelFor(value)}))),reserved=new Set(['title','name','legalName','subject','state','status','lifecycle']),keys=[...new Set([...Object.keys(data),...(definition.required||[])])].filter(k=>!reserved.has(k));
+ const schema={type:'object',properties:Object.fromEntries(keys.map(key=>[key,valueSchema(key,data[key])])),required:(definition.required||[]).filter(k=>!reserved.has(k))},structured=buildField(schema,'Informations',data,{context:{...data,...entity}}),content=h('div',{class:'form'},media.node,field('Titre',title),field('Statut',status),structured.node);
+ modal({title:(entity?'Modifier':'Créer')+' · '+pretty(kind),content,wide:true,className:'sq-specialized-editor',onClose:media.dispose,actions:[{label:'Enregistrer',kind:'primary',icon:'check',onClick:async close=>{if(!title.reportValidity())return;const finalData={...data,...structured.read()};for(const key of ['title','name','legalName','subject'])if(key in data||(definition.required||[]).includes(key))finalData[key]=title.value.trim();for(const key of ['state','status','lifecycle'])if(key in data||(definition.required||[]).includes(key))finalData[key]=status.value;
+ savedEntity=await saveSpecialized(kind,{...(savedEntity?{id:savedEntity.id,version:savedEntity.version}:{}),title:title.value.trim(),status:status.value,data:finalData});await media.save(savedEntity.id);close();toast('Donnée métier enregistrée');await reload();}}]});
 }
 async function attachFile(domain,entity){
   const kind=fileKind(domain);if(!kind)return;
@@ -132,27 +124,15 @@ function archiveAction({kind,item,specialized,reload}){
 function renderDomainList({kind,items,writable,reload,specialized=false}){
   if(specialized&&kind==="business-units")return businessUnitList({items,writable,reload,onEdit:item=>specializedForm(kind,item,reload)});
   if(!specialized&&supportsRecord(kind))return recordList(kind,items,reload,{writable});
-  const saved=viewContext(`domain:${state.route.section}:${state.route.subpage}:${kind}`,{query:"",status:"all",sort:"recent",limit:40});
-  const host=h("div"),results=h("div",{class:"list"}),summary=h("div",{class:"collection-summary",role:"status"});
-  const search=h("input",{class:"search-input",type:"search",placeholder:"Rechercher dans la liste…",value:saved.query,"aria-label":`Rechercher dans ${pretty(kind)}`});
-  const statuses=[...new Set(items.map(v=>String(v.status||"")).filter(Boolean))];
-  const statusSelect=select(saved.status,[{value:"all",label:"Tous les statuts"},...statuses.map(value=>({value,label:pretty(value)}))]);statusSelect.className="filter-select";statusSelect.setAttribute("aria-label","Filtrer par statut");
-  const sortSelect=select(saved.sort,[{value:"recent",label:"Plus récents"},{value:"title",label:"Titre A–Z"},{value:"status",label:"Statut"}]);sortSelect.className="filter-select";sortSelect.setAttribute("aria-label","Trier les éléments");
+  const definition=catalogKind(kind),host=h('div',{class:'sq-pane'}),dedicated=definition?.workflowRequired||definition?.genericUpdate===false;
+  const workflow=async item=>{const catalog=await contracts(),ops=catalog.operations.filter(o=>o.path.split('/').includes(kind)&&groupAllowed(o.group,!o.readOnly)&&(!item||Object.keys(o.params?.properties||{}).length));if(!ops.length)throw new Error('Le circuit de cette fiche n’est pas disponible pour vos droits.');const menu=h('div',{class:'stack'});for(const op of ops)menu.append(button(({GET:'Consulter',POST:'Continuer',PUT:'Modifier',PATCH:'Modifier',DELETE:'Supprimer'})[op.method]+' · '+labelFor(op.path.split('/').at(-1).replace(':','')),{onClick:()=>openOperation(op,{context:item||{},onComplete:reload})}));modal({title:'Circuit · '+pretty(kind),content:menu,wide:true});};
+  const canModify=item=>writable&&!dedicated&&!item?.data?.workflowManaged&&!(kind==='fiscal-periods'&&['closed','audited'].includes(item.status))&&!(kind==='supplier-bills'&&item.status!=='draft');
   const edit=item=>specialized?specializedForm(kind,item,reload):coreForm(kind,item,reload);
-  const more=button("Afficher la suite",{kind:"ghost",onClick:()=>{saved.limit+=40;draw();}});
-  host.append(h("div",{class:"collection-toolbar"},h("div",{class:"collection-search"},search),statusSelect,sortSelect,writable?button("Nouveau",{kind:"primary",iconName:"add",onClick:()=>edit(null)}):null),summary,results,more);
-  function draw(){
-    const q=saved.query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
-    const filtered=items.filter(value=>(saved.status==="all"||String(value.status||"")===saved.status)&&`${value.title||""} ${value.status||""} ${JSON.stringify(value.data||value.payload||{})}`.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().includes(q)).sort((a,b)=>saved.sort==="title"?String(a.title||"").localeCompare(String(b.title||""),"fr"):saved.sort==="status"?String(a.status||"").localeCompare(String(b.status||""),"fr"):new Date(b.updatedAt||b.updated_at||b.createdAt||0)-new Date(a.updatedAt||a.updated_at||a.createdAt||0));
-    summary.replaceChildren(...[h("strong",{text:String(filtered.length)}),h("span",{text:` résultat${filtered.length>1?"s":""} sur ${items.length}`}),q||saved.status!=="all"?button("Réinitialiser",{small:true,kind:"ghost",onClick:()=>{saved.query="";saved.status="all";saved.limit=40;search.value="";statusSelect.value="all";draw();}}):null].filter(Boolean));
-    results.replaceChildren(...(filtered.length?filtered.slice(0,saved.limit).map(item=>row({title:item.title||"Sans titre",subtitle:item.data?.description||item.payload?.description||pretty(kind),status:item.status,meta:formatDate(item.updatedAt||item.updated_at),actions:[writable?button("Modifier",{small:true,iconName:"edit",onClick:()=>edit(item)}):null,writable&&!specialized&&fileKind(kind)?button("Fichier",{small:true,iconName:"upload",onClick:()=>attachFile(kind,item)}):null,writable?button("Archiver",{small:true,kind:"ghost",iconName:"archive",onClick:()=>archiveAction({kind,item,specialized,reload})}):null].filter(Boolean)})):[emptyState("Aucun élément","Aucun résultat pour ce périmètre et ces filtres.")]));
-    more.hidden=filtered.length<=saved.limit;
-  }
-  search.addEventListener("input",()=>{saved.query=search.value;saved.limit=40;draw();});
-  statusSelect.addEventListener("change",()=>{saved.status=statusSelect.value;draw();});
-  sortSelect.addEventListener("change",()=>{saved.sort=sortSelect.value;draw();});
-  draw();return host;
+  const actions=item=>[{label:'Informations',icon:'document',group:'Consulter',run:()=>modal({title:item.title||pretty(kind),content:displayValue(item),wide:true})},...(canModify(item)?[{label:'Modifier',icon:'edit',group:'Gérer',run:()=>edit(item)}]:[]),...(dedicated||item.data?.workflowManaged?[{label:'Ouvrir le circuit métier',icon:'sync',group:'Parcours',run:()=>workflow(item)}]:[]),...(canModify(item)&&definition?.genericArchive!==false?[{label:'Archiver',icon:'archive',group:'Conserver',run:()=>archiveAction({kind,item,specialized,reload})}]:[])];
+  if(writable)host.append(button(dedicated?'Circuit de création':'Nouveau',{kind:'primary',iconName:'add',onClick:()=>dedicated?workflow(null):edit(null)}));
+  host.append(dataTable({rows:items,columns:[{id:'title',label:'Titre'},{id:'status',label:'Statut',render:r=>statusDot(r.status,labelFor(r.status)),value:r=>labelFor(r.status)},{id:'updatedAt',label:'Modifié le',value:r=>formatDate(r.updatedAt||r.updated_at)}],onOpen:item=>actions(item)[0].run(),actions,name:kind,selectionActions:selected=>[{label:'Informations de la sélection',icon:'document',group:'Consulter',run:()=>modal({title:selected.length+' élément(s)',content:displayValue(selected),wide:true})},...(specialized&&writable&&!dedicated&&definition?.genericArchive!==false?[{label:'Archiver la sélection',icon:'archive',group:'Conserver',run:async()=>{if(!await confirmDialog({title:'Archiver la sélection ?',message:selected.length+' élément(s) concernés.',label:'Archiver'}))return;for(const item of selected){if(!canModify(item))throw new Error('Une fiche demande son circuit dédié.');await archiveSpecialized(kind,item.id,item.version);}await reload();}}]:[])]}));return host;
 }
+
 function snapshotView(value){
   if(value==null)return emptyState("Module prêt","Ce module est disponible mais ne contient encore aucune donnée dans votre périmètre.");
   if(Array.isArray(value)){

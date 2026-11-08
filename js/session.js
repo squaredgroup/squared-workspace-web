@@ -10,15 +10,15 @@ if (!tab.get(tokenKey) && legacy.get(tokenKey)) tab.set(tokenKey, legacy.get(tok
 legacy.remove(tokenKey);
 let refreshPromise = null;
 let generation = 0;
+export const sessionEpoch=()=>generation;
 const device = () => ({ name: "Navigateur Web", platform: "Web" });
 const messages = {
   account_locked: "Compte temporairement verrouillé après plusieurs tentatives. Réessayez plus tard.",
   inactive_account: "Ce compte est désactivé. Contactez l’administrateur Workspace.",
-  passkey_not_available: "Aucune passkey n’est disponible pour ce compte.",
+  passkey_not_available: "Aucune passkey n’est enregistrée pour ce site sur ce compte.",
   invalid_credentials: "Adresse e-mail ou mot de passe incorrect.",
   invalid_refresh_token: "Votre session a expiré. Reconnectez-vous.",
   invalid_or_expired_invitation: "Cette invitation est invalide ou expirée. Demandez une nouvelle invitation.",
-  invalid_recovery_code: "Ce code de récupération est invalide ou a déjà été utilisé.",
   invalid_passkey: "La passkey n’a pas pu être vérifiée.",
   forbidden: "Votre compte ne dispose pas de cet accès.",
   member_already_exists: "Un compte utilise déjà cette adresse. Connectez-vous avec ce compte."

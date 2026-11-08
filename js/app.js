@@ -1,3 +1,4 @@
+import { areaBranch, toolsSection, nativeTopbar, unifiedNavigation, folderSidebar } from "./native/shell.js";
 import { focusTabs, focusHeader, renderSpaces } from "./focus-navigation.js";
 import { configureMobile, openTools } from "./mobile.js";
 import { openFocusSearch } from "./focus-search.js";
@@ -6,7 +7,7 @@ import { supportsRecord, renderRecord } from "./focus-records.js";
 import { CORE_DOMAIN_BY_SECTION } from "./config.js";
 import { authContext } from "./auth-flow.js";
 import { state,setState,setRoute,subscribe,setAppearance } from "./store.js";
-import { SECTIONS,NAV_AREAS,canAccessSection,canAccessSubpage,iconPath,realtimeURL,navigationAreaForSection,navigationAreaDestination } from "./config.js";
+import { SECTIONS,NAV_AREAS,LEGACY_SUBPAGES,canAccessSection,canAccessSubpage,iconPath,realtimeURL,navigationAreaForSection,navigationAreaDestination } from "./config.js";
 import { refreshSession,loadMe,loadWorkspace,loadDomainCatalog,logout,hasStoredSession } from "./api.js";
 import { renderAuth } from "./modules/auth.js";
 import { h,icon,iconButton,emptyState,skeletonPage,toast,errorMessage,relativeDate,modal,announce,profileAvatar,roleLabel } from "./ui.js";
@@ -19,16 +20,11 @@ function safeRoute(){
   const accessible=accessibleSections();
   if(!accessible.includes(state.route.section)){setRoute(accessible.includes("dashboard")?"dashboard":accessible[0]||"profile");return false}
   const section=SECTIONS[state.route.section];
-  if(state.route.subpage&&section?.subpages&&!section.subpages.some(p=>p.id===state.route.subpage&&canAccessSubpage(p,state.user))){setRoute(state.route.section,section.subpages.find(p=>canAccessSubpage(p,state.user))?.id||"");return false}
+  if(state.route.subpage&&section?.subpages&&![...section.subpages,...(LEGACY_SUBPAGES[state.route.section]||[])].some(p=>p.id===state.route.subpage&&canAccessSubpage(p,state.user))){setRoute(state.route.section,section.subpages.find(p=>canAccessSubpage(p,state.user))?.id||"");return false}
   return true;
 }
 function displayName(user){return `${user?.firstName||user?.first_name||""} ${user?.lastName||user?.last_name||""}`.trim()||user?.email||"Membre"}
-function navigationAreaItem(area){
-  const active=area.sections.includes(state.route.section),destination=navigationAreaDestination(area,state.user);
-  if(!destination||!canAccessSection(destination,state.user))return null;
-  const section=SECTIONS[destination];
-  return h("button",{class:`nav-item nav-area-item ${active?"active":""}`,type:"button","aria-current":active?"page":null,onClick:()=>setRoute(destination,section?.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("img",{class:"nav-icon",src:iconPath(area.icon,active),alt:"",width:19,height:19,decoding:"async"}),h("span",{class:"nav-label",text:area.title}));
-}
+function navigationAreaItem(area){ return areaBranch(area); }
 function sidebarShortcut(label,section,iconName,subpage=""){
   if(!canAccessSection(section,state.user))return null;
   return h("button",{class:"sidebar-shortcut",type:"button","aria-label":`Ouvrir ${label}`,onClick:()=>setRoute(section,subpage)},icon(iconName,15),h("span",{text:label}));
@@ -47,16 +43,11 @@ function sidebar(){
   const canCreate=["OWNER","ADMIN"].includes(u?.role)||(u?.permissions||[]).some(permission=>/^(manage|create|sendMail)/.test(permission));
   nav.append(
     h("div",{class:"studio-nav-section native-nav-areas"},h("span",{class:"studio-nav-heading",text:"Workspace"}),...NAV_AREAS.map(navigationAreaItem).filter(Boolean)),
-    h("section",{class:"studio-nav-section sidebar-files","aria-label":"Dossiers"},h("span",{class:"studio-nav-heading",text:"Dossiers"}),
-      sidebarShortcut("Bibliothèque générale","resources","folder"),
-      sidebarShortcut("Documents","documents","documents"),
-      sidebarShortcut("Squared Docs","documents","document"),
-      canAccessSection("documents",state.user)?h("button",{class:"sidebar-shortcut sidebar-create",type:"button",onClick:()=>setRoute("documents")},icon("add",14),h("span",{text:"Créer un dossier"})):null
-    ),
-    sidebarTeam()
+    folderSidebar(),
+    sidebarTeam(), toolsSection()
   );
   return h("aside",{class:"sidebar"},
-    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:36,height:36,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{text:"v1.0.0"}))),
+    h("div",{class:"brand"},h("img",{class:"brand-logo",src:"/assets/squaredgroup-logo.png",alt:"Squared Group",width:36,height:36,decoding:"async"}),h("div",{class:"brand-copy"},h("strong",{text:"Squared Workspace"}),h("span",{text:"Version web"}))),
     h("div",{class:`sidebar-quick-actions ${canCreate?"":"no-create"}`},canCreate?h("button",{class:"sidebar-new",type:"button",onClick:openTools},icon("add",15),h("span",{text:"Nouveau"})):null,h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Rechercher dans Workspace",onClick:openCommand},icon("search",15)),notificationButton("Ouvrir les notifications"),h("button",{class:"sidebar-quick-icon",type:"button","aria-label":"Synchroniser le Workspace",onClick:event=>refreshWorkspace(event.currentTarget)},icon("sync",15))),
     nav,
     h("div",{class:"sidebar-footer"},h("button",{class:"sidebar-settings",type:"button",onClick:()=>setRoute("settings")},icon("settings",16),h("span",{text:"Paramètres"})),h("button",{class:"account-card",type:"button",onClick:()=>setRoute("profile")},profileAvatar(u,{className:"avatar",size:34,ariaHidden:true}),h("div",{class:"account-meta"},h("strong",{text:displayName(u)}),h("span",{text:u?.email||roleLabel(u?.role)})),icon("More",15)))
@@ -79,33 +70,9 @@ async function refreshWorkspace(button){
   catch(error){toast(errorMessage(error),"error",6000)}
   finally{setState({loading:false});if(button.isConnected){button.disabled=false;button.removeAttribute("aria-busy")}}
 }
-function topbar(){
-  if(matchMedia("(max-width: 880px)").matches)return focusHeader({search:openCommand,tools:openTools,refresh:refreshWorkspace});
-  const refresh=iconButton("sync","Actualiser les données",event=>refreshWorkspace(event.currentTarget));refresh.classList.add("desktop-only");
-  const effectiveTheme=document.documentElement.dataset.theme||"dark";
-  const greeting=h("div",{class:"native-greeting"},h("span",{class:"native-greeting-emoji","aria-hidden":"true",text:"👋"}),h("span",{text:`Bonjour, ${displayName(state.user)}`}));
-  return h("header",{class:"topbar"},
-    h("div",{class:"menu-toggle"},iconButton("grid","Ouvrir le menu",()=>setState({sidebarOpen:!state.sidebarOpen}))),
-    h("div",{class:"native-history"},iconButton("ArrowLeft","Page précédente",()=>history.back()),iconButton("ArrowRight","Page suivante",()=>history.forward())),
-    greeting,
-    h("span",{class:"native-role",text:roleLabel(state.user?.role)}),
-    h("button",{class:"native-global-search",type:"button","aria-label":"Recherche",onClick:openCommand},icon("search",15),h("span",{text:"Rechercher dans Workspace"}),h("kbd",{text:"⌘ K"})),
-    h("div",{class:"top-actions"},systemState(),refresh,notificationButton(),iconButton("settings","Paramètres",()=>setRoute("settings")),iconButton(effectiveTheme==="light"?"moon":"sun","Changer de thème",()=>setAppearance({mode:effectiveTheme==="light"?"dark":"light"})),h("button",{class:"icon-button native-logout",type:"button","aria-label":"Déconnexion",title:"Déconnexion",onClick:async()=>{await logout()}},h("span",{"aria-hidden":"true",text:"↗"})),h("button",{class:"top-profile",type:"button","aria-label":"Ouvrir le profil",onClick:()=>setRoute("profile")},profileAvatar(state.user,{size:30,ariaHidden:true})),h("button",{class:"native-add",type:"button","aria-label":"Créer dans Workspace",onClick:openTools},icon("add",15)))
-  );
-}
-function moduleTabs(){
-  const area=navigationAreaForSection(state.route.section)||NAV_AREAS[0];
-  const sections=area.sections.filter(key=>canAccessSection(key,state.user));
-  if(!sections.length)return null;
-  return h("nav",{class:"native-module-tabs","aria-label":`Navigation ${area.title}`},...sections.map(key=>{
-    const active=key===state.route.section,section=SECTIONS[key];
-    return h("button",{type:"button",class:active?"active":"","aria-current":active?"page":null,"aria-label":`Ouvrir ${section.title}`,onClick:()=>setRoute(key,section.subpages?.find(page=>canAccessSubpage(page,state.user))?.id||"")},h("span",{text:section.title}),key==="training"?h("small",{text:"BUILD"}):null);
-  }));
-}
-function subnav(){
-  if(state.route.item)return null;
-  if(["tasks","missions"].includes(state.route.section)&&matchMedia("(max-width: 880px)").matches)return h("nav",{class:"subnav focus-work-switch","aria-label":"Travail"},...["tasks","projects","planning","missions"].filter(key=>canAccessSection(key,state.user)).map(key=>h("button",{type:"button",class:key===state.route.section?"active":"","aria-current":key===state.route.section?"page":null,text:SECTIONS[key].title,onClick:()=>setRoute(key,SECTIONS[key].subpages?.find(p=>canAccessSubpage(p,state.user))?.id||"")})));
-  const s=SECTIONS[state.route.section];if(!s?.subpages?.length||s.internalNavigation)return null;const pages=s.subpages.filter(p=>canAccessSubpage(p,state.user));return h("nav",{class:"subnav","aria-label":`Sous-navigation ${s.title}`},...pages.map(page=>h("button",{class:state.route.subpage===page.id?"active":"",type:"button","aria-current":state.route.subpage===page.id?"page":null,onClick:()=>setRoute(state.route.section,page.id),text:page.title})))}
+function topbar(){ return nativeTopbar({search:openCommand,refresh:refreshWorkspace,notifications:notificationButton,logout:async()=>{await logout()}}); }
+function moduleTabs(){ return unifiedNavigation(); }
+function subnav(){ return null; }
 function buildShell(){
   if(!safeRoute())return;
   app.replaceChildren();
@@ -118,15 +85,19 @@ function refreshChrome(){
   if(!refs.shell)return;
   refs.shell.querySelector(".sidebar")?.replaceWith(sidebar());
   refs.shell.querySelector(".topbar")?.replaceWith(topbar());
-  refs.shell.querySelector(".native-module-tabs")?.replaceWith(moduleTabs());
+  refs.shell.querySelector(".sq-unified-tabs")?.replaceWith(moduleTabs());
   refs.shell.querySelector(".mobile-tabs")?.replaceWith(mobileTabs());
   refs.shell.classList.toggle("sidebar-open",state.sidebarOpen);
+  refs.shell.classList.toggle("sq-sidebar-collapsed",!!state.desktopSidebarCollapsed);
   const banner=refs.main.querySelector(".network-banner");
   if(!state.online&&!banner)refs.main.querySelector(".topbar")?.after(h("div",{class:"network-banner"},icon("warning",15),h("span",{text:"Connexion interrompue. Les données affichées restent visibles ; aucune action n’est envoyée automatiquement."})));
   if(state.online)banner?.remove();
 }
+window.addEventListener("sq:sidebar-update",()=>refreshChrome());
 window.addEventListener("sq:navigation-preferences",()=>{document.querySelectorAll(".sq-mobile-pins").forEach(node=>node.remove());refreshChrome();});
 async function sectionPage(section,subpage){
+  const { renderNativePage } = await import("./native/router.js");
+  const nativePage = await renderNativePage(section,subpage); if(nativePage)return nativePage;
   if(section==="spaces")return renderSpaces();
   if(section==="planning"&&subpage==="personal"){
     const {renderPersonalPlanning}=await import("./modules/personal-planning.js");return renderPersonalPlanning();
@@ -139,7 +110,7 @@ async function sectionPage(section,subpage){
   if(section==="webContent"){const {renderCMSStudio}=await import("./modules/cms-studio.js");return renderCMSStudio(subpage||"overview")}
   if(SECTIONS[section]?.cms){const {renderCMS}=await import("./modules/cms.js");return renderCMS(section)}
   if(section==="mailbox"){const {renderMailbox}=await import("./modules/mailbox.js");return renderMailbox(subpage||"mailbox")}
-  if(section==="messages"){const {renderMessages}=await import("./modules/messages.js");return renderMessages()}
+  if(section==="messages"){const {renderMessages}=await import("./modules/messages.js");return renderMessages(subpage)}
   if(section==="support"&&["","tickets-clients","demandes-internes"].includes(subpage)){const {renderSupport}=await import("./modules/support.js");return renderSupport(subpage||"tickets-clients")}
   if(section==="notifications"){const {renderNotifications}=await import("./modules/notifications.js");return renderNotifications()}
   if(section==="training"){const {renderTraining}=await import("./modules/training.js");return renderTraining()}
@@ -239,3 +210,5 @@ function signature(){return JSON.stringify({profileRevision:state.profileRevisio
 subscribe(()=>{if(!uiReady||!state.user)return;const before=uiSignature?JSON.parse(uiSignature):{};const next=signature();if(next===uiSignature)return;const after=JSON.parse(next);uiSignature=next;if(!refs.shell){buildShell();return}const routeChanged=JSON.stringify(before.route)!==JSON.stringify(after.route);refreshChrome();if(routeChanged)renderCurrent({focus:true})});
 matchMedia("(max-width: 880px)").addEventListener("change",()=>{if(uiReady){refreshChrome();if(!document.querySelector(".overlay"))renderCurrent({focus:false});}});
 bootstrap().catch(error=>{resetInterface();toast(errorMessage(error),"error")});
+
+window.addEventListener("sq:refresh",()=>{void refreshWorkspace(document.createElement("button"));});

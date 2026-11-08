@@ -1,5 +1,6 @@
 export function formatMoney(value, currency = "EUR", fallback = "Montant non renseigné") {
-  const raw = String(value ?? "").trim();
+  const raw = String((value&&typeof value==="object"?value.amount:value) ?? "").trim();
+  if(value&&typeof value==="object"&&value.currency)currency=value.currency;
   if (!raw) return fallback;
   const normalized = raw.replace(/\s/g, "").replace(",", ".");
   if (!/^[0-9]+(?:\.[0-9]{1,2})?$/.test(normalized)) return raw;

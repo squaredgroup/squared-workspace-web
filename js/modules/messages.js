@@ -229,11 +229,11 @@ function newConversation(reload) {
     } }]
   });
 }
-export async function renderMessages() {
+export async function renderMessages(subpage="messages") {
   const currentOwner = state.user?.id || "member";
   if (owner !== currentOwner) { resetMessages(); owner = currentOwner; }
   const context=viewContext("messages",{query:"",filter:"all"});
-  listQuery=context.query;listMode=["all","unread","pinned","archived"].includes(context.filter)?context.filter:"all";
+  listQuery=context.query;listMode=["unread","pinned","archived"].includes(subpage)?subpage:"all";context.filter=listMode;
   unsubscribeView?.(); const version = ++generation;
   selectedId=state.route.item||null;
   const root = h("div", { class: "sq-messages" }), left = h("div", { class: "sq-inbox-body" }), right = h("div", { class: "sq-thread-content" });
@@ -282,7 +282,7 @@ export async function renderMessages() {
     resultsLabel.textContent = ({ all: "Derniers échanges", unread: "À lire", pinned: "Épinglées", archived: "Archives" })[listMode];
     const shortcuts = activeConversations.filter(conversation => pinned.has(conversation.id));
     pinnedRail.hidden = listMode !== "all" || Boolean(term) || !shortcuts.length;
-    pinnedRail.replaceChildren(...shortcuts.map(conversation => h("button", { type: "button", class: "sq-pinned-shortcut", "aria-label": `Ouvrir la conversation épinglée ${conversation.name || "Conversation"}`, onClick: () => openConversation(conversation.id, true) }, profileAvatar(conversationPerson(conversation), { size: 44, ariaHidden: true }), h("span", { text: conversation.name || "Conversation", title: conversation.name || "Conversation" }), icon("star", 11))));
+    pinnedRail.replaceChildren(...shortcuts.map(conversation => h("button", { type: "button", class: "sq-pinned-shortcut", "aria-label": `Ouvrir la conversation épinglée ${conversation.name || "Conversation"}`, onClick: () => openConversation(conversation.id, true) }, profileAvatar(conversationPerson(conversation), { size: 44, ariaHidden: true }), h("span", { text: conversation.name || "Conversation", title: conversation.name || "Conversation" }), icon("star", 11,true))));
     results.replaceChildren(filtered.length ? h("div", { class: "mail-list" }, ...filtered.map(conversation => {
       const messages = conversationMessages(conversation), last = messages.at(-1), unread = Math.max(0, Number(conversation.unread) || 0);
       const draft = getDraft(conversation.id);
@@ -292,7 +292,7 @@ export async function renderMessages() {
         profileAvatar(conversationPerson(conversation), { className: "conversation-avatar", size: 46, ariaHidden: true }),
         h("span", { class: "mail-item-content" },
           h("span", { class: "sq-conversation-topline" }, h("strong", { title: conversation.name || "Conversation", text: conversation.name || "Conversation" }), h("time", { class: "sq-conversation-time", datetime: last && messageDate(last) || null, text: last ? conversationTime(messageDate(last)) : "" })),
-          h("span", { class: "sq-conversation-bottomline" }, lastAttachment && !draft ? icon(attachmentKind(lastAttachment) === "image" ? "image" : "document", 13) : null, h("p", { class: draft ? "sq-conversation-draft" : "", text: draft ? "Brouillon · " + draft.slice(0, 70) : lastSummary }), unread ? h("span", { class: "conversation-unread", "aria-label": `${unread} messages non lus`, text: unread > 99 ? "99+" : String(unread) }) : pinned.has(conversation.id) ? icon("star", 13) : null)));
+          h("span", { class: "sq-conversation-bottomline" }, lastAttachment && !draft ? icon(attachmentKind(lastAttachment) === "image" ? "image" : "document", 13) : null, h("p", { class: draft ? "sq-conversation-draft" : "", text: draft ? "Brouillon · " + draft.slice(0, 70) : lastSummary }), unread ? h("span", { class: "conversation-unread", "aria-label": `${unread} messages non lus`, text: unread > 99 ? "99+" : String(unread) }) : pinned.has(conversation.id) ? h("span",{class:"sq-pin-filled"},icon("star", 13,true)) : null)));
     })) : emptyState(term || listMode !== "all" ? "Aucun résultat" : "Aucune conversation", term ? "Aucune conversation ne correspond à cette recherche." : listMode === "archived" ? "Aucune conversation archivée." : listMode === "pinned" ? "Aucune conversation épinglée." : listMode === "unread" ? "Aucune conversation non lue." : "Créez une conversation avec un membre Workspace.", "messages"));
     resultCount.textContent = `${filtered.length} conversation(s)`;
   }
@@ -535,7 +535,7 @@ export async function renderMessages() {
     const contextHint = h("div", { class: "message-reply-hint" });
     if (linkedContext) contextHint.replaceChildren(h("span", { text: `${linkedContext.subtitle} · ${linkedContext.title}` }), button("Retirer", { small: true, onClick: () => { linkedContext = null; contextHint.replaceChildren(); } }));
     const contextButton = button("Lier un élément", { small: true, onClick: () => {
-      const kinds = [["projects", "project", "Projet"], ["missions", "mission", "Mission"], ["tasks", "task", "Tâche"], ["validations", "validation", "Validation"], ["deliverables", "deliverable", "Livrable"], ["contracts", "contract", "Contrat"], ["documents", "document", "Document"]];
+      const kinds = [["projects", "project", "Projet"], ["missions", "mission", "Mission"], ["tasks", "task", "Tâche"], ["validations", "validation", "Validation"], ["deliverables", "deliverable", "Livrable"], ["contracts", "contract", "Contrat"], ["documents", "document", "Document"], ["clients", "client", "Client"], ["resources", "resource", "Ressource"], ["events", "event", "Rendez-vous"]];
       const options = kinds.flatMap(([collection, kind, label]) => (state.workspace?.[collection] || []).filter(item => item.id).map(item => ({ entityKind: kind, entityID: item.id, title: item.title || item.name || item.reference || label, subtitle: label, projectID: item.projectID || null })));
       if (!options.length) { toast("Aucun élément Workspace visible à lier.", "error"); return; }
       const choice = h("select", {}, ...options.map((item, index) => h("option", { value: String(index), text: `${item.subtitle} · ${item.title}` })));

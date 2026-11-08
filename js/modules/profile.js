@@ -1,5 +1,6 @@
+import { canAccessSection } from '../config.js';
 import { state,setAppearance,setRoute } from "../store.js";
-import { updateMe,loadSecurity,updateSecurity,changePassword,listSessions,revokeSession,loadSettings,saveSettings,recoveryCodes,createPasskeyOptions,registerPasskey } from "../api.js";
+import { updateMe,loadSecurity,updateSecurity,changePassword,listSessions,revokeSession,loadSettings,saveSettings,createPasskeyOptions,registerPasskey } from "../api.js";
 import { createPasskey } from "../webauthn.js";
 import { profilePhotoControl } from "../profile-photo.js";
 import { h,icon,pageHeader,card,button,field,input,select,validateControls,toast,errorMessage,row,emptyState,modal,confirmAction,badge,advancedEditor,profileAvatar,roleLabel } from "../ui.js";
@@ -26,24 +27,18 @@ async function securityCard(){
     const mfa=h("input",{type:"checkbox",checked:Boolean(sec.multiFactorEnabled)}),alerts=h("input",{type:"checkbox",checked:Boolean(sec.loginAlertsEnabled)});
     host.append(
       h("div",{class:"setting-list"},
-        settingRow("Authentification multifacteur","Exige une seconde vérification lors des connexions sensibles.",mfa),
+        settingRow("Authentification multifacteur","Exige une passkey après le mot de passe lors de la connexion.",mfa),
         settingRow("Alertes de connexion","Signale les nouvelles connexions selon la politique de votre compte.",alerts)
       ),
+      h("p",{class:"muted",text:"Pour utiliser la MFA sur ce site, ajoutez une passkey depuis ce navigateur avant de l’activer."}),
       h("div",{class:"card-actions"},
         button("Enregistrer",{kind:"primary",iconName:"check",onClick:async()=>{try{sec=await updateSecurity({multiFactorEnabled:mfa.checked,loginAlertsEnabled:alerts.checked});toast("Sécurité mise à jour")}catch(error){toast(errorMessage(error),"error")}}}),
-        button("Ajouter une passkey",{iconName:"key",onClick:async()=>{try{const challenge=await createPasskeyOptions();const response=await createPasskey(challenge.publicKey);await registerPasskey(challenge.challengeId,response,`Web · ${navigator.platform||"Navigateur"}`);toast("Passkey enregistrée")}catch(error){toast(errorMessage(error),"error",6000)}}}),
+        button("Ajouter une passkey pour ce site",{iconName:"key",onClick:async()=>{try{const challenge=await createPasskeyOptions();const response=await createPasskey(challenge.publicKey);await registerPasskey(challenge.challengeId,response,`Web · ${navigator.platform||"Navigateur"}`);toast("Passkey enregistrée")}catch(error){toast(errorMessage(error),"error",6000)}}}),
         button("Changer le mot de passe",{onClick:passwordModal})
-      ),
-      button("Générer de nouveaux codes de récupération",{kind:"ghost",iconName:"shield",onClick:async()=>{
-        try{
-          const data=await recoveryCodes(),codes=data.codes||data.recoveryCodes||data;
-          const list=Array.isArray(codes)?codes:[];
-          modal({title:"Codes de récupération",content:h("div",{class:"stack"},h("p",{class:"page-subtitle",text:"Conservez ces codes dans un endroit sûr. Un code utilisé ne doit pas être réutilisé."}),list.length?h("div",{class:"recovery-grid"},...list.map(code=>h("code",{text:String(code)}))):advancedEditor("Réponse serveur",h("pre",{class:"json-view",text:JSON.stringify(data,null,2)})))});
-        }catch(error){toast(errorMessage(error),"error")}
-      }})
+      )
     );
   }catch(error){host.append(emptyState("Sécurité indisponible",errorMessage(error),"warning"))}
-  return card("Sécurité","Passkeys, MFA et récupération du compte.",host,{iconName:"shield"});
+  return card("Sécurité","Passkeys et authentification multifacteur.",host,{iconName:"shield"});
 }
 function passwordModal(){
   const current=input("",{type:"password",autocomplete:"current-password",required:true}),next=input("",{type:"password",autocomplete:"new-password",required:true,minLength:10});
@@ -77,15 +72,15 @@ const SETTINGS_DESTINATIONS=[
 ];
 
 function settingsDirectory(){
-  return h("section",{class:"settings-directory","aria-label":"Rubriques des paramètres"},...SETTINGS_DESTINATIONS.map(([title,copy,iconName,section,subpage])=>h("button",{type:"button",class:"settings-destination",onClick:()=>setRoute(section,subpage||"")},h("span",{class:"settings-destination-icon"},icon(iconName,18)),h("span",{},h("strong",{text:title}),h("small",{text:copy})),icon("ChevronRight",14))));
+  return h("section",{class:"settings-directory","aria-label":"Rubriques des paramètres"},...SETTINGS_DESTINATIONS.filter(([, , ,section])=>canAccessSection(section,state.user)).map(([title,copy,iconName,section,subpage])=>h("button",{type:"button",class:"settings-destination",onClick:()=>setRoute(section,subpage||"")},h("span",{class:"settings-destination-icon"},icon(iconName,18)),h("span",{},h("strong",{text:title}),h("small",{text:copy})),icon("ChevronRight",14))));
 }
 
 export async function renderSettings(subpage=""){
-  const root=h("div",{class:"settings-page"});root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Le centre de réglages de l’app : compte, expérience, accès, données et opérations."}),settingsDirectory());
+  const root=h("div",{class:"settings-page"});const directory=settingsDirectory();directory.classList.add("sq-settings-nav");const pane=h("div",{class:"sq-settings-content"}),layout=h("div",{class:"sq-settings-layout"},directory,pane);root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Compte, expérience, accès, données et opérations.",actions:[button("Préférences complètes",{iconName:"sliders",onClick:async()=>{const{openOperation}=await import("../native/workflows.js");return openOperation("put_settings",{context:await loadSettings()});}})]}),layout);
   try{
     let settings=await loadSettings();
     const densityValue=String(settings.dashboardDensity||"balanced").toLowerCase().replace("équilibrée","balanced").replace("aérée","airy").replace("dense","dense");
-    const theme=select(settings.appearanceMode||"dark",[{value:"system",label:"Système"},{value:"dark",label:"Sombre"},{value:"light",label:"Clair"}]);
+    const theme=select(settings.appearanceMode==="light"?"light":"dark",[{value:"light",label:"Clair"},{value:"dark",label:"Sombre"}]);
     const density=select(densityValue,[{value:"airy",label:"Aérée"},{value:"balanced",label:"Équilibrée"},{value:"dense",label:"Dense"}]);
     const width=select(settings.contentWidth||"balanced",[{value:"focused",label:"Concentrée"},{value:"balanced",label:"Équilibrée"},{value:"wide",label:"Large"}]);
     const language=input(settings.language||"fr-FR"),timezone=input(settings.timezone||"Europe/Paris");
@@ -106,7 +101,7 @@ export async function renderSettings(subpage=""){
         }catch(error){toast(errorMessage(error),"error",6000)}
       }})
     );
-    root.append(h("div",{class:"grid two"},card("Apparence & expérience","Ces réglages s’appliquent immédiatement à la version Web.",experience,{iconName:"settings"}),await sessionsCard()));
+    pane.append(h("div",{class:"grid"},card("Apparence & expérience","Ces réglages s’appliquent immédiatement à la version Web.",experience,{iconName:"settings"}),await sessionsCard()));
   }catch(error){root.append(emptyState("Paramètres indisponibles",errorMessage(error),"warning"))}
   return root;
 }
