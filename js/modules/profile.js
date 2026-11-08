@@ -1,3 +1,4 @@
+import { canAccessSection } from '../config.js';
 import { state,setAppearance,setRoute } from "../store.js";
 import { updateMe,loadSecurity,updateSecurity,changePassword,listSessions,revokeSession,loadSettings,saveSettings,createPasskeyOptions,registerPasskey } from "../api.js";
 import { createPasskey } from "../webauthn.js";
@@ -71,15 +72,15 @@ const SETTINGS_DESTINATIONS=[
 ];
 
 function settingsDirectory(){
-  return h("section",{class:"settings-directory","aria-label":"Rubriques des paramètres"},...SETTINGS_DESTINATIONS.map(([title,copy,iconName,section,subpage])=>h("button",{type:"button",class:"settings-destination",onClick:()=>setRoute(section,subpage||"")},h("span",{class:"settings-destination-icon"},icon(iconName,18)),h("span",{},h("strong",{text:title}),h("small",{text:copy})),icon("ChevronRight",14))));
+  return h("section",{class:"settings-directory","aria-label":"Rubriques des paramètres"},...SETTINGS_DESTINATIONS.filter(([, , ,section])=>canAccessSection(section,state.user)).map(([title,copy,iconName,section,subpage])=>h("button",{type:"button",class:"settings-destination",onClick:()=>setRoute(section,subpage||"")},h("span",{class:"settings-destination-icon"},icon(iconName,18)),h("span",{},h("strong",{text:title}),h("small",{text:copy})),icon("ChevronRight",14))));
 }
 
 export async function renderSettings(subpage=""){
-  const root=h("div",{class:"settings-page"});root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Le centre de réglages de l’app : compte, expérience, accès, données et opérations."}),settingsDirectory());
+  const root=h("div",{class:"settings-page"});const directory=settingsDirectory();directory.classList.add("sq-settings-nav");const pane=h("div",{class:"sq-settings-content"}),layout=h("div",{class:"sq-settings-layout"},directory,pane);root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Compte, expérience, accès, données et opérations.",actions:[button("Préférences complètes",{iconName:"sliders",onClick:async()=>{const{openOperation}=await import("../native/workflows.js");return openOperation("put_settings",{context:await loadSettings()});}})]}),layout);
   try{
     let settings=await loadSettings();
     const densityValue=String(settings.dashboardDensity||"balanced").toLowerCase().replace("équilibrée","balanced").replace("aérée","airy").replace("dense","dense");
-    const theme=select(settings.appearanceMode||"dark",[{value:"system",label:"Système"},{value:"dark",label:"Sombre"},{value:"light",label:"Clair"}]);
+    const theme=select(settings.appearanceMode==="light"?"light":"dark",[{value:"light",label:"Clair"},{value:"dark",label:"Sombre"}]);
     const density=select(densityValue,[{value:"airy",label:"Aérée"},{value:"balanced",label:"Équilibrée"},{value:"dense",label:"Dense"}]);
     const width=select(settings.contentWidth||"balanced",[{value:"focused",label:"Concentrée"},{value:"balanced",label:"Équilibrée"},{value:"wide",label:"Large"}]);
     const language=input(settings.language||"fr-FR"),timezone=input(settings.timezone||"Europe/Paris");
@@ -100,7 +101,7 @@ export async function renderSettings(subpage=""){
         }catch(error){toast(errorMessage(error),"error",6000)}
       }})
     );
-    root.append(h("div",{class:"grid two"},card("Apparence & expérience","Ces réglages s’appliquent immédiatement à la version Web.",experience,{iconName:"settings"}),await sessionsCard()));
+    pane.append(h("div",{class:"grid"},card("Apparence & expérience","Ces réglages s’appliquent immédiatement à la version Web.",experience,{iconName:"settings"}),await sessionsCard()));
   }catch(error){root.append(emptyState("Paramètres indisponibles",errorMessage(error),"warning"))}
   return root;
 }

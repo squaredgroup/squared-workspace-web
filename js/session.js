@@ -10,6 +10,7 @@ if (!tab.get(tokenKey) && legacy.get(tokenKey)) tab.set(tokenKey, legacy.get(tok
 legacy.remove(tokenKey);
 let refreshPromise = null;
 let generation = 0;
+export const sessionEpoch=()=>generation;
 const device = () => ({ name: "Navigateur Web", platform: "Web" });
 const messages = {
   account_locked: "Compte temporairement verrouillé après plusieurs tentatives. Réessayez plus tard.",

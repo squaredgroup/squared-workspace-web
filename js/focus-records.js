@@ -1,3 +1,5 @@
+import { mediaEditor,recordMedia } from './native/media.js';
+import { dataTable,actionMenu,statusDot,confirmDialog,downloadBlob } from './native/components.js';
 import { state, setRoute } from "./store.js";
 import { canAccessSection, SECTIONS } from "./config.js";
 import { getCoreEntity, saveCoreEntity, loadWorkspace, downloadFile, uploadFile, archiveCoreEntity } from "./api.js";
@@ -35,9 +37,9 @@ function choiceWithCurrent(value,options,label) {
   if(value&&!all.some(item=>String(item.value)===String(value)))all.push({value,label:"Valeur liée non chargée — conservée"});
   return select(value,all);
 }
-export function editRecord(domain,record=null,reload=async()=>{}) {
+export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   if(!canEditRecord(domain)){toast("Cette modification n’est pas autorisée.","error");return;}
-  const original=record||{},editing=Boolean(original.id),person=state.user?.id;
+  const original=record||defaults,editing=Boolean(original.id),person=state.user?.id;let savedRecord=record;const media=mediaEditor(domain,record?.id);
   if(editing&&!(Number(original.version)>0)){toast("Actualisez le détail avant de modifier cet élément.","error");return;}
   const title=input(record?titleOf(record):"",{required:true,maxLength:240,placeholder:domain==="tasks"?"Que faut-il faire ?":"Donnez un titre clair"});
   const status=select(valueOf(original,"status")||(domain==="tasks"?"pending":"draft"),statusOptions(domain,original));
@@ -62,6 +64,7 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
   if(remuneration&&currency){content.append(h("div",{class:"form-row"},field("Rémunération",remuneration,"Facultative ; elle sera affichée dans la proposition envoyée."),field("Devise",currency)));controls.push(remuneration,currency);}
   if(client&&amount&&currency){content.append(h("div",{class:"form-row"},field("Partie contractante",client),field("Montant",amount)),field("Devise",currency));controls.push(client,amount,currency);}
   content.append(metadata);
+  content.prepend(media.node);
   const error=h("p",{class:"focus-form-error",role:"alert",hidden:true});content.append(error);
   let dirty=false,busy=false;
   content.addEventListener("input",()=>dirty=true);content.addEventListener("change",()=>dirty=true);
@@ -71,7 +74,7 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
     if(!title.value.trim()){title.setCustomValidity("Saisissez un titre.");title.reportValidity();title.addEventListener("input",()=>title.setCustomValidity(""),{once:true});return;}
     if(!state.online){error.hidden=false;error.textContent="Connexion nécessaire pour enregistrer. La saisie reste dans cette fenêtre.";return;}
     busy=true;error.hidden=true;
-    const body=entityBody(original);body.title=title.value.trim();body.status=status.value;
+    const body=entityBody(savedRecord||original);body.title=title.value.trim();body.status=status.value;
     putValue(body,domain==="missions"?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"],description.value);
     if(controls.includes(project)){
       body.parentId=project.value||null;
@@ -85,14 +88,15 @@ export function editRecord(domain,record=null,reload=async()=>{}) {
     if(remuneration&&currency){putValue(body,["remuneration"],remuneration.value.trim()||null);putValue(body,["currency"],remuneration.value.trim()?currency.value.trim().toUpperCase():null);}
     if(client&&amount&&currency){putValue(body,["client"],client.value.trim());putValue(body,["amount"],amount.value.trim());putValue(body,["currency"],currency.value.trim().toUpperCase());}
     try {
-      await saveCoreEntity(domain,body);
+      savedRecord=await saveCoreEntity(domain,body);
       if(state.user?.id!==person)return;
+      await media.save(savedRecord.id);
       dirty=false;busy=false;close();toast(editing?"Modifications enregistrées":"Élément créé");
       try{await loadWorkspace();await reload();}catch{toast("Enregistrement confirmé. Actualisez la liste lorsque le réseau revient.","error");}
     }catch(e){if(state.user?.id===person){error.hidden=false;error.textContent=errorMessage(e);}}
     finally{busy=false;}
   };
-  dialog=modal({title:`${editing?"Modifier":"Créer"} · ${domainLabels[domain]||domain}`,content,wide:true,className:"focus-editor-dialog",beforeClose:()=>!busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
+  dialog=modal({title:`${editing?"Modifier":"Créer"} · ${domainLabels[domain]||domain}`,content,wide:true,className:"focus-editor-dialog",onClose:media.dispose,beforeClose:()=>!busy&&(!dirty||window.confirm("Abandonner les modifications non enregistrées ?")),actions:[{label:"Enregistrer",kind:"primary",icon:"check",onClick:save}]});
   content.addEventListener("submit",e=>{e.preventDefault();void save(dialog.close);});
 }
 export async function finishTask(record,reload=async()=>{}) {
@@ -119,34 +123,12 @@ export function recordRow(domain,record,{onRefresh,compact=false}={}) {
   if(domain==="tasks"&&canEditRecord(domain)&&!isFinished(record))row.append(button("Terminer",{small:true,kind:"ghost",ariaLabel:`Terminer ${titleOf(record)}`,onClick:()=>finishTask(record,onRefresh)}));
   return row;
 }
-export function recordList(domain,items,reload,{writable=canEditRecord(domain)}={}) {
-  const context=viewContext(`records:${state.route.section}:${state.route.subpage}:${domain}`,{query:"",status:"all",scope:"all",sort:"due",view:"all",limit:30});
-  const root=h("div",{class:"focus-collection"}),results=h("div",{class:"focus-record-list"}),summary=h("p",{class:"focus-summary",role:"status","aria-live":"polite"}),more=button("Afficher la suite",{kind:"ghost",onClick:()=>{context.limit+=30;draw();}});
-  const search=h("input",{type:"search",class:"search-input",placeholder:`Rechercher dans ${domainLabels[domain]?.toLowerCase()||"la liste"}…`,value:context.query,"aria-label":"Rechercher dans la liste"});
-  const states=[...new Set(items.map(item=>valueOf(item,"status")).filter(Boolean))];
-  if(context.status!=="all"&&!states.includes(context.status))context.status="all";
-  const status=select(context.status,[{value:"all",label:"Tous les statuts"},...states.map(value=>({value,label:statusLabel(value)}))]);status.setAttribute("aria-label","Filtrer par statut");
-  const scope=select(context.scope,[{value:"all",label:"Périmètre visible"},{value:"mine",label:"Affecté à moi"},{value:"unassigned",label:"Non affecté"}]);scope.setAttribute("aria-label","Périmètre des éléments");
-  const sort=select(context.sort,[{value:"due",label:"Échéances"},{value:"recent",label:"Plus récents"},{value:"title",label:"Titre A–Z"}]);sort.setAttribute("aria-label","Trier les éléments");
-  const filters=h("details",{class:"focus-filters"},h("summary",{},icon("sliders",18),h("span",{text:"Filtres et tri"}))),filterBody=h("div",{class:"focus-filter-body"},field("Statut",status),field("Périmètre",scope),field("Trier",sort));filters.append(filterBody);
-  for(const [control,key] of [[status,"status"],[scope,"scope"],[sort,"sort"]])control.addEventListener("change",()=>{context[key]=control.value;context.limit=30;draw();});
-  search.addEventListener("input",()=>{context.query=search.value;context.limit=30;draw();});
-  const heading=h("div",{class:"focus-list-controls"},search,filters);
-  if(writable)heading.append(button(domain==="tasks"?"Nouvelle tâche":"Nouveau",{kind:"primary",iconName:"add",onClick:()=>editRecord(domain,null,reload)}));
-  const views=h("div",{class:"studio-list-views",role:"group","aria-label":"Vue de la liste"});
-  for(const [value,label] of [["all","Tout"],["active","À traiter"],["overdue","En retard"],["completed","Terminés"]])views.append(button(label,{kind:"ghost",small:true,pressed:context.view===value,onClick:()=>{context.view=value;context.limit=30;draw();},className:`studio-view-${value}`}));
-  const reset=button("Réinitialiser",{small:true,kind:"ghost",className:"studio-list-reset",onClick:()=>{Object.assign(context,{query:"",status:"all",scope:"all",view:"all",sort:"due",limit:30});search.value="";status.value="all";scope.value="all";sort.value="due";draw();}});
-  root.append(heading,views,summary,results,more);
-  function draw(){
-    const term=normalize(context.query.trim());
-    const visible=items.filter(item=>(context.status==="all"||valueOf(item,"status")===context.status)&&(context.view==="all"||(context.view==="completed"?isFinished(item):!isFinished(item)&&(context.view!=="overdue"||dueBucket(item)==="overdue")))&&(context.scope==="all"||(context.scope==="mine"?isMine(item,state.user?.id):!assigneeOf(item)))&&normalize(`${titleOf(item)} ${valueOf(item,"description","detail")} ${statusLabel(valueOf(item,"status"))}`).includes(term));
-    visible.sort((a,b)=>context.sort==="title"?titleOf(a).localeCompare(titleOf(b),"fr"):context.sort==="recent"?new Date(valueOf(b,"updatedAt","updated_at","createdAt")||0)-new Date(valueOf(a,"updatedAt","updated_at","createdAt")||0):String(dueOf(a)||"9999").localeCompare(String(dueOf(b)||"9999")));
-    summary.replaceChildren(h("span",{text:`${visible.length} résultat${visible.length>1?"s":""} · ${context.scope==="mine"?"affectés à vous":context.scope==="unassigned"?"non affectés":"votre périmètre autorisé"}`}),term||context.status!=="all"||context.scope!=="all"||context.view!=="all"?reset:null);
-    for(const [index,value] of ["all","active","overdue","completed"].entries())views.children[index].setAttribute("aria-pressed",String(context.view===value));
-    results.replaceChildren(...(visible.length?visible.slice(0,context.limit).map(item=>recordRow(domain,item,{onRefresh:reload})): [emptyState("Aucun élément à afficher",term||context.status!=="all"?"Modifiez vos filtres ou votre recherche.":"Les éléments accessibles apparaîtront ici.",sectionForDomain(domain))]));
-    more.hidden=visible.length<=context.limit;
-  }
-  draw();return root;
+export function recordList(domain,items,reload,{writable=canEditRecord(domain)}={}){
+ const root=h('div',{class:'sq-pane'}),archived=new Set(state.workspace?.intelligence?.archivedEntityIDs||[]),visible=items.filter(r=>!archived.has(r.id));
+ const open=r=>openRecord(domain,r.id),share=async rows=>{const{shareRecords}=await import('./native/records.js');return shareRecords(domain,rows);},archive=async(rows,archived=false)=>{const{archiveRecords}=await import('./native/trash.js');const kind=({projects:'project',missions:'mission',tasks:'task',events:'event',documents:'document',contracts:'contract',clients:'client',validations:'validation',deliverables:'deliverable',resources:'resource'})[domain];await archiveRecords(rows,kind,{archived});await loadWorkspace();await reload();};
+ const actions=r=>[{label:'Ouvrir',icon:'Show',group:'Consulter',run:()=>open(r)},...(writable?[{label:'Modifier',icon:'edit',group:'Gérer',run:()=>editRecord(domain,r,reload)}]:[]),...(state.user?.permissions?.includes('sendMessages')?[{label:'Partager dans une conversation',icon:'share',group:'Diffuser',run:()=>share([r])}]:[]),...(writable?[{label:'Archiver',icon:'archive',group:'Conserver',run:()=>archive([r],true)},{label:'Mettre à la corbeille',icon:'trash',danger:true,group:'Supprimer',run:()=>archive([r])}]:[])];
+ if(writable)root.append(h('div',{class:'sq-viewer-toolbar'},button('Nouveau',{kind:'primary',iconName:'add',onClick:()=>editRecord(domain,null,reload)})));
+ root.append(dataTable({rows:visible,name:domain,onOpen:open,columns:[{id:'title',label:domainLabels[domain]||'Titre',value:titleOf},{id:'status',label:'Statut',value:r=>statusLabel(valueOf(r,'status')),render:r=>statusDot(valueOf(r,'status'),statusLabel(valueOf(r,'status')))},{id:'responsible',label:'Responsable',value:r=>memberName(list('team').find(m=>m.id===assigneeOf(r)))},{id:'due',label:'Échéance',value:r=>dueOf(r)?dateLabel(dueOf(r)):'Sans échéance'},{id:'project',label:'Projet',value:r=>titleOf(list('projects').find(p=>p.id===parentOf(r))||{})}],actions,selectionActions:rows=>[...(state.user?.permissions?.includes('sendMessages')?[{label:'Partager la sélection',icon:'share',group:'Diffuser',run:()=>share(rows)}]:[]),...(writable?[{label:'Archiver la sélection',icon:'archive',group:'Conserver',run:()=>archive(rows,true)},{label:'Mettre à la corbeille',icon:'trash',danger:true,group:'Supprimer',run:()=>archive(rows)}]:[])]}));return root;
 }
 export async function renderRecord(domain,id) {
   const section=sectionForDomain(domain),root=h("div",{class:"focus-detail"});
@@ -160,6 +142,7 @@ export async function renderRecord(domain,id) {
   if(canEditRecord(domain))actions.push(button("Modifier",{iconName:"edit",onClick:()=>editRecord(domain,record,redraw)}));
   if(["missions","contracts"].includes(domain)&&canEditRecord(domain)&&state.user?.permissions?.includes("sendMessages"))actions.push(button("Proposer dans une conversation",{iconName:"messages",kind:"primary",onClick:async()=>{const {openRecordProposal}=await import("./message-proposals.js");openRecordProposal(domain,record,redraw);}}));
   root.append(pageHeader({eyebrow:domainLabels[domain],title:titleOf(record),subtitle:statusLabel(valueOf(record,"status")),actions}));
+  try{root.append(await recordMedia(domain,id));}catch{}
   const metadata=h("dl",{class:"focus-properties"});
   const property=(label,value)=>{if(value!==""&&value!==null&&value!==undefined)metadata.append(h("div",{},h("dt",{text:label}),value instanceof Node?h("dd",{},value):h("dd",{text:value})));};
   property("Échéance",dueOf(record)?dateLabel(dueOf(record)):"Sans échéance");

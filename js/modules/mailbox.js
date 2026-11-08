@@ -88,8 +88,9 @@ function conversationMessage(mail,index,total){
   return details;
 }
 const compose = (reload, replyTo = null, draft = null) => openMailComposer(reload, replyTo, draft);
-async function mailboxMain(){
+async function mailboxMain(subpage="mailbox"){
   const context=viewContext("mailbox",{folder:"INBOX",query:"",filter:"ALL",selectedId:""});
+  const routedFolder=({mailbox:"INBOX",sent:"SENT",drafts:"DRAFTS",starred:"STARRED",archived:"ARCHIVED"})[subpage];if(routedFolder&&context.folder!==routedFolder){context.folder=routedFolder;context.selectedId="";}
   let {folder,query,filter}=context,selected=null,searchTimer=null,generation=0,reading=0,listY=0;
   const root=h("div",{class:"focus-mail"}),listHost=h("div"),detailHost=h("div"),results=h("div");
   const folderNav=h("nav",{class:"subnav","aria-label":"Dossiers de messagerie"});
@@ -165,7 +166,7 @@ export async function renderMailbox(subpage="mailbox"){
   if(subpage==="templates")return templatesView();
   if(subpage==="appearance")return styleView();
   if(subpage==="connections")return connectionView();
-  return mailboxMain();
+  return mailboxMain(subpage);
 }
 async function connectionView(){
   const root=h("div"),details=h("div");

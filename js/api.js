@@ -1,5 +1,5 @@
 import { state, setState } from "./store.js";
-import { request, setSession, refreshSession, APIError } from "./session.js";
+import { request, setSession, refreshSession, APIError,sessionEpoch } from "./session.js";
 import { apiURL } from "./config.js";
 export { APIError, request, setSession, clearSession, refreshSession, logout, hasStoredSession, probeConnection } from "./session.js";
 const DEVICE = () => ({ name: "Navigateur Web", platform: "Web" });
@@ -110,14 +110,19 @@ export async function saveSpecialized(kind, entity) {
 export async function archiveSpecialized(kind, id, version) { await writeWithFreshWorkspaceRevision(() => request(`/v1/domain-data/${kind}/${id}?version=${version}`, { method: "DELETE", headers: { "If-Match": state.workspaceEtag || '"0"' } })); }
 
 export async function uploadFile(file, entityType, entityId) {
-  if (file.size > 25 * 1024 * 1024) throw new Error("Le fichier dépasse la limite de 25 Mo.");
+  const actor=state.user?.id,epoch=sessionEpoch();const guard=()=>{if(state.user?.id!==actor||sessionEpoch()!==epoch)throw new Error("Le compte a changé. Import interrompu.");};
+  if (file.size > 256 * 1024 * 1024) throw new Error("Le fichier dépasse la limite de 256 Mo.");
   const bytes = await file.arrayBuffer();
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const checksum = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
+  guard();
   const { data: upload } = await request("/v1/files/upload-url", { method: "POST", body: { fileName: file.name, contentType: file.type || "application/octet-stream", byteCount: file.size, entityType, entityId } });
-  await request(`/v1/files/${upload.fileId}/content`, { method: "PUT", rawBody: bytes, contentType: file.type || "application/octet-stream", timeoutMs: 120000 });
+  guard();
+  if(upload.chunkSize){for(let offset=0,part=1;offset<bytes.byteLength;offset+=upload.chunkSize,part++){guard();await request(`/v1/files/${upload.fileId}/parts/${part}`,{method:"PUT",rawBody:bytes.slice(offset,offset+upload.chunkSize),contentType:"application/octet-stream",timeoutMs:120000});}}
+  else await request(`/v1/files/${upload.fileId}/content`, { method: "PUT", rawBody: bytes, contentType: file.type || "application/octet-stream", timeoutMs: 120000 });
+  guard();
   await request(`/v1/files/${upload.fileId}/complete`, { method: "POST", body: { checksum, byteCount: file.size }, timeoutMs: 120000 });
-  return { id: upload.fileId, fileName: file.name, storageKey: upload.fileId, mediaType: file.type || "application/octet-stream", byteCount: file.size };
+  guard();return { id: upload.fileId, fileName: file.name, storageKey: upload.fileId, mediaType: file.type || "application/octet-stream", byteCount: file.size,checksum };
 }
 export async function fetchFileBlob(id, { signal } = {}) {
   const path = `/v1/files/${encodeURIComponent(id)}/content`;

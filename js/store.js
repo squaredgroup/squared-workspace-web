@@ -35,6 +35,10 @@ export function subscribe(listener){ listeners.add(listener); return () => liste
 export function notify(){ for(const listener of listeners) listener(state); }
 export function setState(patch){ Object.assign(state,patch); notify(); }
 export function updateState(mutator){ mutator(state); notify(); }
+export let navigationIndex=0,navigationLength=0;
+history.replaceState({...history.state,sqWorkspaceIndex:0},"",location.href);
+export function goBack(){if(navigationIndex>0)history.back();}
+export function goForward(){if(navigationIndex<navigationLength)history.forward();}
 export function setRoute(section,subpage="",item=""){
   state.route={section,subpage,...(item?{item}: {})}; state.sidebarOpen=false;
   const group=SECTIONS[section]?.group;
@@ -44,7 +48,7 @@ export function setRoute(section,subpage="",item=""){
     tab.set("sq-closed-nav-groups",JSON.stringify(state.closedGroups));
   }
   const encoded = `#/${section}${subpage?`/${encodeURIComponent(subpage)}`:""}${item?`?item=${encodeURIComponent(item)}`:""}`;
-  if(location.hash!==encoded) history.pushState(null,"",encoded);
+  if(location.hash!==encoded){navigationIndex++;navigationLength=navigationIndex;history.pushState({sqWorkspaceIndex:navigationIndex},"",encoded);}
   notify();
 }
 export function setGroupOpen(group,open){
@@ -56,7 +60,7 @@ export function setGroupOpen(group,open){
 }
 export function setAppearance(patch){ state.appearance={...state.appearance,...patch}; preferences.set("sq-web-appearance",JSON.stringify(state.appearance)); applyAppearance(); notify(); }
 export function applyAppearance(){
-  const preference=["light","dark","system"].includes(state.appearance.mode)?state.appearance.mode:"dark";
+  const preference=["light","dark"].includes(state.appearance.mode)?state.appearance.mode:"dark";
   const mode=preference==="system"?(colorScheme.matches?"light":"dark"):preference;
   const density=["dense","airy","balanced"].includes(state.appearance.density)?state.appearance.density:"balanced";
   const width=["focused","balanced","wide"].includes(state.appearance.contentWidth)?state.appearance.contentWidth:"balanced";
@@ -74,6 +78,7 @@ export function applyAppearance(){
 }
 const colorScheme=window.matchMedia?.("(prefers-color-scheme: light)")||{matches:false,addEventListener(){}};
 colorScheme.addEventListener?.("change",()=>{if(state.appearance.mode==="system"){applyAppearance();notify()}});
+window.addEventListener("popstate",()=>{navigationIndex=Number(history.state?.sqWorkspaceIndex)||0;});
 window.addEventListener("hashchange",()=>{
   state.route=initialRoute();
   const group=SECTIONS[state.route.section]?.group;

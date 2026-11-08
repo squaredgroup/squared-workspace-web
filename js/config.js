@@ -1,3 +1,4 @@
+import { NATIVE_PAGES, NATIVE_AREAS } from "./native/catalog.js";
 import { iconlyPath } from "./iconly.js";
 
 export const APP_NAME = "Squared Workspace";
@@ -14,16 +15,18 @@ export function realtimeURL(path = "/v1/realtime") {
 
 export const ICONS = {
   More:"MoreSquare", Expand:"Show", Paperclip:"Add", DoubleCheck:"Check",
+  communications:"Image",trash:"Trash",documentation:"Document",shortcuts:"Key",
   dashboard:"SidebarDashboard", today:"SidebarToday", projects:"SidebarProjects", missions:"SidebarMissions", tasks:"SidebarTasks", planning:"SidebarPlanning", map:"SidebarMap",
   businessUnits:"SidebarBusinessUnits", objectives:"SidebarObjectives", reports:"SidebarReports", finance:"SidebarFinance", timeExpenses:"SidebarTimeExpenses",
   validations:"SidebarValidations", deliverables:"SidebarDeliverables", contracts:"SidebarContracts", documents:"SidebarDocuments", resources:"SidebarResources",
   siteServices:"SidebarSiteServices", siteProducts:"SidebarSiteProducts", siteReferences:"SidebarSiteReferences", siteReleases:"SidebarSiteReleases", sitePublications:"SidebarSitePublications", siteMedia:"SidebarSiteMedia",
   messages:"CircleMessages", mailbox:"Mail", notifications:"Notification", activity:"Clock", clients:"Company", team:"Users", people:"User", securityOperations:"Shield", governance:"SidebarGovernance", support:"HelpSign", marketing:"Sparkles", automations:"Sync", training:"Star", profile:"User", settings:"Settings",
   webContent:"Globe", siteHelp:"HelpSign", siteTraining:"Star", siteInbox:"Mail", siteNewsletter:"Mail", siteSystem:"Grid", commercial:"Money", suppliers:"Bag",
-  folder:"Folder", chart:"Chart", globe:"Globe", archive:"Archive", calendar:"Calendar", clock:"Clock", users:"Users", wallet:"Wallet", trend:"Trend", money:"Money", bag:"Bag", warning:"Warning", shield:"Shield", document:"Document", check:"Check", company:"Company", key:"Key", user:"User", star:"Star", grid:"Grid", sliders:"Sliders", phone:"Phone", mail:"Mail", cloud:"Cloud", image:"Image", sync:"Sync", invoice:"Invoice", lock:"Lock", eyeOff:"EyeOff", sparkles:"Sparkles", search:"Search", add:"Add", edit:"Edit", trash:"Trash", logout:"Logout", send:"Send", download:"Download", upload:"Upload", external:"External", close:"Close", sun:"Sun", moon:"Moon", notification:"Notification"
+  folder:"Folder", chart:"Chart", globe:"Globe", inspector:"TopBarInspectorSearch",archive:"Archive", calendar:"Calendar", clock:"Clock", users:"Users", wallet:"Wallet", trend:"Trend", money:"Money", bag:"Bag", warning:"Warning", shield:"Shield", document:"Document", check:"SelectionCheckmark", company:"Company", key:"Key", user:"User", star:"Star", grid:"Grid", sliders:"Sliders", phone:"Phone", mail:"Mail", cloud:"Cloud", image:"Image", sync:"Sync", invoice:"Invoice", lock:"Lock", eyeOff:"EyeOff", sparkles:"Sparkles", search:"Search", add:"Add", edit:"Edit", trash:"Trash", logout:"Logout", send:"Send", download:"Download", upload:"Upload", external:"External", close:"CloseRemove", sun:"Sun", moon:"Moon", notification:"Notification"
 };
 
 export function iconPath(name, fill=false){
+  if(name==="inspector")return "/assets/icons/TopBarInspectorSearch.svg";
   const token = ICONS[name] || name || "Grid";
   return iconlyPath(token, fill);
 }
@@ -80,17 +83,15 @@ export const NAV_GROUPS = ["Pilotage","Général","Finance","Offre","Décision",
 // La navigation native présente neuf espaces stables. Les anciennes routes restent
 // disponibles dans Espaces, la recherche et les liens profonds, sans recréer une
 // sidebar interminable ni casser les favoris existants.
-export const NAV_AREAS = [
-  {id:"dashboard",title:"Tableau de bord",root:"dashboard",icon:"dashboard",sections:["dashboard","today","objectives","reports","businessUnits","governance","training"]},
-  {id:"projects",title:"Projets",root:"projects",icon:"projects",sections:["projects","missions","tasks","validations","deliverables"]},
-  {id:"planning",title:"Calendrier",root:"planning",icon:"planning",sections:["planning","map"]},
-  {id:"finance",title:"Finance",root:"finance",icon:"finance",sections:["finance","timeExpenses"]},
-  {id:"relations",title:"Relations",root:"clients",icon:"users",sections:["clients","commercial","suppliers","people"]},
-  {id:"documents",title:"Documents",root:"documents",icon:"documents",sections:["documents","contracts","resources"]},
-  {id:"communication",title:"Communication",root:"messages",icon:"messages",sections:["messages","mailbox","notifications"]},
-  {id:"marketing",title:"Marketing",root:"marketing",icon:"marketing",sections:["marketing"]},
-  {id:"sites",title:"Mes sites",root:"webContent",icon:"webContent",sections:["webContent","siteServices","siteProducts","siteReferences","siteReleases","sitePublications","siteHelp","siteMedia","siteInbox","siteNewsletter"]}
-];
+export const LEGACY_SUBPAGES=Object.fromEntries(Object.entries(SECTIONS).map(([key,value])=>[key,value.subpages||[]]));
+for(const [key,pages] of Object.entries(NATIVE_PAGES))if(SECTIONS[key])SECTIONS[key].subpages=pages.every(p=>p.id.startsWith('pilotage-'))?[...(SECTIONS[key].subpages||[]),...pages]:pages;
+SECTIONS.communications={title:"Communication",group:"Communication",permissions:["manageTeam"],subpages:NATIVE_PAGES.communications};
+SECTIONS.siteSystem={title:"Mes sites",group:"Administration",permissions:["manageCMS"],subpages:NATIVE_PAGES.siteSystem};
+SECTIONS.trash={title:"Corbeille",group:"Outils et aide"};
+SECTIONS.documentation={title:"Documentation",group:"Outils et aide"};
+SECTIONS.shortcuts={title:"Raccourcis clavier",group:"Outils et aide"};
+for(const [key,id,title] of [['dashboard','dashboard','Tableau de bord'],['today','today','Aujourd’hui'],['businessUnits','poles','Pôles & entités'],['documents','files','Fichiers'],['webContent','studio','Contenus & CMS']])if(!SECTIONS[key].subpages?.some(p=>p.id===id))SECTIONS[key].subpages=[{id,title,permissions:[]},...(SECTIONS[key].subpages||[])];
+export const NAV_AREAS = NATIVE_AREAS;
 
 export function navigationAreaForSection(sectionKey){
   return NAV_AREAS.find(area=>area.sections.includes(sectionKey)) || null;
