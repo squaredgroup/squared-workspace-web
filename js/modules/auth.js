@@ -87,15 +87,16 @@ export function renderAuth(onAuthenticated, { message = "", restoring = false } 
   const stage = h("div", { class: "auth-stage" });
   const panel = h("section", { class: "auth-panel" },
     h("div", { class: "auth-panel-top" },
-      h("div", { class: "auth-mobile-brand" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "" }), h("div", {}, h("strong", { text: "Squared Workspace" }), h("span", { text: "Executive operating system" }))),
+      h("div", { class: "auth-mobile-brand" }, h("img", { src: "/assets/squaredgroup-logo.png", alt: "" }), h("div", {}, h("strong", { text: "Squared Workspace" }), h("span", { text: "Votre espace de travail" }))),
       h("div", { class: "auth-panel-tools" }, h("div", { class: "auth-private" }, icon("lock", 14), h("span", { text: "Accès privé" })), themeControl())),
+    h("img", { class: "sq-workspace-sticker sq-login-sticker", src: "/assets/workspace-sticker.png", alt: "", width: 128, height: 128 }),
     stage,
     h("div", { class: "auth-panel-foot" }, h("span", { text: "Squared Group" }), h("span", { text: "Environnement sécurisé" })));
   const showGrid = !authContext.action || authContext.action === "activation";
   const visual = h("section", { class: "auth-visual" }, showGrid ? h("div", { class: "auth-grid" }) : null,
     h("div", { class: "auth-orb auth-orb-one" }), h("div", { class: "auth-orb auth-orb-two" }),
-    h("div", { class: "auth-brand" }, h("img", { class: "auth-mark", src: "/assets/squaredgroup-logo.png", alt: "" }), h("div", {}, h("strong", { text: "Squared Workspace" }), h("span", { text: "Executive operating system" }))),
-    h("div", { class: "auth-visual-copy" },
+    h("div", { class: "auth-brand" }, h("img", { class: "auth-mark", src: "/assets/squaredgroup-logo.png", alt: "" }), h("div", {}, h("strong", { text: "Squared Workspace" }), h("span", { text: "Votre espace de travail" }))),
+    h("div", { class: "auth-visual-copy" }, h("img", { class: "sq-workspace-sticker sq-auth-sticker", src: "/assets/workspace-sticker.png", alt: "", width: 180, height: 180 }),
       h("div", { class: "auth-visual-status" }, h("span", { class: "auth-live-dot" }), "Espace opérationnel"),
       h("div", { class: "auth-kicker", text: "Le centre de commandement Squared" }),
       h("h1", {}, "Pilotez tout.", h("br"), h("span", { text: "Restez alignés." })),
@@ -103,7 +104,7 @@ export function renderAuth(onAuthenticated, { message = "", restoring = false } 
       h("div", { class: "auth-capabilities" },
         h("div", {}, icon("grid", 17), h("span", {}, h("strong", { text: "Vue unifiée" }), h("small", { text: "Toute l’activité au même endroit" }))),
         h("div", {}, icon("shield", 17), h("span", {}, h("strong", { text: "Accès maîtrisé" }), h("small", { text: "Permissions et sessions protégées" }))),
-        h("div", {}, icon("sync", 17), h("span", {}, h("strong", { text: "Toujours synchronisé" }), h("small", { text: "Un espace commun, sur chaque appareil" })))))
+        h("div", {}, icon("sync", 17), h("span", {}, h("strong", { text: "Un espace partagé" }), h("small", { text: "Un espace commun, sur chaque appareil" })))))
   );
   app.replaceChildren(h("main", { id:"workspace-main", class: "auth-screen", tabindex:"-1" }, visual, panel));
   if (authContext.action === "activation") showActivation(stage, onAuthenticated);

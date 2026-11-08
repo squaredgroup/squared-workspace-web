@@ -44,7 +44,7 @@ function passwordModal(){
   const current=input("",{type:"password",autocomplete:"current-password",required:true}),next=input("",{type:"password",autocomplete:"new-password",required:true,minLength:10});
   modal({title:"Changer le mot de passe",content:h("div",{class:"form"},field("Mot de passe actuel",current),field("Nouveau mot de passe",next,"10 caractères minimum avec majuscule, minuscule et chiffre.")),actions:[{label:"Modifier",kind:"primary",icon:"check",onClick:async close=>{try{if(!validateControls(current,next))return;await changePassword(current.value,next.value);current.value="";next.value="";toast("Mot de passe modifié. Reconnectez-vous sur vos autres appareils.");close()}catch(error){toast(errorMessage(error),"error")}}}]});
 }
-const SETTINGS_DESTINATIONS=[
+const SETTINGS_DESTINATIONS=[["À propos","Version et ressources Workspace","document","settings","about"],
   ["Compte","Profil, identité et appareils","user","profile"],
   ["Notifications","Canaux, alertes et synthèses","notification","notifications"],
   ["Apparence","Thème, couleurs et interface","sparkles","settings","appearance"],
@@ -76,6 +76,8 @@ function settingsDirectory(){
 }
 
 export async function renderSettings(subpage=""){
+  if(subpage==='updates'){const {workspaceUpdates}=await import('../native/about.js');return workspaceUpdates();}
+  if(subpage==='about'){const {aboutWorkspace}=await import('../native/about.js');return aboutWorkspace();}
   const root=h("div",{class:"settings-page"});const directory=settingsDirectory();directory.classList.add("sq-settings-nav");const pane=h("div",{class:"sq-settings-content"}),layout=h("div",{class:"sq-settings-layout"},directory,pane);root.append(pageHeader({eyebrow:"Workspace",title:"Paramètres",subtitle:"Compte, expérience, accès, données et opérations.",actions:[button("Préférences complètes",{iconName:"sliders",onClick:async()=>{const{openOperation}=await import("../native/workflows.js");return openOperation("put_settings",{context:await loadSettings()});}})]}),layout);
   try{
     let settings=await loadSettings();

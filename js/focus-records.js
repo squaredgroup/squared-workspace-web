@@ -46,7 +46,7 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   if(!canEditRecord(domain)){toast("Cette modification n’est pas autorisée.","error");return;}
   const original=record||defaults,oldTaskProfile=domain==='tasks'?taskProfile(record?.id):null,editing=Boolean(original.id),person=state.user?.id;let savedRecord=record,profileBaseline=oldTaskProfile;const media=mediaEditor(domain,record?.id);
   if(editing&&!(Number(original.version)>0)){toast("Actualisez le détail avant de modifier cet élément.","error");return;}
-  const title=input(record?titleOf(record):"",{required:true,maxLength:240,placeholder:domain==="tasks"?"Que faut-il faire ?":"Donnez un titre clair"});
+  const title=input(record?titleOf(record):(defaults.title||defaults.name||""),{required:true,maxLength:240,placeholder:domain==="tasks"?"Que faut-il faire ?":"Donnez un titre clair"});
   const status=select(valueOf(original,"status")||(domain==="tasks"?"pending":["projects","missions"].includes(domain)?"planned":"active"),statusOptions(domain,original));
   if(domain==="validations")status.disabled=true;
   const description=textarea(valueOf(original,...(["missions","projects"].includes(domain)?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||oldTaskProfile?.description||"",{rows:4,maxLength:20000,placeholder:"Contexte, résultat attendu, informations utiles…"});
