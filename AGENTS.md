@@ -43,6 +43,12 @@ Une demande comme « synchronise Workspace Web avec l’app » autorise le parco
 - Conserver dans le dépôt web une référence versionnée de synchronisation, par exemple `docs/native-parity.json` : fichiers natifs concernés, empreintes de leur contenu, révision Git de référence et écarts encore ouverts. Exclure secrets, données métier, caches et binaires générés. Actualiser cette référence après le report effectif des changements ; ne pas marquer un écart bloqué comme terminé.
 - Terminer par un compte rendu court : changements reportés, version publiée, lien du site et écarts restants. Distinguer implémentation, compilation, publication et validation manuelle. Une compilation ou une empreinte de fichier ne prouve pas la fidélité du rendu ni le fonctionnement d’un parcours.
 
+## Référence de synchronisation
+
+- Consulter `docs/native-parity.json` pour la couverture et les écarts connus.
+- `python3 scripts/native-reference.py` compare les empreintes actuelles, y compris le travail non commité, à la dernière référence ; cette commande ne lance pas l’app et n’est pas un test.
+- Après le report effectif et la revue des changements, `python3 scripts/native-reference.py --record-reviewed` actualise cet inventaire. Préserver séparément les écarts non résolus ; une empreinte observée ne signifie pas qu’une fonction a été validée.
+
 ## Modification des consignes seules
 
 Une demande limitée à ce fichier ne déclenche pas une synchronisation du produit, une compilation ou une publication du site. Relire le contenu et le diff, puis enregistrer les consignes dans le dépôt sans lancer de tests.

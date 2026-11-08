@@ -1,0 +1,14 @@
+import { buildField } from './workflows.js';
+import { valueOf } from '../focus-model.js';
+const text={type:'string',maxLength:20000},uuid={type:'string',format:'uuid',anyOf:[{type:'string',format:'uuid'},{type:'null'}]},array=properties=>({type:'array',maxItems:100,items:{type:'object',properties:{id:{type:'string',format:'uuid'},...properties},required:['id','title']}});
+export function missionBriefEditor(record){
+ const before=valueOf(record,'brief')||{},definitions=[
+ ['Présentation',{type:{type:'string',enum:['Production','Conseil','Audit','Conception','Développement','Formation','Maintenance','Recherche','Autre']},isDraft:{type:'boolean'},proposedAssigneeID:uuid}],
+ ['Travail attendu',{objective:text,instructions:text,methods:text,outOfScope:text,deliverableDetails:array({title:{type:'string',minLength:1},format:{type:'string',default:''},instructions:{...text,default:''}}),steps:array({title:{type:'string',minLength:1},isCompleted:{type:'boolean'}})}],
+ ['Organisation',{milestones:array({title:{type:'string',minLength:1},targetAt:{type:'string',format:'date-time',default:new Date().toISOString()},isCompleted:{type:'boolean'},amount:{type:'string'}}),resourceLinks:array({title:{type:'string'},url:{type:'string',format:'uri'}}),accessRequirements:text}],
+ ['Validation',{validatorID:uuid,handoffMode:{type:'string',enum:['Dans Squared Workspace','Lien de partage','Réunion de restitution','E-mail','Autre']},restitution:text,restitutionDurationMinutes:{type:'integer',minimum:1,maximum:480},revisionPolicy:text}],
+ ['Rémunération',{paymentMode:{type:'string',enum:['À définir','Forfait','Taux horaire','Taux journalier','Par livrable','Par jalon','Sans rémunération']},paymentTerms:text,authorizedExpenses:text,expenseCap:{type:'string'},visibility:{type:'string',enum:['Équipe du projet','Responsable et gestionnaires']},internalNotes:text}]
+ ];
+ const defaults={type:'Production',isDraft:false,handoffMode:'Dans Squared Workspace',paymentMode:'À définir',visibility:'Équipe du projet',...before},groups=definitions.map(([title,properties])=>({title,field:buildField({type:'object',properties},title,defaults,{context:record,generateIDs:true})}));
+ return{groups,read(){const result={...before};for(const group of groups)Object.assign(result,group.field.read());if((!record.id||before.objective)&&String(result.objective||'').trim().length<8)throw Error('Décrivez l’objectif concret de la mission.');if((!record.id||before.objective)&&!(result.deliverableDetails?.length||result.expectedDeliverables?.length))throw Error('Ajoutez au moins un livrable attendu.');for(const link of result.resourceLinks||[]){let url;try{url=new URL(link.url);}catch{}if(!link.title?.trim()||!['https:','http:'].includes(url?.protocol))throw Error('Donnez un titre et une adresse web valide à chaque ressource liée.');}return result;}};
+}

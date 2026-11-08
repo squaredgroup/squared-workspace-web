@@ -14,6 +14,7 @@ export function realtimeURL(path = "/v1/realtime") {
 
 
 export const ICONS = {
+  home:"Home",folderOpen:"FolderOpen",messagesCircle:"CircleMessages",pin:"Pin",payment:"Payment",personAdd:"PersonAdd",
   More:"MoreSquare", Expand:"Show", Paperclip:"Add", DoubleCheck:"Check",
   communications:"Image",trash:"Trash",documentation:"Document",shortcuts:"Key",
   dashboard:"SidebarDashboard", today:"SidebarToday", projects:"SidebarProjects", missions:"SidebarMissions", tasks:"SidebarTasks", planning:"SidebarPlanning", map:"SidebarMap",
@@ -91,6 +92,7 @@ SECTIONS.trash={title:"Corbeille",group:"Outils et aide"};
 SECTIONS.documentation={title:"Documentation",group:"Outils et aide"};
 SECTIONS.shortcuts={title:"Raccourcis clavier",group:"Outils et aide"};
 for(const [key,id,title] of [['dashboard','dashboard','Tableau de bord'],['today','today','Aujourd’hui'],['businessUnits','poles','Pôles & entités'],['documents','files','Fichiers'],['webContent','studio','Contenus & CMS']])if(!SECTIONS[key].subpages?.some(p=>p.id===id))SECTIONS[key].subpages=[{id,title,permissions:[]},...(SECTIONS[key].subpages||[])];
+SECTIONS.documents.title="Fichiers";SECTIONS.mailbox.title="Mail";SECTIONS.webContent.title="Base de données";SECTIONS.training.title="Formation BUILD";ICONS.training="Share";
 export const NAV_AREAS = NATIVE_AREAS;
 
 export function navigationAreaForSection(sectionKey){

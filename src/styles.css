@@ -15,6 +15,7 @@
 @import "../css/workspace.css";
 @import "../css/native-current.css";
 @import "../css/native-fidelity.css";
+@import "../css/native-sync.css";
 
 @source "../index.html";
 @source "../js/**/*.js";
