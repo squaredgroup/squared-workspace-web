@@ -47,6 +47,7 @@ Une demande comme « synchronise Workspace Web avec l’app » autorise le parco
 
 - Consulter `docs/native-parity.json` pour la couverture et les écarts connus.
 - `python3 scripts/native-reference.py` compare les empreintes actuelles, y compris le travail non commité, à la dernière référence ; cette commande ne lance pas l’app et n’est pas un test.
+- `python3 scripts/refresh-native-contracts.py` extrait et compare les schémas de `Backend/src` sans importer le serveur. Après revue, `--write` actualise le catalogue web ; réutiliser les dépendances ou le cache existants et configurer explicitement les droits de tout nouveau groupe. Cette analyse ne prouve pas le déploiement des routes.
 - Après le report effectif et la revue des changements, `python3 scripts/native-reference.py --record-reviewed` actualise cet inventaire. Préserver séparément les écarts non résolus ; une empreinte observée ne signifie pas qu’une fonction a été validée.
 
 ## Modification des consignes seules
