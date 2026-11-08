@@ -49,7 +49,8 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   const project=choiceWithCurrent(parentOf(original),list("projects").map(p=>({value:p.id,label:titleOf(p)})),"Aucun projet");
   const assignee=choiceWithCurrent(assigneeOf(original),list("team").map(m=>({value:m.id||m.memberId,label:memberName(m)})),"Non affecté");
   const oldDue=dueOf(original),date=input(dayKey(oldDue),{type:"date"});
-  const priority=choiceWithCurrent(valueOf(original,"priorityLevel","priority"),[{value:"low",label:"Basse"},{value:"normal",label:"Normale"},{value:"high",label:"Haute"},{value:"critical",label:"Critique"}],"Non définie");
+  const canonicalPriority=valueOf(original,"priorityLevel")||(domain==="tasks"?valueOf(original,"priority"):(["urgent","blocked"].includes(valueOf(original,"priority"))?"critical":"normal"));
+  const priority=choiceWithCurrent(canonicalPriority,[{value:"low",label:"Basse"},{value:"normal",label:"Normale"},{value:"high",label:"Haute"},{value:"critical",label:"Critique"}],"Non définie");
   const controls=[title,status,description],content=h("form",{class:"form focus-editor"},field(domain==="tasks"?"Tâche":"Titre",title),field(domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description",description));
   const remuneration=domain==="missions"?input(valueOf(original,"remuneration")||"",{placeholder:"Ex. 1 250,00 ou modalités convenues",maxLength:240}):null;
   const client=domain==="contracts"?input(valueOf(original,"client")||"",{placeholder:"Partie contractante",required:true,maxLength:240}):null;
@@ -67,6 +68,7 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   content.append(metadata);
   const optional=(type,extra={})=>({type,anyOf:[{type,...extra},{type:'null'}]});
   const properties=domain==='projects'?{clientID:optional('string',{format:'uuid'}),budgetAmount:optional('number',{minimum:0,maximum:1e12}),currency:{type:'string',pattern:'^[A-Z]{3}$'},startsAt:optional('string',{format:'date-time'}),objectives:{type:'string',maxLength:20000},successCriteria:{type:'string',maxLength:20000},objectiveDetails:{type:'array',maxItems:50,items:{type:'object',properties:{id:{type:'string',format:'uuid'},title:{type:'string',minLength:1},criterion:{type:'string'},target:{type:'string'},unit:{type:'string'},dueAt:optional('string',{format:'date-time'})},required:['id','title']}}}:domain==='missions'?{startsAt:optional('string',{format:'date-time'}),estimateHours:optional('number',{minimum:0,maximum:100000}),acceptanceCriteria:{type:'string',maxLength:20000}}:domain==='clients'?{contact:{type:'string'},email:{type:'string',format:'email'},phone:{type:'string'},address:{type:'string'},sector:{type:'string'}}:domain==='events'?{startsAt:optional('string',{format:'date-time'}),endsAt:optional('string',{format:'date-time'}),location:{type:'string'},meetingURL:{type:'string',format:'uri'}}:{};
+  for(const key of Object.keys(properties)){const current=valueOf(original,key);if(properties[key].type==='string'&&current&&typeof current==='object')delete properties[key];}
   const initial=Object.fromEntries(Object.keys(properties).map(key=>[key,valueOf(original,key)||(['objectiveDetails'].includes(key)?[]:key==='currency'?'EUR':undefined)]));
   if(domain==='projects'){const budget=valueOf(original,'budgetAmount');initial.budgetAmount=budget===''?null:budget;}
   const extra=Object.keys(properties).length?buildField({type:'object',properties},'Informations',initial,{context:original}):null;if(extra)content.append(extra.node);

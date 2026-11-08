@@ -16,7 +16,7 @@ export function assigneeOf(record) {
   return typeof value === "object" ? value?.id || "" : value;
 }
 export function isMine(record, userId) {
-  const ids = valueOf(record, "assigneeIds", "assigneeIDs", "assignedMemberIDs", "participantIDs");
+  const ids = valueOf(record, "assigneeIds", "assigneeIDs", "assignedMemberIDs", "participantIDs", "memberIDs");
   return Boolean(userId && (assigneeOf(record) === userId || (Array.isArray(ids) && ids.includes(userId))));
 }
 export function dayKey(value, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone) {
