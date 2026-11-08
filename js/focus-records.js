@@ -1,3 +1,4 @@
+import { buildField } from './native/workflows.js';
 import { mediaEditor,recordMedia } from './native/media.js';
 import { dataTable,actionMenu,statusDot,confirmDialog,downloadBlob } from './native/components.js';
 import { state, setRoute } from "./store.js";
@@ -16,7 +17,7 @@ const memberName=member=>member?.name||`${member?.firstName||member?.first_name|
 const statusOptions=(domain,record)=>{
   const fromCatalog=state.domainCatalog?.kinds?.find(k=>k.kind===domain)?.statuses;
   const existing=list(domain).map(item=>valueOf(item,"status")).filter(Boolean);
-  const defaults=domain==="tasks"?["pending","active","completed"]:domain==="validations"?["pending","approved","rejected"]:["draft","active","completed"];
+  const defaults=domain==="validations"?["pending","approved","rejected"]:["active","production","review","validation","pending","planned","tentative","postponed","cancelled","completed","approved","rejected","blocked","urgent","delivered","signature"];
   return [...new Set([valueOf(record,"status"),...(Array.isArray(fromCatalog)&&fromCatalog.length?fromCatalog:[...defaults,...existing])].filter(Boolean))].map(value=>({value,label:statusLabel(value)}));
 };
 export function openRecord(domain,id) {
@@ -42,13 +43,13 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
   const original=record||defaults,editing=Boolean(original.id),person=state.user?.id;let savedRecord=record;const media=mediaEditor(domain,record?.id);
   if(editing&&!(Number(original.version)>0)){toast("Actualisez le détail avant de modifier cet élément.","error");return;}
   const title=input(record?titleOf(record):"",{required:true,maxLength:240,placeholder:domain==="tasks"?"Que faut-il faire ?":"Donnez un titre clair"});
-  const status=select(valueOf(original,"status")||(domain==="tasks"?"pending":"draft"),statusOptions(domain,original));
+  const status=select(valueOf(original,"status")||(domain==="tasks"?"pending":["projects","missions"].includes(domain)?"planned":"active"),statusOptions(domain,original));
   if(domain==="validations")status.disabled=true;
-  const description=textarea(valueOf(original,...(domain==="missions"?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"",{rows:4,maxLength:20000,placeholder:"Contexte, résultat attendu, informations utiles…"});
+  const description=textarea(valueOf(original,...(["missions","projects"].includes(domain)?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"",{rows:4,maxLength:20000,placeholder:"Contexte, résultat attendu, informations utiles…"});
   const project=choiceWithCurrent(parentOf(original),list("projects").map(p=>({value:p.id,label:titleOf(p)})),"Aucun projet");
   const assignee=choiceWithCurrent(assigneeOf(original),list("team").map(m=>({value:m.id||m.memberId,label:memberName(m)})),"Non affecté");
   const oldDue=dueOf(original),date=input(dayKey(oldDue),{type:"date"});
-  const priority=choiceWithCurrent(valueOf(original,"priority"),[{value:"low",label:"Basse"},{value:"normal",label:"Normale"},{value:"high",label:"Haute"},{value:"urgent",label:"Urgente"}],"Non définie");
+  const priority=choiceWithCurrent(valueOf(original,"priorityLevel","priority"),[{value:"low",label:"Basse"},{value:"normal",label:"Normale"},{value:"high",label:"Haute"},{value:"critical",label:"Critique"}],"Non définie");
   const controls=[title,status,description],content=h("form",{class:"form focus-editor"},field(domain==="tasks"?"Tâche":"Titre",title),field(domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description",description));
   const remuneration=domain==="missions"?input(valueOf(original,"remuneration")||"",{placeholder:"Ex. 1 250,00 ou modalités convenues",maxLength:240}):null;
   const client=domain==="contracts"?input(valueOf(original,"client")||"",{placeholder:"Partie contractante",required:true,maxLength:240}):null;
@@ -60,10 +61,20 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
     content.append(h("div",{class:"form-row"},field("Responsable",assignee),field("Échéance",date,"Une date sans heure reste une date de calendrier.")));
     controls.push(assignee,date);
   }
-  if(domain==="tasks"){metadata.append(field("Priorité",priority));controls.push(priority);}
+  if(["projects","missions","tasks"].includes(domain)){metadata.append(field("Priorité",priority));controls.push(priority);}
   if(remuneration&&currency){content.append(h("div",{class:"form-row"},field("Rémunération",remuneration,"Facultative ; elle sera affichée dans la proposition envoyée."),field("Devise",currency)));controls.push(remuneration,currency);}
   if(client&&amount&&currency){content.append(h("div",{class:"form-row"},field("Partie contractante",client),field("Montant",amount)),field("Devise",currency));controls.push(client,amount,currency);}
   content.append(metadata);
+  const optional=(type,extra={})=>({type,anyOf:[{type,...extra},{type:'null'}]});
+  const properties=domain==='projects'?{clientID:optional('string',{format:'uuid'}),budgetAmount:optional('number',{minimum:0,maximum:1e12}),currency:{type:'string',pattern:'^[A-Z]{3}$'},startsAt:optional('string',{format:'date-time'}),objectives:{type:'string',maxLength:20000},successCriteria:{type:'string',maxLength:20000},objectiveDetails:{type:'array',maxItems:50,items:{type:'object',properties:{id:{type:'string',format:'uuid'},title:{type:'string',minLength:1},criterion:{type:'string'},target:{type:'string'},unit:{type:'string'},dueAt:optional('string',{format:'date-time'})},required:['id','title']}}}:domain==='missions'?{startsAt:optional('string',{format:'date-time'}),estimateHours:optional('number',{minimum:0,maximum:100000}),acceptanceCriteria:{type:'string',maxLength:20000}}:domain==='clients'?{contact:{type:'string'},email:{type:'string',format:'email'},phone:{type:'string'},address:{type:'string'},sector:{type:'string'}}:domain==='events'?{startsAt:optional('string',{format:'date-time'}),endsAt:optional('string',{format:'date-time'}),location:{type:'string'},meetingURL:{type:'string',format:'uri'}}:{};
+  const initial=Object.fromEntries(Object.keys(properties).map(key=>[key,valueOf(original,key)||(['objectiveDetails'].includes(key)?[]:key==='currency'?'EUR':undefined)]));
+  if(domain==='projects'){const budget=valueOf(original,'budgetAmount');initial.budgetAmount=budget===''?null:budget;}
+  const extra=Object.keys(properties).length?buildField({type:'object',properties},'Informations',initial,{context:original}):null;if(extra)content.append(extra.node);
+  const teamChoices=[];
+  if(domain==='projects'){
+   const selected=new Set(valueOf(original,'memberIDs')||[]),members=h('div',{class:'sq-member-options'}),search=input('',{type:'search',placeholder:'Rechercher un collaborateur…'});for(const member of list('team')){const id=member.id||member.memberId,choice=h('input',{type:'checkbox',checked:selected.has(id),value:id}),name=memberName(member),line=h('label',{class:'sq-check-row'},choice,h('span',{text:name}));teamChoices.push(choice);members.append(line);search.addEventListener('input',()=>line.hidden=!name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()));}content.append(field('Collaborateurs',h('div',{class:'stack'},search,members)));
+  }
+  const tags=['projects','missions','documents','resources'].includes(domain)?input((valueOf(original,'tags')||[]).join?.(', ')||valueOf(original,'tags')||'',{placeholder:'Étiquettes séparées par des virgules'}):null;if(tags)content.append(field('Étiquettes',tags));
   content.prepend(media.node);
   const error=h("p",{class:"focus-form-error",role:"alert",hidden:true});content.append(error);
   let dirty=false,busy=false;
@@ -75,19 +86,22 @@ export function editRecord(domain,record=null,reload=async()=>{},defaults={}) {
     if(!state.online){error.hidden=false;error.textContent="Connexion nécessaire pour enregistrer. La saisie reste dans cette fenêtre.";return;}
     busy=true;error.hidden=true;
     const body=entityBody(savedRecord||original);body.title=title.value.trim();body.status=status.value;
-    putValue(body,domain==="missions"?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"],description.value);
+    putValue(body,["missions","projects"].includes(domain)?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"],description.value);
     if(controls.includes(project)){
       body.parentId=project.value||null;
       if(Object.hasOwn(body,"parent_id"))body.parent_id=body.parentId;
       if(valueOf(original,"projectId","projectID","project_id"))putValue(body,["projectId","projectID","project_id"],body.parentId);
     }
-    if(controls.includes(assignee))putValue(body,["assigneeId","assigneeID","assignedToId","assignedToID","assignedTo","responsibleId","ownerId"],assignee.value||null);
+    if(controls.includes(assignee))putValue(body,domain==="projects"?["leadID","assigneeId","ownerId"]:domain==="missions"?["ownerID","assigneeId","ownerId"]:["assigneeID","assigneeId","assignedToId","assignedToID","assignedTo","responsibleId","ownerId"],assignee.value||null);
     // Do not erase an existing timestamp merely by opening and saving the form.
     if(controls.includes(date)&&date.value!==(dayKey(oldDue)))putValue(body,["dueAt","due_at","dueDate","deadline","startAt","start_at","startsAt"],date.value||null);
-    if(controls.includes(priority))putValue(body,["priority"],priority.value||null);
+    if(controls.includes(priority))putValue(body,[domain==="tasks"?"priority":"priorityLevel"],priority.value||null);
     if(remuneration&&currency){putValue(body,["remuneration"],remuneration.value.trim()||null);putValue(body,["currency"],remuneration.value.trim()?currency.value.trim().toUpperCase():null);}
     if(client&&amount&&currency){putValue(body,["client"],client.value.trim());putValue(body,["amount"],amount.value.trim());putValue(body,["currency"],currency.value.trim().toUpperCase());}
     try {
+      if(extra){const values=extra.read();if(domain==='projects'&&values.objectiveDetails)values.objectiveDetails=values.objectiveDetails.map(v=>({id:v.id,title:v.title||'',criterion:v.criterion||'',target:v.target||'',unit:v.unit||'',dueAt:v.dueAt||null}));for(const[key,value]of Object.entries(values))if(value!==undefined)putValue(body,[key],value);}
+      if(domain==='projects'){const ids=teamChoices.filter(c=>c.checked).map(c=>c.value);if(assignee.value&&!ids.includes(assignee.value))ids.push(assignee.value);putValue(body,['memberIDs'],ids);const lead=list('team').find(m=>(m.id||m.memberId)===assignee.value);if(lead)putValue(body,['lead'],memberName(lead));const clientID=valueOf(body,'clientID'),clientItem=list('clients').find(c=>c.id===clientID);if(clientItem)putValue(body,['client'],titleOf(clientItem));}
+      if(tags)putValue(body,['tags'],[...new Set(tags.value.split(',').map(v=>v.trim()).filter(Boolean))]);
       savedRecord=await saveCoreEntity(domain,body);
       if(state.user?.id!==person)return;
       await media.save(savedRecord.id);
@@ -152,7 +166,7 @@ export async function renderRecord(domain,id) {
   const project=list("projects").find(p=>p.id===parentOf(record));if(project&&canAccessSection("projects",state.user))property("Projet",button(titleOf(project),{small:true,kind:"ghost",iconName:"folder",onClick:()=>openRecord("projects",project.id)}));
   const release=valueOf(record,"revision","revisionNumber","versionName","fileVersion");property(domain==="deliverables"?"Version du livrable":"Version de l’enregistrement",release||record.version||"Non renseignée");
   property("Dernière mise à jour",valueOf(record,"updatedAt","updated_at")?dateLabel(valueOf(record,"updatedAt","updated_at")):null);
-  root.append(h("div",{class:"studio-record-layout"},h("div",{class:"studio-record-main"},h("section",{class:"focus-brief"},h("h2",{text:domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description"}),h("p",{text:valueOf(record,...(domain==="missions"?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"Aucune description renseignée."}))),metadata));
+  root.append(h("div",{class:"studio-record-layout"},h("div",{class:"studio-record-main"},h("section",{class:"focus-brief"},h("h2",{text:domain==="missions"?"Résumé":domain==="contracts"?"Périmètre du contrat":"Description"}),h("p",{text:valueOf(record,...(["missions","projects"].includes(domain)?["summary","description","detail","body"]:domain==="contracts"?["scope","description","detail","body"]:["description","detail","body"]))||"Aucune description renseignée."}))),metadata));
   if(domain==="tasks"&&!isFinished(record)&&canEditRecord(domain))root.append(button("Terminer la tâche",{kind:"primary",iconName:"check",onClick:()=>finishTask(record,redraw)}));
   if(domain==="projects"){
     for(const child of ["tasks","deliverables","documents"]){

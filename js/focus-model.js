@@ -12,7 +12,7 @@ export const statusOf = record => normalize(valueOf(record, "status", "state"));
 export const isFinished = record => /^(completed|done|closed|archived|approved|rejected|cancelled|canceled|paid)$/.test(statusOf(record));
 export const parentOf = record => valueOf(record, "parent_id", "parentId", "projectId", "projectID", "project_id");
 export function assigneeOf(record) {
-  const value = valueOf(record, "assigneeId", "assigneeID", "assignedToId", "assignedToID", "assignedTo", "responsibleId", "ownerId");
+  const value = valueOf(record, "assigneeId", "assigneeID", "assignedToId", "assignedToID", "assignedTo", "responsibleId", "ownerId", "ownerID", "leadID");
   return typeof value === "object" ? value?.id || "" : value;
 }
 export function isMine(record, userId) {
@@ -42,7 +42,7 @@ export function dateLabel(value, timeZone) {
   const [y,m,d] = key.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", { day:"numeric", month:"short", year:"numeric" }).format(new Date(y,m-1,d,12));
 }
-export const statusLabel = value => ({pending:"À faire",active:"En cours",in_progress:"En cours",completed:"Terminé",done:"Terminé",draft:"Brouillon",approved:"Validé",rejected:"Refusé",review:"À examiner",archived:"Archivé",blocked:"Bloqué",paid:"Payé",sent:"Envoyé"})[String(value).toLowerCase()] || String(value || "Non défini").replaceAll("_", " ");
+export const statusLabel = value => ({pending:"À faire",active:"Actif",production:"En production",validation:"En validation",planned:"Planifié",tentative:"Provisoire",postponed:"Reporté",cancelled:"Annulé",delivered:"Livré",signature:"À signer",in_progress:"En cours",completed:"Terminé",done:"Terminé",draft:"Brouillon",approved:"Approuvé",rejected:"Refusé",review:"En révision",archived:"Archivé",blocked:"Bloqué",paid:"Payé",sent:"Envoyé"})[String(value).toLowerCase()] || String(value || "Non défini").replaceAll("_", " ");
 export const domainLabels = {projects:"Projets",tasks:"Tâches",missions:"Missions",events:"Agenda",validations:"Validations",deliverables:"Livrables",documents:"Documents",resources:"Ressources",contracts:"Contrats",clients:"Clients",activities:"Activité"};
 export const sectionForDomain = domain => ({events:"planning",activities:"activity",conversations:"messages"})[domain] || domain;
 export function strictObject(raw) {
