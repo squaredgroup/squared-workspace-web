@@ -147,3 +147,6 @@ export function canAccessSection(sectionKey,user){
   return true;
 }
 export function canAccessSubpage(page,user){ return (!page?.requiresAdministrator||["OWNER","ADMIN"].includes(user?.role))&&(!page?.permissions?.length || page.permissions.some(p=>user?.permissions?.includes(p))); }
+
+// Wix operations share the server records used by the native app.
+for(const [section,id,title,permissions] of [['webContent','requests','Demandes Wix',['manageCMS','manageSales','manageSupport','manageOrganization']],['webContent','forms','Formulaires Wix',['manageCMS']],['commercial','requests','Demandes du site',['manageSales']],['planning','bookings','Réservations du site',['manageOrganization']],['automations','automations','E-mails et rappels Wix',['manageAutomations']],['settings','settings','Connexion Wix',['manageOrganization']]])if(!SECTIONS[section].subpages?.some(p=>p.id==='site-wix-'+id))SECTIONS[section].subpages=[...(SECTIONS[section].subpages||[]),{id:'site-wix-'+id,title,permissions,icon:'globe'}];
