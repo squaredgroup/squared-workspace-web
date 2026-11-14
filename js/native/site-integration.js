@@ -37,7 +37,7 @@ export async function renderSiteIntegration(initial='requests'){
  const permissions=()=>meta.permissions||{},connection=()=>meta.connections?.[0],members=()=>choices(meta.members||[],'Non affecté');
  const command=async(path,body={},method='POST')=>call(base+path,{method,body});
  const refresh=async(append=false)=>{try{meta=await call(base);await draw(append);}catch(e){feedback.replaceChildren(notice(e.message,'error'));}};
- const act=(label,fn)=>button(label,{onClick:async()=>{try{await fn();await refresh();}catch(e){feedback.replaceChildren(notice(e.message,'error'));}}});
+ const act=(label,fn)=>button(label,{onClick:async()=>{try{const result=await fn();if(result?.message)feedback.replaceChildren(notice(result.message));await refresh();}catch(e){feedback.replaceChildren(notice(e.message,'error'));}}});
  root.append(h('h1',{text:'Squared Group · Wix'}),field('Espace',navigation),header,feedback,content);
  navigation.addEventListener('change',()=>{section=navigation.value;offset=0;records=[];void refresh();});
  function contactEditor(id,connectionID){
@@ -124,7 +124,11 @@ export async function renderSiteIntegration(initial='requests'){
    const d=await call(base+'/automations?offset='+offset);records=append?[...records,...d.jobs]:d.jobs;next=d.nextOffset;if(permissions().manageRules)header.append(button('Nouvelle règle',{onClick:()=>ruleEditor()}));
    for(const rule of d.rules)content.append(card(rule.name,rule.trigger+' · '+rule.sender_owner+' · '+(rule.enabled?'active':'inactive'),button('Configurer et prévisualiser',{onClick:()=>ruleEditor(rule)})));
    for(const job of records)content.append(card(job.recipient,job.due_at+' · '+job.state,stack(job.error?notice(job.error,'warning'):null,['failed','uncertain'].includes(job.state)?act('Relancer après vérification',async()=>{if(await confirmDialog({title:'Relancer cet e-mail ?',message:'Confirmez que vous avez vérifié sa non-livraison chez le prestataire. Une relance d’un envoi incertain peut produire un doublon.',danger:true}))await command('/mail-jobs/'+job.id+'/retry',{confirmed:true,deliveryChecked:true});}):null)));
-   content.append(h('h2',{text:'Inventaire Wix'}));for(const c of d.inventory)for(const a of c.automation_inventory||[])content.append(h('p',{text:a.name+' · '+a.status+' · '+(a.trigger?.triggerKey||'')}));
+   const inventoryPane=h('details',{},h('summary',{text:'Inventaire des automatisations Wix'}));content.append(inventoryPane);if(permissions().manageConnection)inventoryPane.append(act('Actualiser l’inventaire Wix',()=>command('/connections/'+connection().id+'/inventory')));
+   for(const c of d.inventory)for(const a of c.automation_inventory||[]){const controls=[];
+    if(permissions().manageWixAutomations){controls.push(act('Lire l’état actuel',()=>command('/wix-automations/command',{operationID:uid(),connectionID:c.id,id:a.id,action:'readAutomation'})));
+     if(a.trigger?.triggerKey==='wix_form_app-form_submitted'&&a.actions.some(v=>v.key==='triggered-emails'))controls.push(act('Désactiver cet envoi Wix',async()=>{if(!await confirmDialog({title:'Désactiver cet e-mail dans Wix ?',message:'Les nouveaux déclenchements seront empêchés. Les exécutions déjà en cours doivent être vérifiées avant de reprendre l’envoi dans Workspace. Les autres automatisations sont conservées.',danger:true}))return;return command('/wix-automations/command',{operationID:uid(),connectionID:c.id,id:a.id,action:'deactivate',confirmed:true});}));
+    }inventoryPane.append(card(a.name,'État du catalogue : '+a.status+' · '+(a.trigger?.triggerKey||''),actions(...controls)));}
   }else{
    const c=connection();if(!c){header.append(act('Connecter Squared Group',()=>command('/connections',{siteID:'e257f003-4142-42fc-8146-cd6ed2c193dd'})));return;}
    header.append(notice('Dernière réussite complète : '+(c.last_success_at||'aucune')),notice(meta.webhook.message),notice(c.delivery_enabled?'Envois Workspace autorisés selon les règles activées.':'Envois Workspace désactivés.'));if(c.last_error)header.append(notice(c.last_error,'error'));
