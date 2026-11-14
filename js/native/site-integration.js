@@ -63,7 +63,7 @@ export async function renderSiteIntegration(initial='requests'){
  }
  function submissionEditor(f,r){
   if(!f)return;const body={operationID:uid(),connectionID:f.connection_id,action:r?'update':'create',formID:f.wix_id,...(r?{id:r.source_id,revision:r.source_revision}:{}),values:clone(r?.source_snapshot?.submissions||{}),confirmed:true};
-  editable('Soumission Wix',body,(root,d)=>{root.append(notice('Une création peut déclencher les envois Wix existants. La suppression retire définitivement la soumission de Wix.'));if(r)controls(root,d,[['Action','action','select',opts([['update','Enregistrer dans Wix'],['delete','Supprimer de Wix']])]]);answerControls(root,f.fields,d.values);},async d=>{await command('/submissions/command',d);await refresh();},{danger:true});
+  editable('Soumission Wix',body,(root,d)=>{root.append(notice('Une création peut déclencher les envois Wix existants. La suppression retire définitivement la soumission de Wix.'));if(r)controls(root,d,[['Action','action','select',opts([['update','Enregistrer dans Wix'],['delete','Supprimer de Wix']])]]);answerControls(root,f.fields,d.values);},async d=>{const values=Object.fromEntries(Object.entries(d.values).filter(([key])=>f.fields.some(field=>field.key===key)));await command('/submissions/command',{...d,values});await refresh();},{danger:true});
  }
  function formEditor(f){
   const body={operationID:uid(),connectionID:f?.connection_id||connection()?.id,action:f?'update':'create',...(f?{id:f.wix_id,revision:f.revision,enabled:f.enabled??true}:{}),name:f?.name||'',confirmed:true};
