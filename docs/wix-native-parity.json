@@ -3,11 +3,11 @@
   "scope": "Wix requests, forms, contacts, Workspace bookings and transactional email administration",
   "backendMigration": "145_wix_workspace.sql",
   "nativeSources": {
-    "SquaredWorkspace/Features/SiteCMS/WorkspaceSiteIntegrationPanel.swift": "a5036b028438a803a281765b868e3409a7cd80de5c7a180ac98e1dda9d2a4bdd",
-    "Backend/src/server-site-integration-routes.ts": "0367ca93087883b46baa691d469d305dbe29b3f5118b4edef63b621642f5c574",
+    "SquaredWorkspace/Features/SiteCMS/WorkspaceSiteIntegrationPanel.swift": "82c2587b2922cba6dc1ce95f96a51e144ea6b9aa745cf5f41712617b5f34b719",
+    "Backend/src/server-site-integration-routes.ts": "7ae553ac62e0e23411eb53c5e704848b0f8bec81ae4fb4a11e25888b3f197425",
     "Backend/src/site-booking.ts": "202fae8b08b3ae1f24c615caa88ed738e1f501b52a585a7e19ba7d92dcfb4c55",
     "Backend/src/site-integration.ts": "220b8b5c36b1a61009fda736b55e63b3f757719d6ce078fb7dd2517a247b0cb9",
-    "Backend/src/wix-workspace-client.ts": "f6e6a3edf29697d49d63c4dc1fe89fba37bf03689d5e20b7e1b50d4f170c3d7e"
+    "Backend/src/wix-workspace-client.ts": "5232909cd5f4e5dd0614971fa0dbba9ecb2ef513e3dd4fcd542afb1c6f316735"
   },
   "validation": "Static source checks only; no tests, browser journeys or native build/launch/install.",
   "remaining": [
