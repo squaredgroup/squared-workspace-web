@@ -3,7 +3,7 @@
   "scope": "Wix requests, forms, contacts, Workspace bookings and transactional email administration",
   "backendMigration": "145_wix_workspace.sql",
   "nativeSources": {
-    "SquaredWorkspace/Features/SiteCMS/WorkspaceSiteIntegrationPanel.swift": "bbed74e19c45ad8db023bdc60774075500e435ba14d8eec3a7d9d42aa987e5a3",
+    "SquaredWorkspace/Features/SiteCMS/WorkspaceSiteIntegrationPanel.swift": "cd591ef7c46fc1d7b03c57025b83f37de7482b5b03abb5cdacef7b6ec4a3655e",
     "Backend/src/server-site-integration-routes.ts": "f4e1db95b4c41570d0cba085698dadfa24718fd34fd3de21dcf6e74fee2c366d",
     "Backend/src/site-booking.ts": "053a9e07cc958f10e29c74bce92300efb374811c849174dbc52ee9406673d8d7",
     "Backend/src/site-integration.ts": "cc606dd0ddd938d14609b2995d1c0cc68fd82c882a36f640af318123387e6bdc",
